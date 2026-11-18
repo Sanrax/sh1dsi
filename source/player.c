@@ -4,6 +4,7 @@
 #include <nds.h>
 #include "player.h"
 #include "collision.h"
+#include "room.h"
 
 typedef struct {
     int8_t parent, rotation, translation, offset[3];
@@ -167,14 +168,40 @@ bool playerTick(int turn, int walk, PlayerAction action)
     return true;
 }
 
-void playerWarpForMedal(void)
+static void warp(int worldX, int worldZ, int heading)
 {
-    x = -100 * 4096;
-    z = 82329;
-    yaw = 3840;
+    x = worldX;
+    z = worldZ;
+    yaw = heading;
     speed = 0;
     clip = Idle;
     frameQ12 = blendQ12 = 0;
+}
+
+void playerWarpForMedal(void)
+{
+    warp(-100*4096, 82329, 3840);
+}
+
+void playerEnterRoom(void)
+{
+    // AreaLoad_UpdatePlayerPosition places Harry 0.4 m inside the door.
+    if (roomCurrent() == SchoolCorridor)
+        warp(-116326, 77004, 0);
+    else
+        warp(-417792, 95437, 2048);
+}
+
+bool playerFacingDoor(void)
+{
+    if (roomVersion < 5) return false;
+    bool corridor = roomCurrent() == SchoolCorridor;
+    int dx = (corridor ? -116326 : -417792)-x;
+    int dz = (corridor ? 75366 : 97075)-z;
+    int rayX = sinLerp(yaw*8)/2, rayZ = cosLerp(yaw*8)/2;
+    if (corridor) { dz = -dz; rayZ = -rayZ; }
+    if (rayZ <= 0 || dz < 0 || dz > rayZ) return false;
+    return abs(rayX*dz - dx*rayZ) <= 2304*rayZ;
 }
 
 bool playerFacingPiano(void)
@@ -204,12 +231,30 @@ bool playerFacingMedallion(void)
     return along > 0 && abs(dx*sz-dz*sx) <= (int)(((int64_t)along*2365) >> 12);
 }
 
-void playerSetCamera(void)
+int playerSetCamera(void)
 {
     // vcMakeNormalWatchTgtPos / vcSetWatchTgtXzPos, small chase road.
     // Its one-metre watch circle extends away from the room camera whenever
     // the distance to Harry is below four metres.
-    int dx = x + 417792, dz = z - 74752;
+    bool corridor = roomCurrent() == SchoolCorridor;
+    int origin = roomOriginX();
+    if (!corridor && x >= -419840 && x <= -416768 && z >= 94976 && z <= 98304) {
+        // Fixed-angle road looking back through the music-room doorway.
+        gluLookAtf32((-420864-origin)/2, 768, (81920-82688)/2,
+                     (-414400-origin)/2, 3904, (81920-96368)/2, 0,4096,0);
+        return 768;
+    }
+    int eyeX = -417792, eyeZ = 74752, eyeHeight = 6144, targetHeight = -1024;
+    if (corridor) {
+        // Keep the chase camera on the room 32 road within its XZ limits.
+        eyeX = x-666;
+        eyeZ = 83807;
+        if (eyeX < -121088) eyeX = -121088;
+        if (eyeX > -42496) eyeX = -42496;
+        eyeHeight = 4276;
+        targetHeight = 1384;
+    }
+    int dx = x-eyeX, dz = z-eyeZ;
     int length = sqrt32(dx*dx + dz*dz);
     int extra = length < 4*4096 ? 4*4096-length : 0;
     int targetX = x + sinLerp(yaw*8), targetZ = z + cosLerp(yaw*8);
@@ -217,8 +262,21 @@ void playerSetCamera(void)
         targetX += dx * extra / length;
         targetZ += dz * extra / length;
     }
-    gluLookAtf32(-4096, 6144, 3584, (targetX+409600)/2, -1024,
-                 (81920-targetZ)/2, 0, 4096, 0);
+    if (corridor && length) {
+        // vcAdjCamOfsAngByCharaInScreen keeps Harry's feet inside the
+        // vertical half-angle atan(224/224)/2. Work in slopes to avoid
+        // converting the ray to Euler angles and back.
+        int height = eyeHeight*2+48;
+        int watchX = targetX-eyeX, watchZ = targetZ-eyeZ;
+        int watchDistance = sqrt32(watchX*watchX + watchZ*watchZ);
+        int drop = (int)((int64_t)watchDistance*(height-(length*1697 >> 12)) /
+                         (length+(height*1697 >> 12)));
+        int limit = eyeHeight-drop/2;
+        if (targetHeight > limit) targetHeight = limit;
+    }
+    gluLookAtf32((eyeX-origin)/2, eyeHeight, (81920-eyeZ)/2,
+                 (targetX-origin)/2, targetHeight, (81920-targetZ)/2, 0, 4096, 0);
+    return eyeHeight;
 }
 
 static int dot(const int16_t a[3], const int16_t b[3])
@@ -273,7 +331,7 @@ void playerDraw(unsigned firstPalette)
 
     glPushMatrix();
     // PS1 bone coordinates are in Q8. Convert root pose to room-local DS units.
-    glTranslatef32(((x >> 4)+25600)*8, 0, (5120-(z >> 4))*8);
+    glTranslatef32(((x-roomOriginX()) >> 4)*8, roomCurrent() == SchoolCorridor ? -24 : 0, (5120-(z >> 4))*8);
     glRotateYi(-yaw*8);
     glPolyFmt(POLY_ALPHA(31) | POLY_CULL_FRONT);
     const Corner *c = corners;

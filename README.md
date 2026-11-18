@@ -20,7 +20,7 @@ python3 tools/prepare_assets.py "/path/to/Silent Hill (USA).cue"
 ```
 
 Run `make sdcard` after conversion. Copy the contents of `dist/` to the
-card root. The directory includes the ROM and the two local data files. Keep
+card root. The directory includes the ROM and the three local data files. Keep
 the generated game data on your own devices.
 
 The build starts with Harry standing at Midwich's piano. Up and Down walk forward and backward.
@@ -30,4 +30,6 @@ press A to strike a key. B backs out one view at a time. Solving the puzzle
 starts the silver medallion cutscene. Start skips back to the room camera.
 Walk up to the fallen medallion, face it and press A. Up and Down select a
 reply. A confirms it and B declines. Accepting keeps the medallion in
-inventory for the session. Leaving the room and saving are pending.
+inventory for the session. Face the music-room door and press A to enter the
+corridor. Turn back toward the same door and press A to return. The piano
+and pickup states survive the trip. Other exits and saving are pending.

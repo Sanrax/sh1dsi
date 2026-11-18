@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-bool collisionLoad(FILE *file);
+bool collisionLoad(FILE *file, bool corridor);
 void collisionMove(int *worldX, int *worldZ, int dx, int dz);
 
 #endif

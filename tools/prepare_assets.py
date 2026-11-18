@@ -7,7 +7,7 @@ from pathlib import Path
 
 from disc import open_disc
 from vab import piano_bank
-from room import music_room
+from room import school_room
 
 OUTPUT = Path(__file__).resolve().parents[1] / "dist/sh1dsi/piano.dat"
 
@@ -62,9 +62,11 @@ def prepare(cue):
                 + background(disc.read("TIM/PIANO1.TIM"))
                 + background(disc.read("TIM/PIANO2.TIM"))
                 + piano_bank(disc.read("SND/MEP101.VAB")))
-        room = music_room(disc)
+        room = school_room(disc)
+        corridor = school_room(disc, corridor=True)
     write_asset(OUTPUT, data)
     write_asset(OUTPUT.with_name("room.dat"), room)
+    write_asset(OUTPUT.with_name("corridor.dat"), corridor)
 
 
 def write_asset(output, data):

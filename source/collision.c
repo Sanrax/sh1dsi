@@ -1,21 +1,28 @@
-// Local XZ collision for the flat SCFD00 floor. Edges and tangent vectors
+// Local XZ collision on the school floors. Edges and tangent vectors
 // come from the IPD splits used by the original character query.
 #include <nds.h>
 #include "collision.h"
+#include "room.h"
 
 typedef struct {
-    int16_t ax, az, bx, bz, tx, tz;
+    int ax, az, bx, bz;
+    int16_t tx, tz;
 } Edge;
 static Edge edges[51];
+static unsigned edgeCount;
 enum { Radius = 1228 }; // Harry's 0.3-metre outer cylinder, Q12.
 
-bool collisionLoad(FILE *file)
+bool collisionLoad(FILE *file, bool corridor)
 {
-    if (fread(edges, sizeof edges, 1, file) != 1) return false;
-    for (unsigned i = 0; i < 51; i++) {
-        const Edge *e = &edges[i];
-        if (abs(e->ax) > 20000 || abs(e->az) > 20000 ||
-            abs(e->bx) > 20000 || abs(e->bz) > 20000 ||
+    edgeCount = corridor ? 20 : 51;
+    int scale = corridor ? 16 : 1;
+    for (unsigned i = 0; i < edgeCount; i++) {
+        int16_t in[6];
+        if (fread(in, sizeof in, 1, file) != 1) return false;
+        Edge *e = &edges[i];
+        *e = (Edge){in[0]*scale, in[1]*scale, in[2]*scale, in[3]*scale, in[4], in[5]};
+        if (abs(e->ax) > 65536 || abs(e->az) > 65536 ||
+            abs(e->bx) > 65536 || abs(e->bz) > 65536 ||
             abs(e->tx) > 4096 || abs(e->tz) > 4096 ||
             (e->ax == e->bx && e->az == e->bz))
             return false;
@@ -59,15 +66,15 @@ static bool pushFromEdge(const Edge *e, int *x, int *z)
 
 void collisionMove(int *worldX, int *worldZ, int dx, int dz)
 {
-    int x = *worldX + 409600 + dx, z = *worldZ - 81920 + dz;
+    int x = *worldX - roomOriginX() + dx, z = *worldZ - 81920 + dz;
     // The largest walking step is under five centimetres. A second pass
     // resolves adjacent segments when sliding into a corner.
     for (unsigned pass = 0; pass < 2; pass++) {
         bool contact = false;
-        for (unsigned i = 0; i < 51; i++)
+        for (unsigned i = 0; i < edgeCount; i++)
             contact |= pushFromEdge(&edges[i], &x, &z);
         if (!contact) break;
     }
-    *worldX = x - 409600;
+    *worldX = x + roomOriginX();
     *worldZ = z + 81920;
 }

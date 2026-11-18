@@ -26,7 +26,12 @@ static struct {
     uint16_t pages, batches;
     uint32_t textureBytes, paletteBytes;
 } header;
-static Page pages[4];
+static Page pages[4], skin;
+static SchoolRoom current = MusicRoom;
+
+SchoolRoom roomCurrent(void) { return current; }
+int roomOriginX(void) { return (current == SchoolCorridor ? -20 : -100)*4096; }
+
 static Batch batches[128];
 static Vertex *vertices;
 
@@ -44,11 +49,14 @@ static bool upload(FILE *file, void *vram, unsigned size)
     return true;
 }
 
-bool roomLoad(FILE *file)
+bool roomLoad(FILE *file, SchoolRoom room)
 {
+    bool corridor = room == SchoolCorridor;
     if (fread(&header, sizeof header, 1, file) != 1 ||
-        !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
-          ((!memcmp(header.magic, "SHR", 3) && header.magic[3] >= '2' && header.magic[3] <= '5') && header.pages == 4)) ||
+        (corridor ? (memcmp(header.magic, "SHC1", 4) || header.pages != 2 || !playerReady() ||
+                     header.textureBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
+         !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
+           (!memcmp(header.magic, "SHR", 3) && header.magic[3] >= '2' && header.magic[3] <= '5' && header.pages == 4))) ||
         header.batches > 128 || !header.batches ||
         header.textureBytes > 128*1024 || (header.textureBytes & 7) ||
         header.paletteBytes > 64*1024 || (header.paletteBytes & 31) ||
@@ -68,7 +76,7 @@ bool roomLoad(FILE *file)
         return false;
     vramSetBankC(VRAM_C_TEXTURE_SLOT0);
     vramSetBankE(VRAM_E_TEX_PALETTE);
-    if (header.magic[3] >= '4' && !collisionLoad(file)) return false;
+    if ((corridor || header.magic[3] >= '4') && !collisionLoad(file, corridor)) return false;
     if (header.pages == 4 &&
         (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))
         return false;
@@ -78,6 +86,8 @@ bool roomLoad(FILE *file)
          !pickupLoad(file, header.textureBytes-2048, header.paletteBytes/32-1)))
         return false;
 
+    if (header.pages == 4) skin = pages[3];
+
     // One tightly packed stream in RAM. The file length bounds every batch read.
     long start = ftell(file);
     if (start < 0 || fseek(file, 0, SEEK_END)) return false;
@@ -85,6 +95,7 @@ bool roomLoad(FILE *file)
     if (bytes <= 0 || bytes > 6144*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)) ||
         fseek(file, start, SEEK_SET))
         return false;
+    free(vertices);
     vertices = malloc(bytes);
     if (!vertices) return false;
     unsigned pos = 0, total = bytes / sizeof(Vertex);
@@ -97,6 +108,7 @@ bool roomLoad(FILE *file)
             return false;
         pos += 4*b->quads;
     }
+    current = room;
     return pos == total;
 }
 
@@ -118,8 +130,9 @@ void roomDraw(const Medallion *medal)
     glFrustumf32(-horizontal, horizontal, -vertical, vertical, near, inttof32(16));
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
+    int eyeY = solved ? floattof32(1.30495) : floattof32(1.18495);
     if (gameplay) {
-        playerSetCamera();
+        eyeY = playerSetCamera();
     } else if (solved)
         gluLookAt(-0.695, 1.30495, -1.065, 0.8, 0.07, -1.55, 0, 1, 0);
     else
@@ -127,7 +140,6 @@ void roomDraw(const Medallion *medal)
 
     // vbSetWorldScreenMatrix applies the PS1 224/240 vertical correction
     // to camera-relative world coordinates before rotating them.
-    int eyeY = gameplay ? floattof32(1.5) : solved ? floattof32(1.30495) : floattof32(1.18495);
     glTranslatef32(0, eyeY, 0);
     glScalef32(inttof32(1), 4096*224/240, inttof32(1));
     glTranslatef32(0, -eyeY, 0);
@@ -139,10 +151,9 @@ void roomDraw(const Medallion *medal)
     glColor(RGB15(31,31,31));
     const Vertex *v = vertices;
     if (playerReady()) {
-        const Page *skin = &pages[3];
-        GFX_TEX_FORMAT = (skin->offset >> 3) | (TEXTURE_SIZE_256 << 20)
+        GFX_TEX_FORMAT = (skin.offset >> 3) | (TEXTURE_SIZE_256 << 20)
                          | (TEXTURE_SIZE_256 << 23) | (GL_RGB16 << 26);
-        playerDraw(skin->firstPalette);
+        playerDraw(skin.firstPalette);
     }
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];

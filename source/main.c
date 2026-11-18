@@ -30,7 +30,7 @@ typedef struct {
 static Tone tones[10];
 static uint8_t samples[72 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
-static const char *roomPath;
+static const char *roomPath, *corridorPath;
 
 static bool loadTones(FILE *file, unsigned count)
 {
@@ -59,6 +59,7 @@ static bool loadPiano(void)
         cart = !cart;
         file = fopen(cart ? fat : sd, "rb");
     }
+    corridorPath = cart ? "fat:/sh1dsi/corridor.dat" : "sd:/sh1dsi/corridor.dat";
     roomPath = cart ? "fat:/sh1dsi/room.dat" : "sd:/sh1dsi/room.dat";
     if (!file)
         return false;
@@ -85,6 +86,29 @@ static void stop(const char *message)
     for (;;) swiWaitForVBlank();
 }
 
+static void crossDoor(void)
+{
+    SchoolRoom next = roomCurrent() == MusicRoom ? SchoolCorridor : MusicRoom;
+    FILE *file = fopen(next == MusicRoom ? roomPath : corridorPath, "rb");
+    if (!file) stop("Missing room data.\nRun the asset converter.");
+    uint32_t start = systemCounterGetTicks();
+    // Let the last geometry submission retire before remapping texture VRAM.
+    setBrightness(1, -16);
+    bgHide(0);
+    swiWaitForVBlank();
+    bool ok = roomLoad(file, next);
+    fclose(file);
+    if (!ok) {
+        setBrightness(1, 0);
+        stop("Invalid school room data.");
+    }
+    playerEnterRoom();
+    // GameBoot_InGameStartup step 11 keeps the load screen for at least
+    // one second, including time already spent on disc or card reads.
+    while ((uint32_t)(systemCounterGetTicks()-start) < systemCounterUsecsToTicks(1000000))
+        swiWaitForVBlank();
+}
+
 int main(void)
 {
     lcdMainOnTop();
@@ -100,7 +124,7 @@ int main(void)
     FILE *roomFile = fopen(roomPath, "rb");
     bool hasRoom = roomFile != NULL;
     if (roomFile) {
-        bool ok = roomLoad(roomFile);
+        bool ok = roomLoad(roomFile, MusicRoom);
         fclose(roomFile);
         if (!ok) stop("Invalid music room data");
     }
@@ -123,6 +147,7 @@ int main(void)
     Medallion medal = {0};
     bool inRoom = hasRoom;
     int previousImage = -1;
+    bool enteringRoom = false;
     systemCounterSetup();
     uint32_t previousTime = systemCounterGetTicks(), debt = 0, pressed = 0;
     // MAP1_S01 keyboard updates once per NTSC-U VBlank in the PS1 reference.
@@ -130,6 +155,10 @@ int main(void)
     const uint32_t step = systemCounterUsecsToTicks(stepUs);
     for (;;) {
         swiWaitForVBlank();
+        if (enteringRoom) {
+            setBrightness(1, 0);
+            enteringRoom = false;
+        }
         scanKeys();
         pressed |= keysDown();
         unsigned held = keysHeld();
@@ -154,9 +183,15 @@ int main(void)
                 if (phase == MedalDrop && medal.phase == MedalImpact)
                     sound = 9;
                 if ((pressed & KEY_A) && !wasActive) {
-                    if (!piano.solved && playerFacingPiano())
+                    if (phase == medal.phase && (phase == MedalHanging || phase == MedalFinished) &&
+                        playerFacingDoor()) {
+                        crossDoor();
+                        enteringRoom = roomChanged = true;
+                        previousTime = systemCounterGetTicks();
+                        debt = step;
+                    } else if (roomCurrent() == MusicRoom && !piano.solved && playerFacingPiano())
                         inRoom = false;
-                    else if (medal.phase == MedalFinished && phase == MedalFinished)
+                    else if (roomCurrent() == MusicRoom && medal.phase == MedalFinished && phase == MedalFinished)
                         pickupStart();
                 }
             } else if (!piano.checking && (pressed & KEY_B) && hasRoom) {

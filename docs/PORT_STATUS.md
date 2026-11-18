@@ -3,8 +3,8 @@
 The native build starts in Midwich's music room with Harry at the piano.
 He can walk, turn, approach and solve the keyboard puzzle, watch or skip the
 medallion fall, and collect the silver medallion. Declining leaves it on the
-floor. Accepting keeps one for the session. The door, saving and progression
-beyond the room are pending. The full game is unplayable.
+floor. Accepting keeps one for the session. Harry can use the door to enter
+room 32 and return to the music room. Other exits and saving are pending. The full game is unplayable.
 
 ## Verified build and inputs
 
@@ -79,14 +79,21 @@ The native simulation advances in 16.683 ms steps. Real DSi timing is pending.
   corridor room 32 via point 39. Input-to-gameplay intervals were 83 VBlanks
   outbound and 63 returning in this replay. Corridor spawn X/Z was
   (-116326, 77004) in Q12, yaw 0. Returning placed Harry at (-417792, 95437),
-  yaw 2048. The diagnostic runner captures both cameras.
+  yaw 2048. A melonDS diagnostic recorded both native spawns and headings
+  exactly. The console SD production replay solved the puzzle, collected the
+  medallion and crossed both doors. DLDI also completed an unsolved round trip.
+- SCFF00 loads 1,263 corridor quads, two 4-bit textures (64 KiB) and 20
+  level-path collision edges. Harry's texture stays in VRAM during the
+  crossing. The load screen includes the original one-second minimum.
+  Whole-frame mean absolute RGB errors were 19.3/255 at corridor entry and
+  27.6/255 at reentry. The corridor chase camera, lighting and door audio
+  still differ from the original.
 
 ## Next
 
-1. Load the SCFF00 corridor geometry and collision, match the room 32 camera
-   and implement the round trip from the existing music room.
-2. Carry inventory and event flags across room changes and through an original save point.
-3. Match camera damping, footsteps and pickup sounds to PS1 recordings.
+1. Match the original door sounds and measure room 32 frame timing.
+2. Trace the corridor's next exit and carry inventory and event flags toward an original save point.
+3. Match the corridor chase camera, lighting and footsteps against PS1 traversal.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
 shdecompilations. [Pinned upstream source](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce)

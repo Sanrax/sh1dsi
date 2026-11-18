@@ -4,7 +4,10 @@
 #include <stdio.h>
 #include "medallion.h"
 
-bool roomLoad(FILE *file);
+typedef enum { MusicRoom = 39, SchoolCorridor = 32 } SchoolRoom;
+SchoolRoom roomCurrent(void);
+int roomOriginX(void);
+bool roomLoad(FILE *file, SchoolRoom room);
 void roomDraw(const Medallion *medal);
 
 #endif
