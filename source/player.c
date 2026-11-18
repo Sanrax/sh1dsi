@@ -29,12 +29,12 @@ _Static_assert(sizeof(Bone) == 6 && sizeof(Vertex) == 8 &&
                sizeof(Corner) == 4 && sizeof(Batch) == 4, "player file layout");
 
 static Bone bones[18];
-enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward };
-static const unsigned firstFrame[] = {0, 40, 53, 66, 89};
-static const unsigned frameCount[] = {40, 13, 13, 23, 24};
-static const unsigned frameRate[] = {10, 15, 15, 22, 23};
-static const unsigned blendRate[] = {5, 50, 50, 50, 20};
-static int8_t frames[113][156];
+enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward, Kneel, Rise };
+static const unsigned firstFrame[] = {0, 40, 53, 66, 89, 113, 128};
+static const unsigned frameCount[] = {40, 13, 13, 23, 24, 15, 12};
+static const unsigned frameRate[] = {10, 15, 15, 22, 23, 15, 15};
+static const unsigned blendRate[] = {5, 50, 50, 50, 20, 10, 10};
+static int8_t frames[140][156];
 static Vertex vertices[384];
 static Corner corners[1500];
 static Batch batches[30];
@@ -58,7 +58,7 @@ bool playerLoad(FILE *file, unsigned version)
         fread(bones, sizeof bones, 1, file) != 1)
         return false;
     uint16_t clips = 1;
-    if (version >= 3 && (fread(&clips, 2, 1, file) != 1 || clips != (version == 4 ? 5 : 3)))
+    if (version >= 3 && (fread(&clips, 2, 1, file) != 1 || clips != (version == 5 ? 7 : version == 4 ? 5 : 3)))
         return false;
     unsigned count = firstFrame[clips-1] + frameCount[clips-1];
     if (fread(frames, sizeof frames[0], count, file) != count ||
@@ -126,7 +126,18 @@ static unsigned locomotion(int turn, int walk, int dt)
     return turn < 0 ? TurnLeft : turn > 0 ? TurnRight : Idle;
 }
 
-bool playerTick(int turn, int walk)
+bool playerStopped(void)
+{
+    return speed == 0;
+}
+
+bool playerActionDone(PlayerAction action)
+{
+    return clip == (action == PlayerKneel ? Kneel : Rise) &&
+           frameQ12 == (frameCount[clip]-1)*4096;
+}
+
+bool playerTick(int turn, int walk, PlayerAction action)
 {
     if (!ready) return false;
     halfFrame = !halfFrame;
@@ -134,7 +145,9 @@ bool playerTick(int turn, int walk)
     tickFraction += 33366 * 4096;
     int dt = tickFraction / 1000000;
     tickFraction %= 1000000;
-    unsigned next = locomotion(roomVersion >= 3 ? turn : 0, roomVersion >= 4 ? walk : 0, dt);
+    unsigned next = action == PlayerMove ?
+        locomotion(roomVersion >= 3 ? turn : 0, roomVersion >= 4 ? walk : 0, dt) :
+        action == PlayerKneel ? Kneel : Rise;
     if (next != clip) {
         blendFrom = firstFrame[clip] + (frameQ12 >> 12);
         clip = next;
@@ -145,7 +158,11 @@ bool playerTick(int turn, int walk)
         unsigned advance = dt * blendRate[clip];
         blendQ12 = advance < blendQ12 ? blendQ12-advance : 0;
     } else {
-        frameQ12 = (frameQ12 + dt * frameRate[clip]) % (frameCount[clip]*4096);
+        frameQ12 += dt * frameRate[clip];
+        if (clip < Kneel)
+            frameQ12 %= frameCount[clip]*4096;
+        else if (frameQ12 >= (frameCount[clip]-1)*4096)
+            frameQ12 = (frameCount[clip]-1)*4096;
     }
     return true;
 }
@@ -171,6 +188,20 @@ bool playerFacingPiano(void)
         return false;
     int along = rayZ*dx - dz*rayX;
     return abs(along) <= 3072 * rayX;
+}
+
+bool playerFacingMedallion(void)
+{
+    // MAP_POINTS[17] and Event_CollideFacingCheck. The origin of the
+    // 0.8-metre sector is one eighth of a metre behind Harry.
+    if (roomVersion < 5) return false;
+    int sx = sinLerp(yaw*8), sz = cosLerp(yaw*8);
+    int dx = -404684 - x + sx/8, dz = 93388 - z + sz/8;
+    if (abs(dx) > 3276 || abs(dz) > 3276 || dx*dx+dz*dz > 3276*3276)
+        return false;
+    int along = dx*sx + dz*sz;
+    // tan(30 degrees) in Q12. The cross product is the lateral component.
+    return along > 0 && abs(dx*sz-dz*sx) <= (int)(((int64_t)along*2365) >> 12);
 }
 
 void playerSetCamera(void)

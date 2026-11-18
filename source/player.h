@@ -5,7 +5,11 @@
 
 bool playerLoad(FILE *file, unsigned version);
 bool playerReady(void);
-bool playerTick(int turn, int walk);
+typedef enum { PlayerMove, PlayerKneel, PlayerRise } PlayerAction;
+bool playerTick(int turn, int walk, PlayerAction action);
+bool playerStopped(void);
+bool playerActionDone(PlayerAction action);
+bool playerFacingMedallion(void);
 void playerWarpForMedal(void);
 bool playerFacingPiano(void);
 void playerSetCamera(void);

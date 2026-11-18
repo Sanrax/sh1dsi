@@ -5,6 +5,7 @@
 #include "piano.h"
 #include "room.h"
 #include "player.h"
+#include "pickup.h"
 
 typedef struct {
     uint16_t palette[256];
@@ -107,6 +108,8 @@ int main(void)
     vramSetBankA(VRAM_A_MAIN_BG);
     vramSetBankB(VRAM_B_MAIN_SPRITE);
     int bg = bgInit(3, BgType_Bmp8, BgSize_B8_256x256, 0, 0);
+    bgSetPriority(0, 1);
+    bgSetPriority(bg, 0);
     oamInit(&oamMain, SpriteMapping_Bmp_1D_128, false);
     u16 *sprite = oamAllocateGfx(&oamMain, SpriteSize_16x16, SpriteColorFormat_Bmp);
     if (!sprite)
@@ -141,15 +144,21 @@ int main(void)
                 MedalPhase phase = medal.phase;
                 roomChanged |= medallionTick(&medal, pressed & KEY_START);
                 int turn = 0, walk = 0;
-                if (medal.phase == MedalHanging || medal.phase == MedalFinished) {
+                bool wasActive = pickupActive();
+                if (!wasActive && (medal.phase == MedalHanging || medal.phase == MedalFinished)) {
                     turn = !!(held & KEY_RIGHT) - !!(held & KEY_LEFT);
                     walk = !!(held & KEY_UP) - !!(held & KEY_DOWN);
                 }
-                roomChanged |= playerTick(turn, walk);
+                roomChanged |= playerTick(turn, walk, pickupAction());
+                pickupTick(pressed);
                 if (phase == MedalDrop && medal.phase == MedalImpact)
                     sound = 9;
-                if ((pressed & KEY_A) && !piano.solved && playerFacingPiano())
-                    inRoom = false;
+                if ((pressed & KEY_A) && !wasActive) {
+                    if (!piano.solved && playerFacingPiano())
+                        inRoom = false;
+                    else if (medal.phase == MedalFinished && phase == MedalFinished)
+                        pickupStart();
+                }
             } else if (!piano.checking && (pressed & KEY_B) && hasRoom) {
                 inRoom = true;
             } else {
@@ -174,7 +183,6 @@ int main(void)
 
         int imageIndex = inRoom ? 2 : piano.checking;
         if (inRoom && (previousImage != imageIndex || roomChanged)) {
-            bgHide(bg);
             roomDraw(&medal);
             bgShow(0);
         } else if (!inRoom && previousImage != imageIndex) {
@@ -184,6 +192,7 @@ int main(void)
             memcpy(bgGetGfxPtr(bg), image->pixels, sizeof image->pixels);
             memcpy(BG_PALETTE, image->palette, sizeof image->palette);
         }
+        if (inRoom) pickupDrawPrompt(bg);
         previousImage = imageIndex;
         oamSetXY(&oamMain, 0, ((piano.x >> 12) + 160) * 4 / 5,
                               ((piano.y >> 12) + 120) * 4 / 5);

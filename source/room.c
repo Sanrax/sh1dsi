@@ -3,6 +3,7 @@
 #include "room.h"
 #include "player.h"
 #include "collision.h"
+#include "pickup.h"
 
 typedef struct {
     uint32_t offset;
@@ -47,7 +48,7 @@ bool roomLoad(FILE *file)
 {
     if (fread(&header, sizeof header, 1, file) != 1 ||
         !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
-          ((!memcmp(header.magic, "SHR", 3) && header.magic[3] >= '2' && header.magic[3] <= '4') && header.pages == 4)) ||
+          ((!memcmp(header.magic, "SHR", 3) && header.magic[3] >= '2' && header.magic[3] <= '5') && header.pages == 4)) ||
         header.batches > 128 || !header.batches ||
         header.textureBytes > 128*1024 || (header.textureBytes & 7) ||
         header.paletteBytes > 64*1024 || (header.paletteBytes & 31) ||
@@ -67,9 +68,14 @@ bool roomLoad(FILE *file)
         return false;
     vramSetBankC(VRAM_C_TEXTURE_SLOT0);
     vramSetBankE(VRAM_E_TEX_PALETTE);
-    if (header.magic[3] == '4' && !collisionLoad(file)) return false;
+    if (header.magic[3] >= '4' && !collisionLoad(file)) return false;
     if (header.pages == 4 &&
         (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))
+        return false;
+
+    if (header.magic[3] == '5' &&
+        (header.textureBytes < 2048 || header.paletteBytes < 32 ||
+         !pickupLoad(file, header.textureBytes-2048, header.paletteBytes/32-1)))
         return false;
 
     // One tightly packed stream in RAM. The file length bounds every batch read.
@@ -141,7 +147,7 @@ void roomDraw(const Medallion *medal)
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];
         unsigned count = 4*b->quads;
-        if (b->state == 0 || b->state == (solved ? 2 : 1)) {
+        if (b->state == 0 || (b->state == (solved ? 2 : 1) && !pickupFloorHidden())) {
             bool moving = b->state == 1 && medal->phase >= MedalSwing;
             if (moving) {
                 // SHR1 stores the hanging model with its Q8 pivot baked in.
@@ -167,5 +173,6 @@ void roomDraw(const Medallion *medal)
         }
         v += count;
     }
+    pickupDrawItem();
     glFlush(0);
 }

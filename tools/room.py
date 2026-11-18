@@ -4,6 +4,7 @@ import math
 import struct
 
 from harry import player_data
+from pickup import silver_pickup
 
 
 def collision_edges(ipd):
@@ -121,13 +122,17 @@ def music_room(disc):
     page_info.append((len(pages), 256, len(palettes)//32, len(cluts)//32))
     pages.extend(skin)
     palettes.extend(cluts)
-    result = bytearray(struct.pack("<4sHHII", b"SHR4", len(page_info), len(groups), len(pages), len(palettes)))
+    pickup, texture, clut = silver_pickup(disc)
+    pages.extend(texture)
+    palettes.extend(clut)
+    result = bytearray(struct.pack("<4sHHII", b"SHR5", len(page_info), len(groups), len(pages), len(palettes)))
     for page in page_info:
         result.extend(struct.pack("<IHHI", *page))
     result.extend(pages)
     result.extend(palettes)
     result.extend(collision_edges(data))
     result.extend(player)
+    result.extend(pickup)
     for key, quads in sorted(groups.items(), key=lambda g: (g[0][3] & 1, g[0])):
         result.extend(struct.pack("<4BI", *key, len(quads)//32))
         result.extend(quads)

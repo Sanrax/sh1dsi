@@ -8,8 +8,10 @@ The build enters the 3D music room directly. Up and Down walk, Left and
 Right turn Harry, and the camera follows his heading. A checks the original piano edge
 against his half-metre facing ray. Solving the piano plays the
 silver medallion fall with its impact sound and landing camera, then returns
-to Harry in the gameplay view. Messages, medallion pickup, saving and progression
-beyond this room are pending. The full game is unplayable.
+to Harry in the gameplay view. Facing the fallen medallion and pressing A
+starts its pickup. Harry kneels, the inspection model rotates, and the
+original Yes/No prompt appears. Accepting adds item 98 for the session.
+Saving and progression beyond this room are pending. The full game is unplayable.
 
 ## DSi verification
 
@@ -102,6 +104,17 @@ Declining restored control with event flag 70 clear and no item 98.
 Accepting restored control with the flag set and exactly one item 98.
 The `pickup` route on `diagnostics/dsi` reproduces both outcomes.
 
+The SHR5 converter reads those pickup clips from HB_M1S01.ANM, the 156
+textured Gouraud triangles from UNQ62.TMD, a 64×64 patch from TIM01.TIM,
+and the prompt and glyphs from MAP1_S01 and FONT16.TIM. At keyframe 887
+all 17 non-root bone transforms matched the PS1. On both emulated storage
+paths, declining restored the pickup and accepting disabled repeat pickup.
+B also declined the prompt on the DLDI route.
+In the console SD replay the rotating item changed 2,113 central pixels
+across 40 samples. The 329 bright green item-name pixels matched the
+resampled PS1 frame in both position and count. Item lighting, texture
+interpolation and selection sounds still differ.
+
 ## Source
 
 [silent-hill-decomp at ecbb0d8](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce),
@@ -111,6 +124,6 @@ Copyright (C) 2026 shdecompilations, GPL-3.0. Relevant sources include
 
 ## Next
 
-1. Match the original silver medallion pickup, including the prompt and item animation.
-2. Retain its inventory entry and puzzle flags across save and load.
-3. Match room camera damping and footsteps during traversal.
+1. Trace and implement the music-room door transition to the school corridor.
+2. Retain the inventory entry and puzzle flags across room loads, then at an original save point.
+3. Match room camera damping, footsteps and pickup audio against PS1 recordings.

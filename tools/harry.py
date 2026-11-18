@@ -43,9 +43,12 @@ def player_data(disc):
     data = bytearray(struct.pack("<HH", len(vertices), len(groups)))
     data.extend(anm[20:20+bones*6])
     clips = ((503, 542), (180, 192), (193, 205), (1, 23), (46, 69))
-    data.extend(struct.pack("<H", len(clips)))
+    data.extend(struct.pack("<H", len(clips)+2))
     for start, end in clips:
         data.extend(anm[offset+start*stride:offset+(end+1)*stride])
+    # FS_BUFFER_4 starts at keyframe 676 in Harry's shared animation buffer.
+    map_anim = disc.read("ANIM/HB_M1S01.ANM")
+    data.extend(map_anim[(873-676)*stride:(900-676)*stride])
     for v in vertices:
         data.extend(struct.pack("<3hH", *v))
     for (palette, corners), stream in sorted(groups.items()):

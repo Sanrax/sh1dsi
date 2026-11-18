@@ -28,4 +28,6 @@ Left and Right turn him. Face the keys and press A to inspect the piano, then A 
 to examine the keyboard. Move the cursor with the D-pad and
 press A to strike a key. B backs out one view at a time. Solving the puzzle
 starts the silver medallion cutscene. Start skips back to the room camera.
-Medallion pickup and leaving the room are pending.
+Walk up to the fallen medallion, face it and press A. Up and Down select a
+reply. A confirms it and B declines. Accepting keeps the medallion in
+inventory for the session. Leaving the room and saving are pending.
