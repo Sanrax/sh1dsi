@@ -1,0 +1,79 @@
+"""Prepare the local SD data used by the school piano event."""
+import argparse
+import os
+import struct
+import tempfile
+from pathlib import Path
+
+from disc import open_disc
+
+OUTPUT = Path(__file__).resolve().parents[1] / "dist/sh1dsi/piano.dat"
+
+
+def indexed_tim(data, mode):
+    magic, flags, pal_length, _, _, colors, rows = struct.unpack_from("<III4H", data)
+    if (magic, flags) != (16, 8 | mode) or colors != (16, 256)[mode]:
+        raise ValueError("unexpected indexed TIM format")
+    if pal_length != 12 + 2 * colors * rows:
+        raise ValueError("invalid TIM palette length")
+    img = 8 + pal_length
+    length, _, _, words, height = struct.unpack_from("<I4H", data, img)
+    if length != 12 + words * 2 * height or img + length > len(data):
+        raise ValueError("invalid TIM image length")
+    return data[20:20 + 2 * colors], data[img + 12:img + length], words * 2, height
+
+
+def background(data):
+    palette, pixels, stride, height = indexed_tim(data, 1)
+    if (stride, height) != (320, 240):
+        raise ValueError("expected a 320 by 240 event background")
+    # Sample the center of each native LCD pixel across the whole PS1 frame.
+    image = bytes(pixels[((2*y + 1)*5//8)*stride + (2*x + 1)*5//8]
+                  for y in range(192) for x in range(256))
+    return palette + image
+
+
+def piano_cursor(data):
+    # Gfx_CursorDraw samples a 32x32 region at UV (0,64) using CLUT row 0.
+    palette, pixels, stride, height = indexed_tim(data, 0)
+    if stride < 16 or height < 96:
+        raise ValueError("cursor atlas is too small")
+    colors = struct.unpack("<16H", palette)
+    sprite = bytearray(16 * 16 * 2)
+    for y in range(13):
+        for x in range(13):
+            u, v = (2*x + 1)*16//13, 64 + (2*y + 1)*16//13
+            index = (pixels[v*stride + u//2] >> (4*(u % 2))) & 15
+            color = colors[index]
+            if color:
+                struct.pack_into("<H", sprite, 2*(16*y + x), color | 0x8000)
+    return sprite
+
+
+def prepare(cue):
+    with open_disc(cue) as disc:
+        overlay = disc.read("VIN/MAP1_S01.BIN")
+        # USA/maps/sym.map1_s01.txt and map1_s01.yaml identify the two tables.
+        offset = 0x800DD500 - 0x800C9578
+        tables = overlay[offset:offset+11] + overlay[offset+12:offset+17]
+        data = (b"SHP1" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
+                + background(disc.read("TIM/PIANO1.TIM"))
+                + background(disc.read("TIM/PIANO2.TIM")))
+    OUTPUT.parent.mkdir(exist_ok=True, parents=True)
+    with tempfile.NamedTemporaryFile(dir=OUTPUT.parent, delete=False) as tmp:
+        try:
+            tmp.write(data)
+            tmp.close()
+            os.replace(tmp.name, OUTPUT)
+        finally:
+            Path(tmp.name).unlink(missing_ok=True)
+    print(f"Prepared {OUTPUT.name} ({len(data)} bytes) in dist/sh1dsi/")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("cue", type=Path)
+    try:
+        prepare(parser.parse_args().cue)
+    except (KeyError, OSError, ValueError, struct.error) as error:
+        parser.exit(1, f"Asset preparation failed: {error}\n")
