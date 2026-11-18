@@ -68,6 +68,13 @@ RGB channel differences against the resampled PS1 frames were 10.5/255
 PS1 frames use the 320-pixel active width starting at column 14 in the core's
 350-pixel output. The fixed views sample steps 11 and 15 of the event.
 
+The PS1 room reference now includes gameplay frames before the puzzle and
+after control returns. In both, the locally decoded HB_BASE.ANM idle pose
+matched all 17 non-root bone matrices and translations exactly. HERO.ILM
+uses 19 active meshes and 332 distinct vertices in this unarmed pose. Faces
+can reuse vertices transformed by an earlier bone in the model draw order.
+Harry's geometry and pose have only been checked on the host so far.
+
 ## Source
 
 [silent-hill-decomp at ecbb0d8](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce),
@@ -77,6 +84,6 @@ Copyright (C) 2026 shdecompilations, GPL-3.0. Relevant sources include
 
 ## Next
 
-1. Extract Harry's original model and standing pose and draw him in the music room.
+1. Render Harry from HERO.ILM and HB_BASE.ANM in the measured gameplay camera.
 2. Integrate room collision, player movement and the two interaction triggers.
 3. Complete the medallion pickup and persist its progression flags.
