@@ -4,7 +4,7 @@ The school piano interaction runs natively on ARM9. The D-pad moves the
 original cursor. The two key regions, snapping, incorrect-sequence resets,
 restart on the first key, note delays and five-key solution follow
 `PianoPuzzle_Control` in MAP1_S01. The solved flag lasts for the session.
-The build enters this event directly. Room traversal, messages,
+The build enters the 3D music room directly. Room traversal, Harry, messages,
 the medallion cutscene, saving and the full game are pending.
 
 ## Verified
@@ -25,6 +25,14 @@ the medallion cutscene, saving and the full game are pending.
   the 256 x 192 top LCD. The close-up differed at the cursor as expected.
   This comparison checks presentation of the converted TIM, not a full
   PS1 framebuffer. The bottom LCD is black.
+- The SCFD00 room uses three original 4-bit pages (80 KiB texture VRAM),
+  32 palettes (1 KiB), and 764 submitted quads per static view. Eight IPD
+  instances plus the open piano lid and medallion use original transforms.
+  Two MAP1_S01 camera poses show the hanging and fallen medallion. In
+  melonDS, room → piano → room reproduced the first frame pixel for pixel.
+  Solving switched cameras and changed 48,227 of 49,152 pixels. DS depth
+  testing, perspective texturing and whole-polygon translucency differ from
+  the PS1. Lighting and the intermediate medallion animation are pending.
 - Event simulation uses a provisional 16.667 ms step independent of display
   updates. A PS1 same-event reference and a gameplay frame-rate baseline are
   pending. The school event is the only playable interaction.
@@ -47,6 +55,6 @@ Copyright (C) 2026 shdecompilations, GPL-3.0. Relevant sources include
 
 ## Next
 
-1. Convert the SCFD00 music room geometry and its three texture pages.
-2. Render the room from the original medallion-event camera.
-3. Capture PS1 reference timing and check the view and audio against it.
+1. Compare keyboard timing and both medallion views to the local PS1 reference.
+2. Port the medallion fall and the pickup event.
+3. Integrate Harry and the music room collision and camera triggers.

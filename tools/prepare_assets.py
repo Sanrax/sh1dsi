@@ -7,6 +7,7 @@ from pathlib import Path
 
 from disc import open_disc
 from vab import piano_bank
+from room import music_room
 
 OUTPUT = Path(__file__).resolve().parents[1] / "dist/sh1dsi/piano.dat"
 
@@ -61,15 +62,21 @@ def prepare(cue):
                 + background(disc.read("TIM/PIANO1.TIM"))
                 + background(disc.read("TIM/PIANO2.TIM"))
                 + piano_bank(disc.read("SND/MEP101.VAB")))
-    OUTPUT.parent.mkdir(exist_ok=True, parents=True)
-    with tempfile.NamedTemporaryFile(dir=OUTPUT.parent, delete=False) as tmp:
+        room = music_room(disc)
+    write_asset(OUTPUT, data)
+    write_asset(OUTPUT.with_name("room.dat"), room)
+
+
+def write_asset(output, data):
+    output.parent.mkdir(exist_ok=True, parents=True)
+    with tempfile.NamedTemporaryFile(dir=output.parent, delete=False) as tmp:
         try:
             tmp.write(data)
             tmp.close()
-            os.replace(tmp.name, OUTPUT)
+            os.replace(tmp.name, output)
         finally:
             Path(tmp.name).unlink(missing_ok=True)
-    print(f"Prepared {OUTPUT.name} ({len(data)} bytes) in dist/sh1dsi/")
+    print(f"Prepared {output.name} ({len(data)} bytes) in dist/sh1dsi/")
 
 
 if __name__ == "__main__":
