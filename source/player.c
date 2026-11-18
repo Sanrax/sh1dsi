@@ -28,12 +28,17 @@ _Static_assert(sizeof(Bone) == 6 && sizeof(Vertex) == 8 &&
                sizeof(Corner) == 4 && sizeof(Batch) == 4, "player file layout");
 
 static Bone bones[18];
-static int8_t idle[40][156];
+enum { Idle, TurnLeft, TurnRight };
+static const unsigned firstFrame[] = {0, 40, 53};
+static const unsigned frameCount[] = {40, 13, 13};
+static int8_t frames[66][156];
 static Vertex vertices[384];
 static Corner corners[1500];
 static Batch batches[30];
 static uint16_t vertexCount, batchCount;
-static unsigned animUs;
+static unsigned clip, frameQ12, blendQ12, blendFrom, tickFraction;
+static int x = -409605, z = 81765, yaw = 1024;
+static bool controls;
 static bool ready, halfFrame;
 
 bool playerReady(void)
@@ -41,11 +46,18 @@ bool playerReady(void)
     return ready;
 }
 
-bool playerLoad(FILE *file)
+bool playerLoad(FILE *file, bool hasControls)
 {
+    controls = hasControls;
     if (fread(&vertexCount, 2, 1, file) != 1 || vertexCount > 384 || !vertexCount ||
         fread(&batchCount, 2, 1, file) != 1 || batchCount > 30 || !batchCount ||
-        fread(bones, sizeof bones, 1, file) != 1 || fread(idle, sizeof idle, 1, file) != 1 ||
+        fread(bones, sizeof bones, 1, file) != 1)
+        return false;
+    uint16_t clips = 1;
+    if (controls && (fread(&clips, 2, 1, file) != 1 || clips != 3))
+        return false;
+    unsigned count = firstFrame[clips-1] + frameCount[clips-1];
+    if (fread(frames, sizeof frames[0], count, file) != count ||
         fread(vertices, sizeof(Vertex), vertexCount, file) != vertexCount)
         return false;
     for (int i = 1; i < 18; i++) {
@@ -75,14 +87,71 @@ bool playerLoad(FILE *file)
     return true;
 }
 
-bool playerTick(void)
+bool playerTick(int turn)
 {
     if (!ready) return false;
     halfFrame = !halfFrame;
     if (halfFrame) return false;
-    // HarryAnim_Idle loops over keyframes 503..542 at ten keyframes/second.
-    animUs = (animUs + 33366) % 4000000;
+    tickFraction += 33366 * 4096;
+    int dt = tickFraction / 1000000;
+    tickFraction %= 1000000;
+    if (!controls) turn = 0;
+    // Player_CharaRotate(7), digital strength 64, followed by the original
+    // signed shift when applying the angular displacement to the root.
+    yaw = (yaw + ((turn * 7 * dt) >> 4)) & 4095;
+    unsigned next = turn < 0 ? TurnLeft : turn > 0 ? TurnRight : Idle;
+    if (next != clip) {
+        blendFrom = firstFrame[clip] + (frameQ12 >> 12);
+        clip = next;
+        frameQ12 = 0;
+        blendQ12 = 4096;
+    }
+    if (blendQ12) {
+        unsigned advance = dt * (clip == Idle ? 5 : 50);
+        blendQ12 = advance < blendQ12 ? blendQ12-advance : 0;
+    } else {
+        frameQ12 = (frameQ12 + dt * (clip == Idle ? 10 : 15)) % (frameCount[clip]*4096);
+    }
     return true;
+}
+
+void playerWarpForMedal(void)
+{
+    x = -100 * 4096;
+    z = 82329;
+    yaw = 3840;
+    clip = Idle;
+    frameQ12 = blendQ12 = 0;
+}
+
+bool playerFacingPiano(void)
+{
+    if (!controls) return true;
+    // Event_CollideObbFacingCheck, MAP_POINTS[16]. Intersect Harry's
+    // half-metre facing ray with the piano's north-south interaction edge.
+    int dx = -408371 - x, dz = 81510 - z;
+    int rayX = sinLerp(yaw*8)/2, rayZ = cosLerp(yaw*8)/2;
+    if (rayX <= 0 || dx < 0 || dx > rayX)
+        return false;
+    int along = rayZ*dx - dz*rayX;
+    return abs(along) <= 3072 * rayX;
+}
+
+void playerSetCamera(void)
+{
+    // vcMakeNormalWatchTgtPos / vcSetWatchTgtXzPos, small chase road.
+    // Its one-metre watch circle extends away from the room camera whenever
+    // the distance to Harry is below four metres.
+    int dx = x + 417792, dz = z - 74752;
+    int length = sqrt32(dx*dx + dz*dz);
+    int extra = length < 4*4096 ? 4*4096-length : 0;
+    int targetX = x + sinLerp(yaw*8), targetZ = z + cosLerp(yaw*8);
+    if (length) {
+        targetX += dx * extra / length;
+        targetZ += dz * extra / length;
+    }
+    gluLookAtf32(-4096, 6144, 3584, (targetX+409600)/2, -1024,
+                 (81920-targetZ)/2, 0, 4096, 0);
 }
 
 static int dot(const int16_t a[3], const int16_t b[3])
@@ -92,9 +161,15 @@ static int dot(const int16_t a[3], const int16_t b[3])
 
 static void skeleton(Matrix world[18])
 {
-    unsigned frame = animUs / 100000;
-    int alpha = (animUs % 100000) * 4096 / 100000;
-    const int8_t *a = idle[frame], *b = idle[(frame+1) % 40];
+    unsigned index = frameQ12 >> 12;
+    int alpha = frameQ12 & 4095;
+    const int8_t *a = frames[firstFrame[clip]+index];
+    const int8_t *b = frames[firstFrame[clip]+(index+1)%frameCount[clip]];
+    if (blendQ12) {
+        a = frames[blendFrom];
+        b = frames[firstFrame[clip]];
+        alpha = 4096-blendQ12;
+    }
     world[0] = (Matrix){.r = {{4096,0,0}, {0,4096,0}, {0,0,4096}}};
     for (int i = 1; i < 18; i++) {
         const Bone *bone = &bones[i];
@@ -117,7 +192,7 @@ static void skeleton(Matrix world[18])
     }
 }
 
-void playerDraw(unsigned firstPalette, bool afterPuzzle)
+void playerDraw(unsigned firstPalette)
 {
     Matrix world[18];
     static int16_t positions[384][3];
@@ -131,8 +206,8 @@ void playerDraw(unsigned firstPalette, bool afterPuzzle)
 
     glPushMatrix();
     // PS1 bone coordinates are in Q8. Convert root pose to room-local DS units.
-    glTranslatef32(afterPuzzle ? 0 : -8, 0, afterPuzzle ? -200 : 80);
-    glRotateYi(afterPuzzle ? 2048 : -8192);
+    glTranslatef32(((x >> 4)+25600)*8, 0, (5120-(z >> 4))*8);
+    glRotateYi(-yaw*8);
     glPolyFmt(POLY_ALPHA(31) | POLY_CULL_FRONT);
     const Corner *c = corners;
     for (unsigned i = 0; i < batchCount; i++) {

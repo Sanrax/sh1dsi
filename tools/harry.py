@@ -42,7 +42,10 @@ def player_data(disc):
         raise ValueError("unexpected HB_BASE animation")
     data = bytearray(struct.pack("<HH", len(vertices), len(groups)))
     data.extend(anm[20:20+bones*6])
-    data.extend(anm[offset+503*stride:offset+543*stride])
+    clips = ((503, 542), (180, 192), (193, 205))
+    data.extend(struct.pack("<H", len(clips)))
+    for start, end in clips:
+        data.extend(anm[offset+start*stride:offset+(end+1)*stride])
     for v in vertices:
         data.extend(struct.pack("<3hH", *v))
     for (palette, corners), stream in sorted(groups.items()):

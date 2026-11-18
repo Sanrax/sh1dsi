@@ -46,7 +46,7 @@ bool roomLoad(FILE *file)
 {
     if (fread(&header, sizeof header, 1, file) != 1 ||
         !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
-          (!memcmp(header.magic, "SHR2", 4) && header.pages == 4)) ||
+          ((!memcmp(header.magic, "SHR2", 4) || !memcmp(header.magic, "SHR3", 4)) && header.pages == 4)) ||
         header.batches > 128 || !header.batches ||
         header.textureBytes > 128*1024 || (header.textureBytes & 7) ||
         header.paletteBytes > 64*1024 || (header.paletteBytes & 31) ||
@@ -67,7 +67,7 @@ bool roomLoad(FILE *file)
     vramSetBankC(VRAM_C_TEXTURE_SLOT0);
     vramSetBankE(VRAM_E_TEX_PALETTE);
     if (header.pages == 4 &&
-        (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file)))
+        (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3] == '3')))
         return false;
 
     // One tightly packed stream in RAM. The file length bounds every batch read.
@@ -111,9 +111,7 @@ void roomDraw(const Medallion *medal)
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     if (gameplay) {
-        // Room 39 at the piano, before and after the event warps Harry.
-        if (solved) gluLookAt(-1, 1.5, 0.875, 0.2799, -0.25, -0.9482, 0, 1, 0);
-        else gluLookAt(-1, 1.5, 0.875, 1.0226, -0.25, -0.4296, 0, 1, 0);
+        playerSetCamera();
     } else if (solved)
         gluLookAt(-0.695, 1.30495, -1.065, 0.8, 0.07, -1.55, 0, 1, 0);
     else
@@ -136,7 +134,7 @@ void roomDraw(const Medallion *medal)
         const Page *skin = &pages[3];
         GFX_TEX_FORMAT = (skin->offset >> 3) | (TEXTURE_SIZE_256 << 20)
                          | (TEXTURE_SIZE_256 << 23) | (GL_RGB16 << 26);
-        playerDraw(skin->firstPalette, medal->phase != MedalHanging);
+        playerDraw(skin->firstPalette);
     }
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];

@@ -4,7 +4,9 @@ The school piano interaction runs natively on ARM9. The D-pad moves the
 original cursor. The two key regions, snapping, incorrect-sequence resets,
 restart on the first key, note delays and five-key solution follow
 `PianoPuzzle_Control` in MAP1_S01. The solved flag lasts for the session.
-The build enters the 3D music room directly. Solving the piano plays the
+The build enters the 3D music room directly. Left and Right turn Harry in
+place, and the camera follows his heading. A checks the original piano edge
+against his half-metre facing ray. Solving the piano plays the
 silver medallion fall with its impact sound and landing camera, then returns
 to Harry in the gameplay view. Room traversal, messages, pickup, saving and
 progression are pending. The full game is unplayable.
@@ -74,9 +76,16 @@ after control returns. In both, the locally decoded HB_BASE.ANM idle pose
 matched all 17 non-root bone matrices and translations exactly. HERO.ILM
 uses 19 active meshes and 332 distinct vertices in this unarmed pose. Faces
 can reuse vertices transformed by an earlier bone in the model draw order.
-The ARM9 interpolates 40 original idle keyframes and transforms each vertex
+The ARM9 interpolates the 40 original idle keyframes and both 13-frame turns and transforms each vertex
 once per update. Against the two PS1 gameplay views, whole-frame mean absolute
-RGB differences were 16.7/255 before and 15.4/255 after the event.
+RGB differences measured 16.8/255 before and 15.3/255 after the event.
+
+The PS1 digital-pad reference took 30 simulation updates for 60 VBlanks of
+turning. Left turned 60 angle units per update, right 59 (4096 per turn).
+On virtual console SD and DLDI, turning away prevented A from opening the
+piano and turning back enabled it. A full solve and a Start skip each returned
+to the gameplay camera. The camera target uses the small chase-road watch
+circle. Camera damping during turns is pending.
 
 ## Source
 
@@ -87,6 +96,6 @@ Copyright (C) 2026 shdecompilations, GPL-3.0. Relevant sources include
 
 ## Next
 
-1. Bring over Harry's digital walk and turn states and the IPD collision shapes.
-2. Gate both interactions on position and facing and update the camera during movement.
+1. Integrate forward and backward walking with the SCFD00 collision edges.
+2. Compare room traversal and camera tracking with the measured PS1 pad route.
 3. Complete the medallion pickup and persist its progression flags.

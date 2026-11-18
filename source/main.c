@@ -140,10 +140,13 @@ int main(void)
             if (inRoom) {
                 MedalPhase phase = medal.phase;
                 roomChanged |= medallionTick(&medal, pressed & KEY_START);
-                roomChanged |= playerTick();
+                int turn = 0;
+                if (medal.phase == MedalHanging || medal.phase == MedalFinished)
+                    turn = !!(held & KEY_RIGHT) - !!(held & KEY_LEFT);
+                roomChanged |= playerTick(turn);
                 if (phase == MedalDrop && medal.phase == MedalImpact)
                     sound = 9;
-                if ((pressed & KEY_A) && !piano.solved)
+                if ((pressed & KEY_A) && !piano.solved && playerFacingPiano())
                     inRoom = false;
             } else if (!piano.checking && (pressed & KEY_B) && hasRoom) {
                 inRoom = true;
@@ -154,6 +157,7 @@ int main(void)
                         pressed & KEY_A, pressed & KEY_B, stepUs);
                 if (piano.solved && hasRoom) {
                     inRoom = true;
+                    playerWarpForMedal();
                     medallionStart(&medal);
                 }
             }

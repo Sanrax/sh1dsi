@@ -3,9 +3,12 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-bool playerLoad(FILE *file);
+bool playerLoad(FILE *file, bool hasControls);
 bool playerReady(void);
-bool playerTick(void);
-void playerDraw(unsigned firstPalette, bool afterPuzzle);
+bool playerTick(int turn);
+void playerWarpForMedal(void);
+bool playerFacingPiano(void);
+void playerSetCamera(void);
+void playerDraw(unsigned firstPalette);
 
 #endif

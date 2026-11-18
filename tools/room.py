@@ -98,7 +98,7 @@ def music_room(disc):
     page_info.append((len(pages), 256, len(palettes)//32, len(cluts)//32))
     pages.extend(skin)
     palettes.extend(cluts)
-    result = bytearray(struct.pack("<4sHHII", b"SHR2", len(page_info), len(groups), len(pages), len(palettes)))
+    result = bytearray(struct.pack("<4sHHII", b"SHR3", len(page_info), len(groups), len(pages), len(palettes)))
     for page in page_info:
         result.extend(struct.pack("<IHHI", *page))
     result.extend(pages)
