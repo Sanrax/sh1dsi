@@ -1,0 +1,31 @@
+# Local disc, firmware, and flash media (including case variants).
+*.[Bb][Ii][Nn]
+*.[Cc][Uu][Ee]
+*.[Ii][Ss][Oo]
+*.[Rr][Oo][Mm]
+*.[Ii][Mm][Gg]
+*.chd
+*.sav
+*.dsi
+*.sd
+/rom/
+/nitrofs/
+/assets-local/
+/extracted/
+/converted/
+/firmware/
+/.local/
+/local.mk
+/compile_commands.json
+
+# Toolchain outputs and temporary captures.
+build/
+dist/
+.cache/
+__pycache__/
+*.nds
+*.elf
+*.map
+*.log
+/captures/
+/tmp/
