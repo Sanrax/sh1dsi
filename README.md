@@ -21,3 +21,9 @@ python3 tools/prepare_assets.py "/path/to/Silent Hill (USA).cue"
 
 Copy `dist/sh1dsi/` to the root of the same SD card as the launcher will use
 for the port. The data belongs to the original game and is for local use.
+
+Run `make sdcard` after asset preparation. Copy the contents of `dist/` to
+the card root. The current build enters the school piano event directly.
+Press A to examine it, move the cursor with the D-pad, press A to strike a
+key, and press B to back out. Solving the puzzle ends the interaction for
+this session.
