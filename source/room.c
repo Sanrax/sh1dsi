@@ -2,6 +2,7 @@
 #include <string.h>
 #include "room.h"
 #include "player.h"
+#include "collision.h"
 
 typedef struct {
     uint32_t offset;
@@ -46,7 +47,7 @@ bool roomLoad(FILE *file)
 {
     if (fread(&header, sizeof header, 1, file) != 1 ||
         !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
-          ((!memcmp(header.magic, "SHR2", 4) || !memcmp(header.magic, "SHR3", 4)) && header.pages == 4)) ||
+          ((!memcmp(header.magic, "SHR", 3) && header.magic[3] >= '2' && header.magic[3] <= '4') && header.pages == 4)) ||
         header.batches > 128 || !header.batches ||
         header.textureBytes > 128*1024 || (header.textureBytes & 7) ||
         header.paletteBytes > 64*1024 || (header.paletteBytes & 31) ||
@@ -66,8 +67,9 @@ bool roomLoad(FILE *file)
         return false;
     vramSetBankC(VRAM_C_TEXTURE_SLOT0);
     vramSetBankE(VRAM_E_TEX_PALETTE);
+    if (header.magic[3] == '4' && !collisionLoad(file)) return false;
     if (header.pages == 4 &&
-        (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3] == '3')))
+        (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))
         return false;
 
     // One tightly packed stream in RAM. The file length bounds every batch read.

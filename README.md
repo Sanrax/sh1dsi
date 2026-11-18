@@ -23,9 +23,9 @@ Run `make sdcard` after conversion. Copy the contents of `dist/` to the
 card root. The directory includes the ROM and the two local data files. Keep
 the generated game data on your own devices.
 
-The build starts with Harry standing at Midwich's piano. Left and Right turn
-him in place. Face the keys and press A to inspect the piano, then A again
+The build starts with Harry standing at Midwich's piano. Up and Down walk forward and backward.
+Left and Right turn him. Face the keys and press A to inspect the piano, then A again
 to examine the keyboard. Move the cursor with the D-pad and
 press A to strike a key. B backs out one view at a time. Solving the puzzle
 starts the silver medallion cutscene. Start skips back to the room camera.
-Walking and medallion pickup are pending.
+Medallion pickup and leaving the room are pending.

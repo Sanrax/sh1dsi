@@ -6,6 +6,29 @@ import struct
 from harry import player_data
 
 
+def collision_edges(ipd):
+    collision = memoryview(ipd)[0x54:]
+    x, z, vertices, surfaces, count, cylinders, vert, surface, polygon = struct.unpack_from("<ii4B3I", collision)
+    if (x, z, vertices, surfaces, count, cylinders) != (-30720, 0, 51, 8, 51, 0):
+        raise ValueError("unexpected music-room collision header")
+    output = bytearray()
+    for i in range(count):
+        tx, tz, length, a, b, floor, other = struct.unpack_from("<HHh4B", collision, polygon+10*i)
+        if max(a, b) >= vertices or floor >= surfaces or other != 255 or length <= 0:
+            raise ValueError("invalid music-room split")
+        ax, _, az = struct.unpack_from("<3h", collision, vert+6*a)
+        bx, _, bz = struct.unpack_from("<3h", collision, vert+6*b)
+        # The top two bits of each tangent component are trigger flags.
+        # SCFD00 has no conditional collision or sloped surfaces.
+        if (tx | tz) & 0xc000 or any(struct.unpack_from("<2h", collision, surface+12*floor+8)):
+            raise ValueError("unsupported conditional or sloping music-room split")
+        tx = ((tx ^ 8192) - 8192)
+        tz = ((tz ^ 8192) - 8192)
+        output.extend(struct.pack("<6h", (ax-5120)*16, (az-5120)*16,
+                                  (bx-5120)*16, (bz-5120)*16, tx, tz))
+    return output
+
+
 def music_room(disc):
     data = disc.read("BG/SCFD00.IPD")
     if data[:4] != bytes((20, 0, 253, 0)):
@@ -98,11 +121,12 @@ def music_room(disc):
     page_info.append((len(pages), 256, len(palettes)//32, len(cluts)//32))
     pages.extend(skin)
     palettes.extend(cluts)
-    result = bytearray(struct.pack("<4sHHII", b"SHR3", len(page_info), len(groups), len(pages), len(palettes)))
+    result = bytearray(struct.pack("<4sHHII", b"SHR4", len(page_info), len(groups), len(pages), len(palettes)))
     for page in page_info:
         result.extend(struct.pack("<IHHI", *page))
     result.extend(pages)
     result.extend(palettes)
+    result.extend(collision_edges(data))
     result.extend(player)
     for key, quads in sorted(groups.items(), key=lambda g: (g[0][3] & 1, g[0])):
         result.extend(struct.pack("<4BI", *key, len(quads)//32))

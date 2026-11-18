@@ -1,15 +1,15 @@
 # Port status
 
 The school piano interaction runs natively on ARM9. The D-pad moves the
-original cursor. The two key regions, snapping, incorrect-sequence resets,
+original cursor in the keyboard view. The two key regions, snapping, incorrect-sequence resets,
 restart on the first key, note delays and five-key solution follow
 `PianoPuzzle_Control` in MAP1_S01. The solved flag lasts for the session.
-The build enters the 3D music room directly. Left and Right turn Harry in
-place, and the camera follows his heading. A checks the original piano edge
+The build enters the 3D music room directly. Up and Down walk, Left and
+Right turn Harry, and the camera follows his heading. A checks the original piano edge
 against his half-metre facing ray. Solving the piano plays the
 silver medallion fall with its impact sound and landing camera, then returns
-to Harry in the gameplay view. Room traversal, messages, pickup, saving and
-progression are pending. The full game is unplayable.
+to Harry in the gameplay view. Messages, medallion pickup, saving and progression
+beyond this room are pending. The full game is unplayable.
 
 ## DSi verification
 
@@ -76,7 +76,7 @@ after control returns. In both, the locally decoded HB_BASE.ANM idle pose
 matched all 17 non-root bone matrices and translations exactly. HERO.ILM
 uses 19 active meshes and 332 distinct vertices in this unarmed pose. Faces
 can reuse vertices transformed by an earlier bone in the model draw order.
-The ARM9 interpolates the 40 original idle keyframes and both 13-frame turns and transforms each vertex
+The ARM9 interpolates original idle, turn and walking keyframes and transforms each vertex
 once per update. Against the two PS1 gameplay views, whole-frame mean absolute
 RGB differences measured 16.8/255 before and 15.3/255 after the event.
 
@@ -87,6 +87,15 @@ piano and turning back enabled it. A full solve and a Start skip each returned
 to the gameplay camera. The camera target uses the small chase-road watch
 circle. Camera damping during turns is pending.
 
+The flat-floor solver uses the 51 original SCFD00 split edges and Harry's
+0.3 m collision radius. The same 1,020-VBlank pad route ran on PS1 and
+instrumented melonDS. All sampled headings matched. Across 13 checkpoints,
+the largest sampled XZ error was 3.6 cm. The west-wall stop differed by
+3.4 mm and the final piano-side stop by 1.5 cm. Native key input on virtual
+console SD and DLDI also reached the wall, rejected the piano interaction
+at a distance, then allowed it after walking back. Footsteps, running,
+dynamic obstacles and collision outside this flat room are pending.
+
 ## Source
 
 [silent-hill-decomp at ecbb0d8](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce),
@@ -96,6 +105,6 @@ Copyright (C) 2026 shdecompilations, GPL-3.0. Relevant sources include
 
 ## Next
 
-1. Integrate forward and backward walking with the SCFD00 collision edges.
-2. Compare room traversal and camera tracking with the measured PS1 pad route.
-3. Complete the medallion pickup and persist its progression flags.
+1. Match the original silver medallion pickup, including the prompt and item animation.
+2. Retain its inventory entry and puzzle flags across save and load.
+3. Match room camera damping and footsteps during traversal.

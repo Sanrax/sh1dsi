@@ -3,6 +3,7 @@
 // Copyright (C) 2026 shdecompilations
 #include <nds.h>
 #include "player.h"
+#include "collision.h"
 
 typedef struct {
     int8_t parent, rotation, translation, offset[3];
@@ -28,17 +29,20 @@ _Static_assert(sizeof(Bone) == 6 && sizeof(Vertex) == 8 &&
                sizeof(Corner) == 4 && sizeof(Batch) == 4, "player file layout");
 
 static Bone bones[18];
-enum { Idle, TurnLeft, TurnRight };
-static const unsigned firstFrame[] = {0, 40, 53};
-static const unsigned frameCount[] = {40, 13, 13};
-static int8_t frames[66][156];
+enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward };
+static const unsigned firstFrame[] = {0, 40, 53, 66, 89};
+static const unsigned frameCount[] = {40, 13, 13, 23, 24};
+static const unsigned frameRate[] = {10, 15, 15, 22, 23};
+static const unsigned blendRate[] = {5, 50, 50, 50, 20};
+static int8_t frames[113][156];
 static Vertex vertices[384];
 static Corner corners[1500];
 static Batch batches[30];
 static uint16_t vertexCount, batchCount;
 static unsigned clip, frameQ12, blendQ12, blendFrom, tickFraction;
 static int x = -409605, z = 81765, yaw = 1024;
-static bool controls;
+static int speed;
+static unsigned roomVersion;
 static bool ready, halfFrame;
 
 bool playerReady(void)
@@ -46,15 +50,15 @@ bool playerReady(void)
     return ready;
 }
 
-bool playerLoad(FILE *file, bool hasControls)
+bool playerLoad(FILE *file, unsigned version)
 {
-    controls = hasControls;
+    roomVersion = version;
     if (fread(&vertexCount, 2, 1, file) != 1 || vertexCount > 384 || !vertexCount ||
         fread(&batchCount, 2, 1, file) != 1 || batchCount > 30 || !batchCount ||
         fread(bones, sizeof bones, 1, file) != 1)
         return false;
     uint16_t clips = 1;
-    if (controls && (fread(&clips, 2, 1, file) != 1 || clips != 3))
+    if (version >= 3 && (fread(&clips, 2, 1, file) != 1 || clips != (version == 4 ? 5 : 3)))
         return false;
     unsigned count = firstFrame[clips-1] + frameCount[clips-1];
     if (fread(frames, sizeof frames[0], count, file) != count ||
@@ -87,7 +91,42 @@ bool playerLoad(FILE *file, bool hasControls)
     return true;
 }
 
-bool playerTick(int turn)
+// Digital, unarmed Player_LowerBodyUpdate on a level floor.
+static unsigned locomotion(int turn, int walk, int dt)
+{
+    int direction = clip == WalkForward ? 1 : clip == WalkBackward ? -1 : 0;
+    int acceleration = dt * 1638 / 136;
+    if (direction && walk == direction) {
+        int limit = direction > 0 ? 5734 : 4710;
+        if (!speed || direction < 0 || frameQ12 >= 4096)
+            speed += acceleration;
+        if (speed > limit) speed = limit;
+    } else if (speed) {
+        speed -= 2*acceleration;
+        if (speed < 0) speed = 0;
+    }
+    if (speed) walk = direction;
+    int turnRate = walk > 0 ? 5 : walk < 0 ? -4 : 7;
+    yaw = (yaw + ((turn * turnRate * dt) >> 4)) & 4095;
+    if (speed) {
+        int heading = yaw*8 + (walk < 0 ? 16384 : 0);
+        int sx = sinLerp(heading), sz = cosLerp(heading);
+        int vx = (speed*sx) >> 12, vz = (speed*sz) >> 12;
+        unsigned square = vx*vx + vz*vz;
+        // SquareRoot0 indexes its table with a normalized eight-bit value.
+        // Preserve that quantization when using the ARM9 square-root unit.
+        if (square >= 256) {
+            unsigned shift = 24 - (__builtin_clz(square) & ~1u);
+            square = (square >> shift) << shift;
+        }
+        int distance = ((int)sqrt32(square)*dt) >> 12;
+        collisionMove(&x, &z, (sx*distance) >> 12, (sz*distance) >> 12);
+    }
+    if (walk) return walk > 0 ? WalkForward : WalkBackward;
+    return turn < 0 ? TurnLeft : turn > 0 ? TurnRight : Idle;
+}
+
+bool playerTick(int turn, int walk)
 {
     if (!ready) return false;
     halfFrame = !halfFrame;
@@ -95,11 +134,7 @@ bool playerTick(int turn)
     tickFraction += 33366 * 4096;
     int dt = tickFraction / 1000000;
     tickFraction %= 1000000;
-    if (!controls) turn = 0;
-    // Player_CharaRotate(7), digital strength 64, followed by the original
-    // signed shift when applying the angular displacement to the root.
-    yaw = (yaw + ((turn * 7 * dt) >> 4)) & 4095;
-    unsigned next = turn < 0 ? TurnLeft : turn > 0 ? TurnRight : Idle;
+    unsigned next = locomotion(roomVersion >= 3 ? turn : 0, roomVersion >= 4 ? walk : 0, dt);
     if (next != clip) {
         blendFrom = firstFrame[clip] + (frameQ12 >> 12);
         clip = next;
@@ -107,10 +142,10 @@ bool playerTick(int turn)
         blendQ12 = 4096;
     }
     if (blendQ12) {
-        unsigned advance = dt * (clip == Idle ? 5 : 50);
+        unsigned advance = dt * blendRate[clip];
         blendQ12 = advance < blendQ12 ? blendQ12-advance : 0;
     } else {
-        frameQ12 = (frameQ12 + dt * (clip == Idle ? 10 : 15)) % (frameCount[clip]*4096);
+        frameQ12 = (frameQ12 + dt * frameRate[clip]) % (frameCount[clip]*4096);
     }
     return true;
 }
@@ -120,13 +155,14 @@ void playerWarpForMedal(void)
     x = -100 * 4096;
     z = 82329;
     yaw = 3840;
+    speed = 0;
     clip = Idle;
     frameQ12 = blendQ12 = 0;
 }
 
 bool playerFacingPiano(void)
 {
-    if (!controls) return true;
+    if (roomVersion < 3) return true;
     // Event_CollideObbFacingCheck, MAP_POINTS[16]. Intersect Harry's
     // half-metre facing ray with the piano's north-south interaction edge.
     int dx = -408371 - x, dz = 81510 - z;

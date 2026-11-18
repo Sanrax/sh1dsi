@@ -3,9 +3,9 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-bool playerLoad(FILE *file, bool hasControls);
+bool playerLoad(FILE *file, unsigned version);
 bool playerReady(void);
-bool playerTick(int turn);
+bool playerTick(int turn, int walk);
 void playerWarpForMedal(void);
 bool playerFacingPiano(void);
 void playerSetCamera(void);

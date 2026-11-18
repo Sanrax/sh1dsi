@@ -140,10 +140,12 @@ int main(void)
             if (inRoom) {
                 MedalPhase phase = medal.phase;
                 roomChanged |= medallionTick(&medal, pressed & KEY_START);
-                int turn = 0;
-                if (medal.phase == MedalHanging || medal.phase == MedalFinished)
+                int turn = 0, walk = 0;
+                if (medal.phase == MedalHanging || medal.phase == MedalFinished) {
                     turn = !!(held & KEY_RIGHT) - !!(held & KEY_LEFT);
-                roomChanged |= playerTick(turn);
+                    walk = !!(held & KEY_UP) - !!(held & KEY_DOWN);
+                }
+                roomChanged |= playerTick(turn, walk);
                 if (phase == MedalDrop && medal.phase == MedalImpact)
                     sound = 9;
                 if ((pressed & KEY_A) && !piano.solved && playerFacingPiano())
