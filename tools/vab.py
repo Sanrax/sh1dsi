@@ -30,8 +30,8 @@ def decode_vag(data):
 
 
 def piano_bank(vab):
-    # g_Vab_InfoTable, SD_Call(1438..1445), followed by SD_Call(1421).
-    notes = [(1, n) for n in (48, 51, 52, 53, 54, 56, 59, 61)] + [(0, 60)]
+    # g_Vab_InfoTable, SFX 1438..1445, 1421 (release) and 1417 (impact).
+    notes = [(1, n) for n in (48, 51, 52, 53, 54, 56, 59, 61)] + [(0, 60), (0, 52)]
     programs = struct.unpack_from("<H", vab, 18)[0]
     offsets = 0x820 + programs * 512
     sizes = struct.unpack_from("<256H", vab, offsets)
@@ -56,7 +56,7 @@ def piano_bank(vab):
         pitch = int(4096 * 2 ** ((note - center + fine / 128) / 12))
         rate = round(44100 * pitch / 4096)
         volume = vab[tone + 2] * vab[33 + program * 16] // 127
-        if program == 0:
+        if (program, note) == (0, 60):
             volume = volume * (127 - 30) // 127
         tones.extend(struct.pack("<IIHBB", *unique[vag], rate, volume, vab[tone + 3]))
     return tones + samples

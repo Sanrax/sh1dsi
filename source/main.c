@@ -25,17 +25,17 @@ typedef struct {
     uint8_t volume, pan;
 } Tone;
 
-static Tone tones[9];
-static uint8_t samples[64 * 1024] __attribute__((aligned(32)));
-static bool hasAudio;
+static Tone tones[10];
+static uint8_t samples[72 * 1024] __attribute__((aligned(32)));
+static unsigned toneCount;
 static const char *roomPath;
 
-static bool loadTones(FILE *file)
+static bool loadTones(FILE *file, unsigned count)
 {
-    if (fread(tones, sizeof tones, 1, file) != 1)
+    if (fread(tones, sizeof(Tone), count, file) != count)
         return false;
     size_t size = fread(samples, 1, sizeof samples, file);
-    for (unsigned i = 0; i < 9; i++) {
+    for (unsigned i = 0; i < count; i++) {
         const Tone *tone = &tones[i];
         if (!tone->rate || !tone->bytes || ((tone->offset | tone->bytes) & 3) ||
             tone->offset > size || tone->bytes > size - tone->offset ||
@@ -62,10 +62,11 @@ static bool loadPiano(void)
         return false;
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets
                  && (memcmp(assets.magic, "SHP1", 4) == 0 ||
-                     memcmp(assets.magic, "SHP2", 4) == 0);
-    if (valid && assets.magic[3] == '2') {
-        hasAudio = loadTones(file);
-        valid = hasAudio;
+                     memcmp(assets.magic, "SHP2", 4) == 0 ||
+                     memcmp(assets.magic, "SHP3", 4) == 0);
+    if (valid && assets.magic[3] != '1') {
+        toneCount = assets.magic[3] == '3' ? 10 : 9;
+        valid = loadTones(file, toneCount);
     }
     valid = valid && fgetc(file) == EOF && !ferror(file);
     fclose(file);
@@ -113,8 +114,9 @@ int main(void)
     oamSet(&oamMain, 0, 0, 0, 0, 15, SpriteSize_16x16, SpriteColorFormat_Bmp,
            sprite, -1, false, true, false, false, false);
 
-    if (hasAudio) soundEnable();
+    if (toneCount) soundEnable();
     Piano piano = {0};
+    Medallion medal = {0};
     bool inRoom = hasRoom;
     int previousImage = -1;
     systemCounterSetup();
@@ -131,9 +133,14 @@ int main(void)
         uint32_t elapsed = now - previousTime;
         previousTime = now;
         debt += elapsed > 4 * step ? 4 * step : elapsed;
+        bool roomChanged = false;
         while (debt >= step) {
             int sound = -1;
             if (inRoom) {
+                MedalPhase phase = medal.phase;
+                roomChanged |= medallionTick(&medal, pressed & KEY_START);
+                if (phase == MedalDrop && medal.phase == MedalImpact)
+                    sound = 9;
                 if ((pressed & KEY_A) && !piano.solved)
                     inRoom = false;
             } else if (!piano.checking && (pressed & KEY_B) && hasRoom) {
@@ -143,9 +150,12 @@ int main(void)
                         !!(held & KEY_RIGHT) - !!(held & KEY_LEFT),
                         !!(held & KEY_DOWN) - !!(held & KEY_UP),
                         pressed & KEY_A, pressed & KEY_B, stepUs);
-                if (piano.solved && hasRoom) inRoom = true;
+                if (piano.solved && hasRoom) {
+                    inRoom = true;
+                    medallionStart(&medal);
+                }
             }
-            if (hasAudio && sound >= 0) {
+            if (sound >= 0 && (unsigned)sound < toneCount) {
                 const Tone *tone = &tones[sound];
                 soundPlaySample(samples + tone->offset, SoundFormat_16Bit, tone->bytes,
                                 tone->rate, tone->volume, tone->pan, false, 0);
@@ -155,9 +165,9 @@ int main(void)
         }
 
         int imageIndex = inRoom ? 2 : piano.checking;
-        if (inRoom && previousImage != imageIndex) {
+        if (inRoom && (previousImage != imageIndex || roomChanged)) {
             bgHide(bg);
-            roomDraw(piano.solved);
+            roomDraw(&medal);
             bgShow(0);
         } else if (!inRoom && previousImage != imageIndex) {
             bgHide(0);

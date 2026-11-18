@@ -2,8 +2,9 @@
 #define SH1_ROOM_H
 #include <stdbool.h>
 #include <stdio.h>
+#include "medallion.h"
 
 bool roomLoad(FILE *file);
-void roomDraw(bool solved);
+void roomDraw(const Medallion *medal);
 
 #endif

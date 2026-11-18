@@ -86,15 +86,16 @@ bool roomLoad(FILE *file)
     return pos == total;
 }
 
-void roomDraw(bool solved)
+void roomDraw(const Medallion *medal)
 {
+    bool solved = medal->phase == MedalLanded;
     // MAP1_S01 medallion cameras. Local origin (-100, 0, 20), 2 metres/unit.
     // Screen_CutsceneCameraStateUpdate masks the 320x240 picture at y=±96.
     // Shrink the frustum with the viewport to keep the original pixel scale.
     glViewport(0, 19, 255, 172);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    const int distance = solved ? 376 : 353;
+    const int distance = medal->phase == MedalHanging ? 353 : medal->projection;
     const int near = 1024; // 0.25 scene units, Q12.
     int horizontal = 160 * near / distance;
     int vertical = 96 * near / distance;
@@ -123,6 +124,14 @@ void roomDraw(bool solved)
         const Batch *b = &batches[i];
         unsigned count = 4*b->quads;
         if (b->state == 0 || b->state == (solved ? 2 : 1)) {
+            bool moving = b->state == 1 && medal->phase >= MedalSwing;
+            if (moving) {
+                // SHR1 stores the hanging model with its Q8 pivot baked in.
+                glPushMatrix();
+                glTranslatef32(2048, -medal->y / 2, (20 * 4096 - medal->z) / 2);
+                glRotateXi(medal->angle * 8);
+                glTranslatef32(-2048, -5488, 7640);
+            }
             const Page *p = &pages[b->page];
             unsigned width = p->width == 128 ? TEXTURE_SIZE_128 : TEXTURE_SIZE_256;
             GFX_TEX_FORMAT = (p->offset >> 3) | (width << 20) | (TEXTURE_SIZE_256 << 23)
@@ -136,6 +145,7 @@ void roomDraw(bool solved)
                 glVertex3v16(v[j].x, v[j].y, v[j].z);
             }
             glEnd();
+            if (moving) glPopMatrix(1);
         }
         v += count;
     }

@@ -4,8 +4,9 @@ The school piano interaction runs natively on ARM9. The D-pad moves the
 original cursor. The two key regions, snapping, incorrect-sequence resets,
 restart on the first key, note delays and five-key solution follow
 `PianoPuzzle_Control` in MAP1_S01. The solved flag lasts for the session.
-The build enters the 3D music room directly. Room traversal, Harry, messages,
-the medallion fall, saving and progression are pending. The full game is unplayable.
+The build enters the 3D music room directly. Solving the piano plays the
+silver medallion fall with its impact sound and landing camera. Room traversal,
+Harry, messages, pickup, saving and progression are pending. The full game is unplayable.
 
 ## DSi verification
 
@@ -28,10 +29,18 @@ the medallion fall, saving and progression are pending. The full game is unplaya
   perspective texture interpolation, missing characters and lighting still
   differ from the PS1.
 - All 49,152 overview pixels matched the prepared 5-bit colors. The cursor
-  changed 49 pixels in the initial keyboard view. The event pack stores three
+  changed 49 pixels in the initial keyboard view. The event pack stores four
   MEP101.VAB samples and plays them through native sound channels. An isolated
   melonDS recording peaked at 15,096 in signed 16-bit PCM after a key strike.
   PS1 reverb and envelope matching are pending.
+- After the fifth key, the PS1 event held its first camera for 90 VBlanks,
+  swung the medallion for 32, dropped it for 44 and held for 62 before the
+  second camera. The port advances the fixed-point motion every two simulation
+  ticks. A DLDI replay in melonDS showed the zoom, swing, drop and stationary
+  hold. The isolated impact recording peaked at 15,710 in signed 16-bit PCM.
+  Both the full replay and a Start skip from virtual console SD ended at the
+  previously verified landing frame, identical across all 49,152 pixels.
+  The event holds that view until player traversal is available.
 
 ## Reference measurements
 
@@ -68,6 +77,6 @@ Copyright (C) 2026 shdecompilations, GPL-3.0. Relevant sources include
 
 ## Next
 
-1. Animate the medallion fall and camera transition using the original event steps.
-2. Integrate Harry, room collision and the interaction triggers.
+1. Extract Harry's original model and standing pose and draw him in the music room.
+2. Integrate room collision, player movement and the two interaction triggers.
 3. Complete the medallion pickup and persist its progression flags.

@@ -26,4 +26,5 @@ the generated game data on your own devices.
 The current entry point is Midwich's music room. Press A to approach the
 piano and A again to examine the keys. Move the cursor with the D-pad and
 press A to strike a key. B backs out one view at a time. Solving the puzzle
-switches to the fallen medallion camera. Movement and pickup are pending.
+starts the silver medallion cutscene. Start skips to its landing camera.
+Movement and pickup are pending.
