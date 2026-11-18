@@ -96,6 +96,12 @@ console SD and DLDI also reached the wall, rejected the piano interaction
 at a distance, then allowed it after walking back. Footsteps, running,
 dynamic obstacles and collision outside this flat room are pending.
 
+After the piano solution, the PS1 reference walks to the silver medallion
+and opens the pickup prompt twice. Both prompts held Harry at keyframe 887.
+Declining restored control with event flag 70 clear and no item 98.
+Accepting restored control with the flag set and exactly one item 98.
+The `pickup` route on `diagnostics/dsi` reproduces both outcomes.
+
 ## Source
 
 [silent-hill-decomp at ecbb0d8](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce),
