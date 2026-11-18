@@ -5,9 +5,9 @@ original cursor. The two key regions, snapping, incorrect-sequence resets,
 restart on the first key, note delays and five-key solution follow
 `PianoPuzzle_Control` in MAP1_S01. The solved flag lasts for the session.
 The build enters the 3D music room directly. Room traversal, Harry, messages,
-the medallion cutscene, saving and the full game are pending.
+the medallion fall, saving and progression are pending. The full game is unplayable.
 
-## Verified
+## DSi verification
 
 - BlocksDS 1.24.0 and Wonderful GCC 16.2.0 build a DSi-exclusive ROM with
   unit code 3. melonDS 1.1 direct boot used external BIOS, firmware and a
@@ -17,34 +17,47 @@ the medallion cutscene, saving and the full game are pending.
   SHA-1 `34278d31d9b9b12b3b5db5e45bcbe548991ecbc7`. All non-XA file-table
   entries agreed with upstream silentassets. MAP1_S01 matched the upstream
   SHA-1. Repeated local conversions were byte-identical.
-- melonDS loaded the initial 99,860-byte event pack from virtual console SD, then
-  from emulated DLDI with a fresh empty console SD. Both storage tests
-  exercised examine, move and cancel. With console SD, button input solved
-  the puzzle and the solved flag prevented re-entry. Physical tests pending.
-- All 49,152 overview pixels matched the prepared 5-bit RGB values on
-  the 256 x 192 top LCD. The close-up differed at the cursor as expected.
-  This comparison checks presentation of the converted TIM, not a full
-  PS1 framebuffer. The bottom LCD is black.
-- The SCFD00 room uses three original 4-bit pages (80 KiB texture VRAM),
-  32 palettes (1 KiB), and 764 submitted quads per static view. Eight IPD
-  instances plus the open piano lid and medallion use original transforms.
-  Two MAP1_S01 camera poses show the hanging and fallen medallion. In
-  melonDS, room → piano → room reproduced the first frame pixel for pixel.
-  Solving switched cameras and changed 48,227 of 49,152 pixels. DS depth
-  testing, perspective texturing and whole-polygon translucency differ from
-  the PS1. Lighting and the intermediate medallion animation are pending.
-- Event simulation uses a provisional 16.667 ms step independent of display
-  updates. A PS1 same-event reference and a gameplay frame-rate baseline are
-  pending. The school event is the only playable interaction.
+- The room and piano loaded from virtual console SD and emulated DLDI in
+  separate tests. Each route entered the piano, backed out to the same room
+  frame, and completed the five-key solution. The lower LCD stayed black.
+  Physical console SD and DSpico boot tests are pending.
+- Three 4-bit texture pages use 80 KiB of texture VRAM and 1 KiB of palettes.
+  Eight SCFD00 instances, the open lid and the medallion contribute 764 quads
+  per view. Camera position, zoom and cutscene borders come from MAP1_S01.
+  Static frames persist without geometry resubmission. Whole-polygon alpha,
+  perspective texture interpolation, missing characters and lighting still
+  differ from the PS1.
+- All 49,152 overview pixels matched the prepared 5-bit colors. The cursor
+  changed 49 pixels in the initial keyboard view. The event pack stores three
+  MEP101.VAB samples and plays them through native sound channels. An isolated
+  melonDS recording peaked at 15,096 in signed 16-bit PCM after a key strike.
+  PS1 reverb and envelope matching are pending.
 
-- A separate diagnostic build sampled 600 successive idle event loop intervals
-  on the emulated ARM timer. Min/mean/max were 16.713/16.715/16.717 ms.
-- The current 156,080-byte pack adds three one-shot samples from MEP101.VAB.
-  Seven pitched keys share one waveform. Muted keys play the mechanical
-  strike and delayed release. A melonDS-only audio capture registered a
-  15,096 peak in signed 16-bit PCM after a strike and silence before.
-  SPU reverb, envelopes and output mixing are pending fidelity comparisons.
-  Repeating the five-key input test with audio enabled passed.
+## Reference measurements
+
+Beetle PSX software core, Debian build 0.9.38.6+git20260515+ds-2, NTSC-U
+USA 1.1, digital pad, nominal 59.94 Hz. The owner supplied an SCPH-7001
+BIOS. The core warned that its SHA-1 differed from its expected SCPH-5501.
+The street route started a new game. For the school route the diagnostic
+frontend seeded a private in-memory Continue slot at the piano and played
+the event with controller inputs. The diagnostic branch contains the runner.
+
+| Case | Sample | Measured interval |
+| --- | --- | --- |
+| PS1 opening street, including forward input | 368 consecutive buffer changes | All 2 VBlanks, 33.37 ms, 29.97 updates/s |
+| PS1 school keyboard | 1,322 consecutive buffer changes | All 1 VBlank, 16.68 ms, 59.94 updates/s |
+| melonDS idle piano event, ARM timer | 600 display-loop intervals | 16.713 / 16.715 / 16.717 ms min/mean/max |
+
+The game's uncapped VBlank counter corroborated both PS1 measurements. The
+port uses a 16.683 ms keyboard simulation step. The DSi timer measurement
+covers the idle event only. Real DSi and general gameplay performance are open.
+
+For both medallion cameras the PS1 capture measured 192 content lines
+in a 240-line picture. After matching the projection and borders, mean absolute
+RGB channel differences against the resampled PS1 frames were 10.5/255
+(hanging) and 8.7/255 (fallen). The keyboard comparison measured 4.0/255.
+PS1 frames use the 320-pixel active width starting at column 14 in the core's
+350-pixel output. The fixed views sample steps 11 and 15 of the event.
 
 ## Source
 
@@ -55,6 +68,6 @@ Copyright (C) 2026 shdecompilations, GPL-3.0. Relevant sources include
 
 ## Next
 
-1. Compare keyboard timing and both medallion views to the local PS1 reference.
-2. Port the medallion fall and the pickup event.
-3. Integrate Harry and the music room collision and camera triggers.
+1. Animate the medallion fall and camera transition using the original event steps.
+2. Integrate Harry, room collision and the interaction triggers.
+3. Complete the medallion pickup and persist its progression flags.

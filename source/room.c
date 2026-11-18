@@ -89,16 +89,29 @@ bool roomLoad(FILE *file)
 void roomDraw(bool solved)
 {
     // MAP1_S01 medallion cameras. Local origin (-100, 0, 20), 2 metres/unit.
-    glViewport(0, 0, 255, 191);
+    // Screen_CutsceneCameraStateUpdate masks the 320x240 picture at y=±96.
+    // Shrink the frustum with the viewport to keep the original pixel scale.
+    glViewport(0, 19, 255, 172);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glFrustum(-1.0/24, 1.0/24, -1.0/32, 1.0/32, 1.0/16, 16);
+    const int distance = solved ? 376 : 353;
+    const int near = 1024; // 0.25 scene units, Q12.
+    int horizontal = 160 * near / distance;
+    int vertical = 96 * near / distance;
+    glFrustumf32(-horizontal, horizontal, -vertical, vertical, near, inttof32(16));
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     if (solved)
         gluLookAt(-0.695, 1.30495, -1.065, 0.8, 0.07, -1.55, 0, 1, 0);
     else
         gluLookAt(1.35, 1.18495, -0.985, -0.185, 1.1, -2.265, 0, 1, 0);
+
+    // vbSetWorldScreenMatrix applies the PS1 224/240 vertical correction
+    // to camera-relative world coordinates before rotating them.
+    int eyeY = solved ? floattof32(1.30495) : floattof32(1.18495);
+    glTranslatef32(0, eyeY, 0);
+    glScalef32(inttof32(1), 4096*224/240, inttof32(1));
+    glTranslatef32(0, -eyeY, 0);
 
     glEnable(GL_TEXTURE_2D | GL_BLEND);
     glClearColor(0, 0, 0, 31);

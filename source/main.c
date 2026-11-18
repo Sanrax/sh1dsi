@@ -119,8 +119,9 @@ int main(void)
     int previousImage = -1;
     systemCounterSetup();
     uint32_t previousTime = systemCounterGetTicks(), debt = 0, pressed = 0;
-    // Provisional event cadence until the same PS1 event is measured.
-    const uint32_t step = systemCounterUsecsToTicks(16667);
+    // MAP1_S01 keyboard updates once per NTSC-U VBlank in the PS1 reference.
+    const unsigned stepUs = 16683;
+    const uint32_t step = systemCounterUsecsToTicks(stepUs);
     for (;;) {
         swiWaitForVBlank();
         scanKeys();
@@ -141,7 +142,7 @@ int main(void)
                 sound = pianoUpdate(&piano, &assets.keys,
                         !!(held & KEY_RIGHT) - !!(held & KEY_LEFT),
                         !!(held & KEY_DOWN) - !!(held & KEY_UP),
-                        pressed & KEY_A, pressed & KEY_B, 16667);
+                        pressed & KEY_A, pressed & KEY_B, stepUs);
                 if (piano.solved && hasRoom) inRoom = true;
             }
             if (hasAudio && sound >= 0) {
