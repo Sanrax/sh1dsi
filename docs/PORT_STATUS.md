@@ -4,7 +4,7 @@ The school piano interaction runs natively on ARM9. The D-pad moves the
 original cursor. The two key regions, snapping, incorrect-sequence resets,
 restart on the first key, note delays and five-key solution follow
 `PianoPuzzle_Control` in MAP1_S01. The solved flag lasts for the session.
-The build enters this event directly. Room traversal, messages, audio,
+The build enters this event directly. Room traversal, messages,
 the medallion cutscene, saving and the full game are pending.
 
 ## Verified
@@ -17,7 +17,7 @@ the medallion cutscene, saving and the full game are pending.
   SHA-1 `34278d31d9b9b12b3b5db5e45bcbe548991ecbc7`. All non-XA file-table
   entries agreed with upstream silentassets. MAP1_S01 matched the upstream
   SHA-1. Repeated local conversions were byte-identical.
-- melonDS loaded the 99,860-byte event pack from virtual console SD, then
+- melonDS loaded the initial 99,860-byte event pack from virtual console SD, then
   from emulated DLDI with a fresh empty console SD. Both storage tests
   exercised examine, move and cancel. With console SD, button input solved
   the puzzle and the solved flag prevented re-entry. Physical tests pending.
@@ -29,6 +29,15 @@ the medallion cutscene, saving and the full game are pending.
   updates. A PS1 same-event reference and a gameplay frame-rate baseline are
   pending. The school event is the only playable interaction.
 
+- A separate diagnostic build sampled 600 successive idle event loop intervals
+  on the emulated ARM timer. Min/mean/max were 16.713/16.715/16.717 ms.
+- The current 156,080-byte pack adds three one-shot samples from MEP101.VAB.
+  Seven pitched keys share one waveform. Muted keys play the mechanical
+  strike and delayed release. A melonDS-only audio capture registered a
+  15,096 peak in signed 16-bit PCM after a strike and silence before.
+  SPU reverb, envelopes and output mixing are pending fidelity comparisons.
+  Repeating the five-key input test with audio enabled passed.
+
 ## Source
 
 [silent-hill-decomp at ecbb0d8](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce),
@@ -38,6 +47,6 @@ Copyright (C) 2026 shdecompilations, GPL-3.0. Relevant sources include
 
 ## Next
 
-1. Measure the event loop with the ARM timer on the diagnostics branch.
-2. Decode the map VAB and play the original piano samples on native channels.
-3. Submit an original IPD map chunk to the hardware 3D engine.
+1. Convert the SCFD00 music room geometry and its three texture pages.
+2. Render the room from the original medallion-event camera.
+3. Capture PS1 reference timing and check the view and audio against it.

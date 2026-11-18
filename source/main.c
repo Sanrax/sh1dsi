@@ -18,6 +18,32 @@ static struct {
 
 _Static_assert(sizeof assets == 99860, "piano file layout");
 
+typedef struct {
+    uint32_t offset, bytes;
+    uint16_t rate;
+    uint8_t volume, pan;
+} Tone;
+
+static Tone tones[9];
+static uint8_t samples[64 * 1024] __attribute__((aligned(32)));
+static bool hasAudio;
+
+static bool loadTones(FILE *file)
+{
+    if (fread(tones, sizeof tones, 1, file) != 1)
+        return false;
+    size_t size = fread(samples, 1, sizeof samples, file);
+    for (unsigned i = 0; i < 9; i++) {
+        const Tone *tone = &tones[i];
+        if (!tone->rate || !tone->bytes || ((tone->offset | tone->bytes) & 3) ||
+            tone->offset > size || tone->bytes > size - tone->offset ||
+            tone->volume > 127 || tone->pan > 127)
+            return false;
+    }
+    DC_FlushRange(samples, size);
+    return true;
+}
+
 static bool loadPiano(void)
 {
     // DSi SD and DLDI can mount independently. Try the launcher's drive first.
@@ -30,8 +56,13 @@ static bool loadPiano(void)
     if (!file)
         return false;
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets
-                 && memcmp(assets.magic, "SHP1", 4) == 0 && fgetc(file) == EOF
-                 && !ferror(file);
+                 && (memcmp(assets.magic, "SHP1", 4) == 0 ||
+                     memcmp(assets.magic, "SHP2", 4) == 0);
+    if (valid && assets.magic[3] == '2') {
+        hasAudio = loadTones(file);
+        valid = hasAudio;
+    }
+    valid = valid && fgetc(file) == EOF && !ferror(file);
     fclose(file);
     return valid;
 }
@@ -68,6 +99,7 @@ int main(void)
     oamSet(&oamMain, 0, 0, 0, 0, 15, SpriteSize_16x16, SpriteColorFormat_Bmp,
            sprite, -1, false, true, false, false, false);
 
+    if (hasAudio) soundEnable();
     Piano piano = {0};
     int previousImage = -1;
     systemCounterSetup();
@@ -84,10 +116,15 @@ int main(void)
         previousTime = now;
         debt += elapsed > 4 * step ? 4 * step : elapsed;
         while (debt >= step) {
-            pianoUpdate(&piano, &assets.keys,
+            int sound = pianoUpdate(&piano, &assets.keys,
                         !!(held & KEY_RIGHT) - !!(held & KEY_LEFT),
                         !!(held & KEY_DOWN) - !!(held & KEY_UP),
                         pressed & KEY_A, pressed & KEY_B, 16667);
+            if (hasAudio && sound >= 0) {
+                const Tone *tone = &tones[sound];
+                soundPlaySample(samples + tone->offset, SoundFormat_16Bit, tone->bytes,
+                                tone->rate, tone->volume, tone->pan, false, 0);
+            }
             pressed = 0;
             debt -= step;
         }

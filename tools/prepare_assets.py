@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from disc import open_disc
+from vab import piano_bank
 
 OUTPUT = Path(__file__).resolve().parents[1] / "dist/sh1dsi/piano.dat"
 
@@ -56,9 +57,10 @@ def prepare(cue):
         # USA/maps/sym.map1_s01.txt and map1_s01.yaml identify the two tables.
         offset = 0x800DD500 - 0x800C9578
         tables = overlay[offset:offset+11] + overlay[offset+12:offset+17]
-        data = (b"SHP1" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
+        data = (b"SHP2" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
                 + background(disc.read("TIM/PIANO1.TIM"))
-                + background(disc.read("TIM/PIANO2.TIM")))
+                + background(disc.read("TIM/PIANO2.TIM"))
+                + piano_bank(disc.read("SND/MEP101.VAB")))
     OUTPUT.parent.mkdir(exist_ok=True, parents=True)
     with tempfile.NamedTemporaryFile(dir=OUTPUT.parent, delete=False) as tmp:
         try:

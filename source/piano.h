@@ -13,10 +13,11 @@ typedef struct {
     int x, y; /* centered PS1 coordinates, Q12 */
     unsigned matched;
     unsigned waitUs;
-    bool checking, solved;
+    bool checking, solved, waitingForRelease;
 } Piano;
 
-void pianoUpdate(Piano *p, const PianoKeyboard *keyboard, int dx, int dy,
+// Returns a bank index for the ARM7 sound channel, or -1 for no new sound.
+int pianoUpdate(Piano *p, const PianoKeyboard *keyboard, int dx, int dy,
                  bool enter, bool cancel, unsigned stepUs);
 
 #endif

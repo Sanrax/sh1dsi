@@ -22,34 +22,40 @@ static unsigned keyAt(const PianoKeyboard *kb, int x, int y)
     return key;
 }
 
-void pianoUpdate(Piano *p, const PianoKeyboard *kb, int dx, int dy,
+int pianoUpdate(Piano *p, const PianoKeyboard *kb, int dx, int dy,
                  bool enter, bool cancel, unsigned stepUs)
 {
     if (!p->checking) {
         if (enter && !p->solved)
             *p = (Piano){.checking = true};
-        return;
+        return -1;
     }
     if (p->waitUs) {
         p->waitUs -= p->waitUs > stepUs ? stepUs : p->waitUs;
-        return;
+        if (p->waitUs == 0 && p->waitingForRelease) {
+            p->waitingForRelease = false;
+            p->waitUs = 300000;
+            return 8;
+        }
+        return -1;
     }
     if (p->matched == 5 || cancel) {
         p->solved = p->matched == 5;
         p->checking = false;
-        return;
+        return -1;
     }
     const int q = 4096;
     p->x = clamp(p->x + dx * (45 * 4 * q / 75), -89*q, 85*q);
     p->y = clamp(p->y + dy * (45 * 4 * q / 75), -71*q, 84*q);
     if (!enter)
-        return;
+        return -1;
 
     static const int snap[] = {-77,-64,-52,-39,-27,-2,8,23,36,48,64,73};
     unsigned key = keyAt(kb, p->x >> 12, p->y >> 12);
     p->x = snap[key] * q;
     bool silent = key == 1 || key == 2 || key == 7 || key == 9 || key == 10;
-    p->waitUs = silent ? 500000 : 300000;
+    p->waitingForRelease = silent;
+    p->waitUs = silent ? 200000 : 300000;
     if (!silent)
         p->matched = 0;
     else if (key == kb->sequence[0])
@@ -58,4 +64,6 @@ void pianoUpdate(Piano *p, const PianoKeyboard *kb, int dx, int dy,
         p->matched++;
     else
         p->matched = 0;
+    static const uint8_t sounds[] = {0,7,7,1,2,3,4,7,5,7,7,6};
+    return sounds[key];
 }
