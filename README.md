@@ -23,8 +23,8 @@ Run `make sdcard` after conversion. Copy the contents of `dist/` to the
 card root. The directory includes the ROM and the two local data files. Keep
 the generated game data on your own devices.
 
-The current entry point is Midwich's music room. Press A to approach the
+The current entry point is Harry standing at Midwich's piano. Press A to inspect the
 piano and A again to examine the keys. Move the cursor with the D-pad and
 press A to strike a key. B backs out one view at a time. Solving the puzzle
-starts the silver medallion cutscene. Start skips to its landing camera.
+starts the silver medallion cutscene. Start skips back to the room camera.
 Movement and pickup are pending.

@@ -4,6 +4,7 @@
 #include <string.h>
 #include "piano.h"
 #include "room.h"
+#include "player.h"
 
 typedef struct {
     uint16_t palette[256];
@@ -139,6 +140,7 @@ int main(void)
             if (inRoom) {
                 MedalPhase phase = medal.phase;
                 roomChanged |= medallionTick(&medal, pressed & KEY_START);
+                roomChanged |= playerTick();
                 if (phase == MedalDrop && medal.phase == MedalImpact)
                     sound = 9;
                 if ((pressed & KEY_A) && !piano.solved)

@@ -10,10 +10,10 @@ void medallionStart(Medallion *m)
 
 bool medallionTick(Medallion *m, bool skip)
 {
-    if (m->phase == MedalHanging || m->phase == MedalLanded)
+    if (m->phase == MedalHanging || m->phase == MedalFinished)
         return false;
     if (skip) {
-        m->phase = MedalLanded;
+        m->phase = MedalFinished;
         m->projection = 376;
         return true;
     }
@@ -58,6 +58,12 @@ bool medallionTick(Medallion *m, bool skip)
         if (m->ticks < 62)
             return false;
         m->phase = MedalLanded;
+        m->ticks = 0;
+        return true;
+    case MedalLanded:
+        if (m->ticks < 120)
+            return false;
+        m->phase = MedalFinished;
         return true;
     default:
         return false;

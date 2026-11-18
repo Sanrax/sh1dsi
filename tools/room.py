@@ -3,6 +3,8 @@ from collections import defaultdict
 import math
 import struct
 
+from harry import player_data
+
 
 def music_room(disc):
     data = disc.read("BG/SCFD00.IPD")
@@ -92,11 +94,16 @@ def music_room(disc):
     c, s = round(math.cos(angle)*4096), round(math.sin(angle)*4096)
     add_model(b"SILVER_H", (c,-s,0,0,0,4096,-s,-c,0), local(-98.8,0,22.8), 2)
 
-    result = bytearray(struct.pack("<4sHHII", b"SHR1", mat_count, len(groups), len(pages), len(palettes)))
+    player, skin, cluts = player_data(disc)
+    page_info.append((len(pages), 256, len(palettes)//32, len(cluts)//32))
+    pages.extend(skin)
+    palettes.extend(cluts)
+    result = bytearray(struct.pack("<4sHHII", b"SHR2", len(page_info), len(groups), len(pages), len(palettes)))
     for page in page_info:
         result.extend(struct.pack("<IHHI", *page))
     result.extend(pages)
     result.extend(palettes)
+    result.extend(player)
     for key, quads in sorted(groups.items(), key=lambda g: (g[0][3] & 1, g[0])):
         result.extend(struct.pack("<4BI", *key, len(quads)//32))
         result.extend(quads)

@@ -3,7 +3,7 @@
 #include <stdbool.h>
 
 typedef enum {
-    MedalHanging, MedalZoom, MedalSwing, MedalDrop, MedalImpact, MedalLanded
+    MedalHanging, MedalZoom, MedalSwing, MedalDrop, MedalImpact, MedalLanded, MedalFinished
 } MedalPhase;
 
 typedef struct {

@@ -1,6 +1,7 @@
 #include <nds.h>
 #include <string.h>
 #include "room.h"
+#include "player.h"
 
 typedef struct {
     uint32_t offset;
@@ -23,7 +24,7 @@ static struct {
     uint16_t pages, batches;
     uint32_t textureBytes, paletteBytes;
 } header;
-static Page pages[3];
+static Page pages[4];
 static Batch batches[128];
 static Vertex *vertices;
 
@@ -43,8 +44,10 @@ static bool upload(FILE *file, void *vram, unsigned size)
 
 bool roomLoad(FILE *file)
 {
-    if (fread(&header, sizeof header, 1, file) != 1 || memcmp(header.magic, "SHR1", 4) ||
-        header.pages != 3 || header.batches > 128 || !header.batches ||
+    if (fread(&header, sizeof header, 1, file) != 1 ||
+        !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
+          (!memcmp(header.magic, "SHR2", 4) && header.pages == 4)) ||
+        header.batches > 128 || !header.batches ||
         header.textureBytes > 128*1024 || (header.textureBytes & 7) ||
         header.paletteBytes > 64*1024 || (header.paletteBytes & 31) ||
         fread(pages, sizeof(Page), header.pages, file) != header.pages)
@@ -63,6 +66,9 @@ bool roomLoad(FILE *file)
         return false;
     vramSetBankC(VRAM_C_TEXTURE_SLOT0);
     vramSetBankE(VRAM_E_TEX_PALETTE);
+    if (header.pages == 4 &&
+        (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file)))
+        return false;
 
     // One tightly packed stream in RAM. The file length bounds every batch read.
     long start = ftell(file);
@@ -88,28 +94,34 @@ bool roomLoad(FILE *file)
 
 void roomDraw(const Medallion *medal)
 {
-    bool solved = medal->phase == MedalLanded;
+    bool solved = medal->phase >= MedalLanded;
+    bool gameplay = playerReady() && (medal->phase == MedalHanging || medal->phase == MedalFinished);
     // MAP1_S01 medallion cameras. Local origin (-100, 0, 20), 2 metres/unit.
     // Screen_CutsceneCameraStateUpdate masks the 320x240 picture at y=±96.
     // Shrink the frustum with the viewport to keep the original pixel scale.
-    glViewport(0, 19, 255, 172);
+    int border = gameplay ? 6 : 19;
+    glViewport(0, border, 255, 191-border);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    const int distance = medal->phase == MedalHanging ? 353 : medal->projection;
+    const int distance = gameplay ? 224 : medal->phase == MedalHanging ? 353 : medal->projection;
     const int near = 1024; // 0.25 scene units, Q12.
     int horizontal = 160 * near / distance;
-    int vertical = 96 * near / distance;
+    int vertical = (gameplay ? 112 : 96) * near / distance;
     glFrustumf32(-horizontal, horizontal, -vertical, vertical, near, inttof32(16));
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    if (solved)
+    if (gameplay) {
+        // Room 39 at the piano, before and after the event warps Harry.
+        if (solved) gluLookAt(-1, 1.5, 0.875, 0.2799, -0.25, -0.9482, 0, 1, 0);
+        else gluLookAt(-1, 1.5, 0.875, 1.0226, -0.25, -0.4296, 0, 1, 0);
+    } else if (solved)
         gluLookAt(-0.695, 1.30495, -1.065, 0.8, 0.07, -1.55, 0, 1, 0);
     else
         gluLookAt(1.35, 1.18495, -0.985, -0.185, 1.1, -2.265, 0, 1, 0);
 
     // vbSetWorldScreenMatrix applies the PS1 224/240 vertical correction
     // to camera-relative world coordinates before rotating them.
-    int eyeY = solved ? floattof32(1.30495) : floattof32(1.18495);
+    int eyeY = gameplay ? floattof32(1.5) : solved ? floattof32(1.30495) : floattof32(1.18495);
     glTranslatef32(0, eyeY, 0);
     glScalef32(inttof32(1), 4096*224/240, inttof32(1));
     glTranslatef32(0, -eyeY, 0);
@@ -120,6 +132,12 @@ void roomDraw(const Medallion *medal)
     glClearDepth(0x7fff);
     glColor(RGB15(31,31,31));
     const Vertex *v = vertices;
+    if (playerReady()) {
+        const Page *skin = &pages[3];
+        GFX_TEX_FORMAT = (skin->offset >> 3) | (TEXTURE_SIZE_256 << 20)
+                         | (TEXTURE_SIZE_256 << 23) | (GL_RGB16 << 26);
+        playerDraw(skin->firstPalette, medal->phase != MedalHanging);
+    }
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];
         unsigned count = 4*b->quads;

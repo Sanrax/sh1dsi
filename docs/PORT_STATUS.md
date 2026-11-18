@@ -5,8 +5,9 @@ original cursor. The two key regions, snapping, incorrect-sequence resets,
 restart on the first key, note delays and five-key solution follow
 `PianoPuzzle_Control` in MAP1_S01. The solved flag lasts for the session.
 The build enters the 3D music room directly. Solving the piano plays the
-silver medallion fall with its impact sound and landing camera. Room traversal,
-Harry, messages, pickup, saving and progression are pending. The full game is unplayable.
+silver medallion fall with its impact sound and landing camera, then returns
+to Harry in the gameplay view. Room traversal, messages, pickup, saving and
+progression are pending. The full game is unplayable.
 
 ## DSi verification
 
@@ -22,12 +23,11 @@ Harry, messages, pickup, saving and progression are pending. The full game is un
   separate tests. Each route entered the piano, backed out to the same room
   frame, and completed the five-key solution. The lower LCD stayed black.
   Physical console SD and DSpico boot tests are pending.
-- Three 4-bit texture pages use 80 KiB of texture VRAM and 1 KiB of palettes.
+- The room and Harry use four 4-bit texture pages (112 KiB) and 1,504 bytes of palettes.
   Eight SCFD00 instances, the open lid and the medallion contribute 764 quads
   per view. Camera position, zoom and cutscene borders come from MAP1_S01.
-  Static frames persist without geometry resubmission. Whole-polygon alpha,
-  perspective texture interpolation, missing characters and lighting still
-  differ from the PS1.
+  Harry adds 364 triangles and quads in total. Whole-polygon alpha, perspective
+  texture interpolation, character shading and room lighting differ from the PS1.
 - All 49,152 overview pixels matched the prepared 5-bit colors. The cursor
   changed 49 pixels in the initial keyboard view. The event pack stores four
   MEP101.VAB samples and plays them through native sound channels. An isolated
@@ -38,9 +38,9 @@ Harry, messages, pickup, saving and progression are pending. The full game is un
   second camera. The port advances the fixed-point motion every two simulation
   ticks. A DLDI replay in melonDS showed the zoom, swing, drop and stationary
   hold. The isolated impact recording peaked at 15,710 in signed 16-bit PCM.
-  Both the full replay and a Start skip from virtual console SD ended at the
-  previously verified landing frame, identical across all 49,152 pixels.
-  The event holds that view until player traversal is available.
+  The current build holds the landing view for two seconds, then restores
+  the room camera. Full puzzle replays on virtual SD and DLDI reached the
+  animated player in the second gameplay pose. The bottom LCD stayed black.
 
 ## Reference measurements
 
@@ -55,11 +55,12 @@ the event with controller inputs. The diagnostic branch contains the runner.
 | --- | --- | --- |
 | PS1 opening street, including forward input | 368 consecutive buffer changes | All 2 VBlanks, 33.37 ms, 29.97 updates/s |
 | PS1 school keyboard | 1,322 consecutive buffer changes | All 1 VBlank, 16.68 ms, 59.94 updates/s |
+| melonDS music room with Harry idling, ARM timer | 300 scene submissions | 16.715 / 33.317 / 33.432 ms min/mean/max, 2.893 ms mean CPU submission time |
 | melonDS idle piano event, ARM timer | 600 display-loop intervals | 16.713 / 16.715 / 16.717 ms min/mean/max |
 
 The game's uncapped VBlank counter corroborated both PS1 measurements. The
-port uses a 16.683 ms keyboard simulation step. The DSi timer measurement
-covers the idle event only. Real DSi and general gameplay performance are open.
+port uses a 16.683 ms keyboard simulation step. The room measurement includes skinning and submitting the room and player.
+The timer measures the emulated ARM9. Real DSi and general gameplay performance are open.
 
 For both medallion cameras the PS1 capture measured 192 content lines
 in a 240-line picture. After matching the projection and borders, mean absolute
@@ -73,7 +74,9 @@ after control returns. In both, the locally decoded HB_BASE.ANM idle pose
 matched all 17 non-root bone matrices and translations exactly. HERO.ILM
 uses 19 active meshes and 332 distinct vertices in this unarmed pose. Faces
 can reuse vertices transformed by an earlier bone in the model draw order.
-Harry's geometry and pose have only been checked on the host so far.
+The ARM9 interpolates 40 original idle keyframes and transforms each vertex
+once per update. Against the two PS1 gameplay views, whole-frame mean absolute
+RGB differences were 16.7/255 before and 15.4/255 after the event.
 
 ## Source
 
@@ -84,6 +87,6 @@ Copyright (C) 2026 shdecompilations, GPL-3.0. Relevant sources include
 
 ## Next
 
-1. Render Harry from HERO.ILM and HB_BASE.ANM in the measured gameplay camera.
-2. Integrate room collision, player movement and the two interaction triggers.
+1. Bring over Harry's digital walk and turn states and the IPD collision shapes.
+2. Gate both interactions on position and facing and update the camera during movement.
 3. Complete the medallion pickup and persist its progression flags.
