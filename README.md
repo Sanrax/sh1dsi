@@ -41,7 +41,7 @@ stays unlocked. Walk west along the southern hallway and face
 the single door on the south wall to enter the infirmary. Face the health
 drink or first-aid kit and press A to inspect it. Choose Yes to take it or
 press B to leave it. Rerun the asset converter when updating an existing
-installation for the pickups and corrected downstairs collision.
+installation for the pickups, downstairs collision and poster depth fix.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

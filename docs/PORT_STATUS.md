@@ -142,10 +142,20 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   within 1 cm of PS1 along the blocked axis. The first-floor latch and
   both action-button transitions still work.
 
+## Wall decorations
+
+- The converter offsets 30 confirmed coplanar decoration quads by 7.8 mm
+  toward the visible side. Texture coordinates, the backing walls and
+  runtime geometry counts stay the same.
+- A melonDS DSi-mode sweep sampled 13 angles at a first-floor poster.
+  In the old data, wall texels covered the entire 18 × 16 sample at three
+  angles. In the updated data, all 13 samples showed the poster with zero
+  wall-only texels in that region.
+
 ## Next
 
-1. Stabilize the depth ordering of the coplanar first-floor posters and verify a moving camera view.
-2. Compare the infirmary camera transitions and final view matrix against a PS1 replay at the same poses.
+1. Match the PS1 pitch near the infirmary cabinet and kit.
+2. Compare the remaining infirmary camera transitions and lighting with the PS1.
 3. Trace the route toward the courtyard and identify the next room and door assets.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

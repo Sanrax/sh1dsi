@@ -99,6 +99,22 @@ def infirmary_items(disc):
     return pixels, colors, poses
 
 
+def vertical_rectangle(points):
+    for axis, across in ((0, 2), (2, 0)):
+        if any(p[axis] != points[0][axis] for p in points[1:]):
+            continue
+        horizontal = sorted({p[across] for p in points})
+        vertical = sorted({p[1] for p in points})
+        if len(horizontal) != 2 or len(vertical) != 2 or len(set(points)) != 4:
+            return None
+        a, b, c, _ = points
+        winding = (b[across]-a[across])*(c[1]-a[1]) - (b[1]-a[1])*(c[across]-a[across])
+        # The renderer keeps clockwise faces. Move toward their visible side.
+        side = 1 if (winding > 0) == (axis == 0) else -1
+        return (axis, points[0][axis], side), (*horizontal, *vertical)
+    return None
+
+
 def school_room(disc, room=39):
     cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3)}[room]
     data = disc.read(f"BG/SC{cx:02X}{cz:02X}.IPD")
@@ -137,6 +153,8 @@ def school_room(disc, room=39):
 
     # Group opaque polygons by texture and CLUT without duplicating any texture.
     groups = defaultdict(bytearray)
+    walls = defaultdict(list)
+    decorations = []
     vertex_scale = 4 if room in (12, 31) else 8
     def add_model(name, matrix, position, state=0, *, item_page=None):
         model_data, meshes, base, ptr = models[name]
@@ -168,6 +186,8 @@ def school_room(disc, room=39):
                     raise ValueError("invalid material or CLUT")
                 flags = (face[7] >> 7) | (color_keys[mat][row] << 1)
                 group = groups[state, mat, row, flags]
+                start = len(group)
+                points = []
                 for corner in (0, 1, 3, 2):  # PS1 quad strip to DS perimeter
                     idx = face[12+corner] - base
                     if not 0 <= idx < nverts:
@@ -176,7 +196,17 @@ def school_room(disc, room=39):
                     u, v = face[uv:uv+2]
                     if item_page is not None and (u >= 64 or v >= (32 if v_offset else 128)):
                         raise ValueError("common item UV outside atlas")
-                    group.extend(struct.pack("<3hBB", *vertices[idx], u, v+v_offset))
+                    point = vertices[idx]
+                    group.extend(struct.pack("<3hBB", *point, u, v+v_offset))
+                    points.append(point)
+                if not state and item_page is None and not flags & 1:
+                    rectangle = vertical_rectangle(points)
+                    if rectangle is not None:
+                        plane, bounds = rectangle
+                        if name == b"NULL_NEA":
+                            decorations.append((plane, bounds, group, start))
+                        else:
+                            walls[plane].append(bounds)
 
     infos, buffers = struct.unpack_from("<II", data, 20)
     for i in range(data[9]):
@@ -188,6 +218,17 @@ def school_room(disc, room=39):
             if data[info]:
                 raise ValueError("music room references an external PLM")
             add_model(bytes(data[info+4:info+12]).rstrip(b"\0"), pose[:9], pose[9:])
+
+    # The PS1 ordering table layers wall decorations over their backing
+    # faces. Separate confirmed coplanar pairs by two Q8 units (7.8 mm).
+    for plane, bounds, group, start in decorations:
+        left, right, bottom, top = bounds
+        if any(bounds != b and b[0] <= left and b[1] >= right and b[2] <= bottom and b[3] >= top
+               for b in walls[plane]):
+            axis, depth, side = plane
+            for offset in range(start+2*axis, start+32, 8):
+                struct.pack_into("<h", group, offset, depth+side*2*vertex_scale)
+
     if room == 9:
         page = len(page_info)
         pixels, colors, poses = infirmary_items(disc)
