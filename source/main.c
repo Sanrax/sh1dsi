@@ -28,7 +28,11 @@ typedef struct {
     uint8_t volume, pan;
 } Tone;
 
-enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, DoorUnlock, ToneCount };
+enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, DoorUnlock,
+       PromptMove, PromptCancel, PromptConfirm, ToneCount };
+static const int pickupSounds[] = {
+    [PickupMove] = PromptMove, [PickupCancel] = PromptCancel, [PickupConfirm] = PromptConfirm
+};
 static Tone tones[ToneCount];
 static uint8_t samples[144 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
@@ -83,9 +87,9 @@ static bool loadPiano(void)
         return false;
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets
                  && memcmp(assets.magic, "SHP", 3) == 0 &&
-                 assets.magic[3] >= '1' && assets.magic[3] <= '6';
+                 assets.magic[3] >= '1' && assets.magic[3] <= '7';
     if (valid && assets.magic[3] != '1') {
-        static const unsigned counts[] = {0, 9, 10, 12, 14, ToneCount};
+        static const unsigned counts[] = {0, 9, 10, 12, 14, 15, ToneCount};
         toneCount = counts[assets.magic[3]-'1'];
         valid = loadTones(file, toneCount);
     }
@@ -225,7 +229,8 @@ int main(void)
                     walk = !!(held & KEY_UP) - !!(held & KEY_DOWN);
                 }
                 roomChanged |= playerTick(turn, walk, pickupAction());
-                pickupTick(pressed);
+                PickupSound pickupSound = pickupTick(pressed);
+                if (pickupSound != PickupQuiet) sound = pickupSounds[pickupSound];
                 latchTick(pressed);
                 if (phase == MedalDrop && medal.phase == MedalImpact)
                     sound = 9;

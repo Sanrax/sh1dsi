@@ -163,7 +163,7 @@ bool pickupHidden(PickupItem item)
     return (phase == Inspecting && activeItem == item) || (collected & pickups[item].flag);
 }
 
-void pickupTick(unsigned pressed)
+PickupSound pickupTick(unsigned pressed)
 {
     bool silver = activeItem == SilverMedallion;
     const Model *m = &models[activeItem];
@@ -198,10 +198,13 @@ void pickupTick(unsigned pressed)
             if (pressed & KEY_DOWN) selected = 1;
             if (previous != selected) flash = 0;
             if (pressed & (KEY_A|KEY_B)) {
-                if ((pressed & KEY_A) && !selected && !(pressed & KEY_B))
+                bool accept = (pressed & KEY_A) && !selected && !(pressed & KEY_B);
+                if (accept)
                     collected |= pickups[activeItem].flag;
                 phase = silver ? Rising : Inactive;
+                return accept ? PickupConfirm : PickupCancel;
             }
+            if (previous != selected) return PickupMove;
         }
         break;
     case Rising:
@@ -210,6 +213,7 @@ void pickupTick(unsigned pressed)
     default:
         break;
     }
+    return PickupQuiet;
 }
 
 void pickupDrawItem(void)

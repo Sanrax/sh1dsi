@@ -47,7 +47,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | melonDS idle keyboard | 600 display-loop intervals | 16.713 / 16.715 / 16.717 ms min/mean/max |
 | melonDS southern hallway with medallion | 300 scene intervals | 16.717 / 33.373 / 49.968 ms min/mean/max, 5.138 ms mean ARM9 submission time |
 | melonDS infirmary entrance with medallion | 300 scene intervals | 16.711 / 33.317 / 33.434 ms min/mean/max, 3.920 ms mean ARM9 submission time |
-| melonDS infirmary health drink | 300 scene submissions during the pickup event | 16.717 / 33.374 / 33.432 ms min/mean/max, 4.167 ms mean ARM9 submission time |
+| melonDS infirmary health drink | 300 scene submissions during the pickup event | 16.713 / 33.374 / 33.432 ms min/mean/max, 4.263 ms mean ARM9 submission time |
 
 ## Scene and interaction checks
 
@@ -128,10 +128,14 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   resampled PS1 captures. The scene camera and item lighting still differ.
 - The melonDS 1.1 DLDI run loaded an existing-format slot with the medallion.
   Harry declined and then took each item, left and re-entered the infirmary,
-  and wrote a new notebook slot with both sets of pickups and the latch.
+  and wrote a new notebook slot with the supplies, medallion and latch.
   After restarting melonDS, the same build loaded the saved pose and flags.
   The same replay passed on virtual console SD in upstream build `361ffa9`.
   The regenerated sidecar is required for the interactions.
+- The silver medallion and medical prompts use BASE.VAB effects 1305–1307
+  for changing the selection, declining and accepting. An isolated melonDS
+  recording verified three distinct PCM onsets and silence when pressing
+  Up on the already selected first option.
 
 ## Downstairs collision
 
@@ -162,8 +166,8 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 ## Next
 
 1. Compare the remaining infirmary camera transitions and lighting with the PS1.
-2. Trace the original pickup menu sounds and add the BASE.VAB samples.
-3. Trace the route toward the courtyard and identify the next room and door assets.
+2. Trace the route toward the courtyard and identify the next room and door assets.
+3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
 shdecompilations. [Pinned upstream source](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce)

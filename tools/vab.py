@@ -64,6 +64,9 @@ def school_bank(map_vab, base_vab):
     notes = [(1, n, 127) for n in (48, 51, 52, 53, 54, 56, 59, 61)]
     tones = convert_tones(map_vab, notes + [(0, 60, 97), (0, 52, 127)], samples)
     # Event_DisplayMapMsgWithSfx starts the latch at half volume.
+    # Gfx_MapMsg_Draw and its selection update use effects 1305–1307
+    # at half volume, with a -10 level adjustment for move and cancel.
     tones.extend(convert_tones(base_vab, [(0, 53, 127), (0, 54, 107),
-                                         (1, 54, 57), (1, 55, 57), (2, 54, 64)], samples))
+                                         (1, 54, 57), (1, 55, 57), (2, 54, 64),
+                                         (0, 49, 59), (0, 50, 59), (0, 51, 64)], samples))
     return tones + samples
