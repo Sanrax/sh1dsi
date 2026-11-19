@@ -38,12 +38,15 @@ Turn back up the same stairs to return. On the first floor, face the double
 door on the western wall near the stairs and press A to unlock it. Dismiss the
 message with A or B, then press A to enter the southern hallway. The door
 stays unlocked. Walk west along the southern hallway and face
-the single door on the south wall to enter the infirmary. You can walk to the
-desk, see the medical supplies and leave through the same door.
+the single door on the south wall to enter the infirmary. Face the health
+drink or first-aid kit and press A to inspect it. Choose Yes to take it or
+press B to leave it. Rerun the asset converter to enable the two pickups on
+an existing installation.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left
 or Right changes the confirmation choice. After saving, B returns to the room.
 On a fresh boot, A loads the highlighted checkpoint and B starts at the piano.
 The game keeps up to eleven slots in `/sh1dsi/` on the card containing the game
-data. Keep the `note*.sav` files when updating the port.
+data. The notebook remembers both medical supplies once collected. Keep the
+`note*.sav` files when updating the port.

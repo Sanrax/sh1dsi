@@ -26,7 +26,8 @@ static bool valid(const Record *r)
 {
     const Checkpoint *p = &r->point;
     return !memcmp(r->magic, "SHC1", 4) && r->checksum == checksum(r) &&
-           p->room == Infirmary && p->yaw < 4096 && p->saves && p->flags < 16 &&
+           p->room == Infirmary && p->yaw < 4096 && p->saves &&
+           !(p->flags & ~(PianoSolved | PickupFlags | LatchOpen | NotebookRead)) &&
            (!(p->flags & SilverHeld) || (p->flags & PianoSolved)) &&
            p->x >= 52*4096 && p->x <= 66*4096 && p->z >= 133*4096 && p->z <= 147*4096;
 }

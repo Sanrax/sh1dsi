@@ -16,6 +16,8 @@ typedef struct {
     uint32_t quads;
 } Batch;
 
+enum { StaticBatch, HangingSilverBatch, FallenSilverBatch, DrinkBatch, KitBatch };
+
 typedef struct {
     int16_t x, y, z;
     uint8_t u, v;
@@ -76,13 +78,14 @@ bool roomLoad(FILE *file, SchoolRoom room)
     if (room == Infirmary) magic = "SHI1";
     if (fread(&header, sizeof header, 1, file) != 1) return false;
     bool latchText = room == FirstFloor && !memcmp(header.magic, "SHF2", 4);
-    bool items = room == Infirmary && !memcmp(header.magic, "SHI2", 4);
+    bool medical = room == Infirmary && !memcmp(header.magic, "SHI3", 4);
+    bool items = medical || (room == Infirmary && !memcmp(header.magic, "SHI2", 4));
     enum { ItemPageBytes = 64*256/2, ItemPageOffset = 128*1024-ItemPageBytes };
     if (items && header.textureBytes < ItemPageBytes) return false;
     unsigned sceneBytes = header.textureBytes - (items ? ItemPageBytes : 0);
     unsigned scenePages = room == SchoolCorridor ? 2 : 3;
     if (latchText) magic = "SHF2";
-    if (items) magic = "SHI2";
+    if (items) magic = medical ? "SHI3" : "SHI2";
     if ((corridor ? (memcmp(header.magic, magic, 4) || header.pages != scenePages + items || !playerReady() ||
                      sceneBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
          !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
@@ -134,7 +137,10 @@ bool roomLoad(FILE *file, SchoolRoom room)
 
     if (header.magic[3] == '5' &&
         (header.textureBytes < 2048 || header.paletteBytes < 32 ||
-         !pickupLoad(file, header.textureBytes-2048, header.paletteBytes/32-1)))
+         !pickupLoad(file, SilverMedallion, header.textureBytes-2048, header.paletteBytes/32-1)))
+        return false;
+    if (medical && (!pickupLoad(file, HealthDrink, ItemPageOffset, pages[scenePages].firstPalette+1) ||
+                    !pickupLoad(file, FirstAidKit, ItemPageOffset, pages[scenePages].firstPalette)))
         return false;
 
     // One tightly packed stream in RAM. The file length bounds every batch read.
@@ -148,10 +154,11 @@ bool roomLoad(FILE *file, SchoolRoom room)
     vertices = malloc(bytes);
     if (!vertices) return false;
     unsigned pos = 0, total = bytes / sizeof(Vertex);
+    unsigned maxState = medical ? KitBatch : corridor ? StaticBatch : FallenSilverBatch;
     for (unsigned i = 0; i < header.batches; i++) {
         Batch *b = &batches[i];
         if (fread(b, sizeof *b, 1, file) != 1 || b->page >= header.pages ||
-            b->state > 2 || b->flags > 3 || b->palette >= pages[b->page].palettes ||
+            b->state > maxState || b->flags > 3 || b->palette >= pages[b->page].palettes ||
             b->quads > (total-pos)/4 ||
             fread(vertices+pos, sizeof(Vertex)*4, b->quads, file) != b->quads)
             return false;
@@ -205,11 +212,18 @@ void roomDraw(const Medallion *medal)
         playerDraw(skin.firstPalette);
     }
     if (current == EastCorridor || current == FirstFloor) glScalef32(8192, 8192, 8192);
+    bool visible[] = {
+        [StaticBatch] = true,
+        [HangingSilverBatch] = !solved,
+        [FallenSilverBatch] = solved && !pickupHidden(SilverMedallion),
+        [DrinkBatch] = !pickupHidden(HealthDrink),
+        [KitBatch] = !pickupHidden(FirstAidKit),
+    };
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];
         unsigned count = 4*b->quads;
-        if (b->state == 0 || (b->state == (solved ? 2 : 1) && !pickupFloorHidden())) {
-            bool moving = b->state == 1 && medal->phase >= MedalSwing;
+        if (visible[b->state]) {
+            bool moving = b->state == HangingSilverBatch && medal->phase >= MedalSwing;
             if (moving) {
                 // SHR1 stores the hanging model with its Q8 pivot baked in.
                 glPushMatrix();

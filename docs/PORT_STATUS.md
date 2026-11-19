@@ -3,9 +3,9 @@
 Harry starts at the Midwich piano. He can solve the keyboard puzzle, watch
 or skip the falling silver medallion, decline or accept it, walk through the
 eastern hallway, descend the stairs, unlatch the first-floor door and enter
-the southern hallway. He can enter the infirmary, walk to the desk and return.
-The notebook saves Harry’s pose, puzzle progress, medallion, latch and play
-time. A cold boot can resume at the desk. The full game remains unplayable.
+the southern hallway. In the infirmary he can pick up both medical supplies
+and use the notebook. A cold boot can resume at the desk with the puzzle,
+door latch and pickups intact. The full game remains unplayable.
 
 ## Build and media
 
@@ -17,7 +17,9 @@ time. A cold boot can resume at the desk. The full game remains unplayable.
 - melonDS 1.1 direct boot uses external BIOS, firmware and private NAND.
   The SDK filesystem sample and port verified TWL mode, and the emulator
   reported 16 MB RAM. Physical console SD and DSpico/Pico-Launcher remain
-  untested. The lower screen stays black in production.
+  untested. The official DSpico DLDI driver built from `8ba45f6` fits the
+  ROM's 16 KiB patch area. The lower screen stays black in production.
+  [DSpico driver source](https://github.com/LNH-team/dspico-dldi/tree/8ba45f65690bc40d9279e663e1d89ca806451cc1)
 
 ## Frame pacing
 
@@ -36,6 +38,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | PS1 eastern hallway through stair descent | 357 buffer-change intervals | All 33.37 ms |
 | PS1 crossing the southern hallway | 176 buffer-change intervals | 70 at 33.37 ms and 106 at 50.05 ms |
 | PS1 infirmary from entrance to save interaction | 255 buffer-change intervals | 1 at 16.68 ms, 247 at 33.37 ms and 7 at 50.05 ms |
+| PS1 health drink and first-aid kit events | 130 drink and 126 kit buffer-change intervals | Drink had 9 at 33.37 ms and 121 at 50.05 ms. Kit intervals were all 50.05 ms |
 | melonDS idle music room with Harry | 300 scene submissions | 16.715 / 33.317 / 33.432 ms min/mean/max, 2.893 ms mean ARM9 submission time |
 | melonDS rotating silver pickup with prompt | 300 scene intervals | 16.713 / 33.374 / 33.432 ms min/mean/max, 3.291 ms mean ARM9 submission time |
 | melonDS idle corridor after collecting the medallion | 300 scene intervals | 16.713 / 33.317 / 33.432 ms min/mean/max, 4.137 ms mean ARM9 submission time |
@@ -44,6 +47,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | melonDS idle keyboard | 600 display-loop intervals | 16.713 / 16.715 / 16.717 ms min/mean/max |
 | melonDS southern hallway with medallion | 300 scene intervals | 16.717 / 33.373 / 49.968 ms min/mean/max, 5.138 ms mean ARM9 submission time |
 | melonDS infirmary entrance with medallion | 300 scene intervals | 16.711 / 33.317 / 33.434 ms min/mean/max, 3.920 ms mean ARM9 submission time |
+| melonDS infirmary health drink | 300 scene submissions during the pickup event | 16.717 / 33.374 / 33.432 ms min/mean/max, 4.167 ms mean ARM9 submission time |
 
 ## Scene and interaction checks
 
@@ -116,11 +120,23 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   Both modes reported 16 MB; physical storage remains untested.
   [Upstream SD controller fix](https://github.com/melonDS-emu/melonDS/pull/2438)
 
+## Infirmary pickups
+
+- MAP1_S00 points 97 and 98 use the original standing pickup flow, with
+  locally converted models, texture and prompts. The native prompts matched
+  all 265 bright green drink-name pixels and all 254 kit-name pixels in the
+  resampled PS1 captures. The scene camera and item lighting still differ.
+- The melonDS 1.1 DLDI run loaded an existing-format slot with the medallion.
+  Harry declined and then took each item, left and re-entered the infirmary,
+  and wrote a new notebook slot with both sets of pickups and the latch.
+  After restarting melonDS, the same build loaded the saved pose and flags.
+  The regenerated sidecar is required for the interactions.
+
 ## Next
 
-1. Trace the PS1 health drink and first-aid kit prompts, item poses and flags at points 97 and 98.
-2. Implement both pickups and preserve them across room changes and notebook saves.
-3. Compare the infirmary desk camera and shading against the PS1 approach, then measure the corrected scene.
+1. Reproduce the reported downstairs door and locker collision failures and compare the affected boundaries with the PS1.
+2. Identify the wall surfaces involved in the poster flicker and stabilize their depth ordering.
+3. Compare the infirmary camera transitions and final view matrix against a PS1 replay at the same poses.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
 shdecompilations. [Pinned upstream source](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce)

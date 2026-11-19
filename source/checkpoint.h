@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 enum { SaveSlots = 11, PianoSolved = 1, SilverHeld = 2, LatchOpen = 4, NotebookRead = 8 };
+enum { DrinkHeld = 16, KitHeld = 32, PickupFlags = SilverHeld | DrinkHeld | KitHeld };
 typedef struct {
     int32_t x, z;
     uint32_t ticks, saves;

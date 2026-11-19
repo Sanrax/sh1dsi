@@ -188,7 +188,7 @@ int main(void)
         playerRestorePose(&point);
         piano.solved = (point.flags & PianoSolved) != 0;
         medal.phase = piano.solved ? MedalFinished : MedalHanging;
-        pickupRestore(point.flags & SilverHeld, point.flags & LatchOpen);
+        pickupRestore(point.flags);
     }
     bool inRoom = hasRoom;
     int previousImage = -1;
@@ -241,15 +241,17 @@ int main(void)
                     } else if ((pressed & KEY_A) && playerFacingNotebook()) {
                         playerSavePose(&point);
                         point.flags = (point.flags & NotebookRead) | (piano.solved ? PianoSolved : 0) |
-                                      (pickupHasSilver() ? SilverHeld : 0) | (latchUnlocked() ? LatchOpen : 0);
+                                      pickupFlags() | (latchUnlocked() ? LatchOpen : 0);
                         if (notebookMenu(assetDir, false, &point) == NotebookMissingArt)
                             stop("Missing notebook.dat");
                         roomChanged = true;
                         previousTime = systemCounterGetTicks();
                         debt = step;
-                    } else if ((pressed & KEY_A) && roomCurrent() == MusicRoom) {
-                        if (!piano.solved && playerFacingPiano()) inRoom = false;
-                        else if (phase == MedalFinished) pickupStart();
+                    } else if (pressed & KEY_A) {
+                        if (roomCurrent() == MusicRoom && !piano.solved && playerFacingPiano())
+                            inRoom = false;
+                        else if (roomCurrent() == Infirmary || phase == MedalFinished)
+                            pickupStart();
                     }
                 }
             } else if (!piano.checking && (pressed & KEY_B) && hasRoom) {

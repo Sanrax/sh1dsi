@@ -10,7 +10,7 @@ typedef enum { PlayerMove, PlayerKneel, PlayerRise } PlayerAction;
 bool playerTick(int turn, int walk, PlayerAction action);
 bool playerStopped(void);
 bool playerActionDone(PlayerAction action);
-bool playerFacingMedallion(void);
+bool playerFacingPoint(int worldX, int worldZ);
 void playerWarpForMedal(void);
 bool playerFacingPiano(void);
 bool playerFacingNotebook(void);

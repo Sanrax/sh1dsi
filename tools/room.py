@@ -4,7 +4,7 @@ import math
 import struct
 
 from harry import player_data
-from pickup import prompt_data, silver_pickup
+from pickup import medical_pickups, prompt_data, silver_pickup
 
 
 def collision_edges(ipd, room):
@@ -197,14 +197,19 @@ def school_room(disc, room=39):
         color_keys.append([False]*4)
         plm = disc.read("BG/BG_ITEM.PLM")
         models.update(model_directory(plm))
-        for name, (x,y,z), heading in poses:
+        # Keep separate batches for the two props gated by pickup flags.
+        for state, (name, (x,y,z), heading) in zip((0, 3, 4), poses, strict=True):
             angle = heading * math.tau/4096
             c, s = round(math.cos(angle)*4096), round(math.sin(angle)*4096)
-            add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-10240, y>>4, (z>>4)-30720),
+            add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-10240, y>>4, (z>>4)-30720), state,
                       item_page=page)
     if room != 39:
-        magic = {9: b"SHI2", 12: b"SHF2", 13: b"SHS1", 31: b"SHE1", 32: b"SHC1"}[room]
-        extra = prompt_data(disc, latch=True) if room == 12 else b""
+        magic = {9: b"SHI3", 12: b"SHF2", 13: b"SHS1", 31: b"SHE1", 32: b"SHC1"}[room]
+        extra = b""
+        if room == 9:
+            extra = medical_pickups(disc)
+        elif room == 12:
+            extra = prompt_data(disc, 13, first_floor=True, choices=False)
     else:
         magic = b"SHR5"
         # Map_WorldObjectsInit and Map_WorldObjectsUpdate, EventFlag_71 set.

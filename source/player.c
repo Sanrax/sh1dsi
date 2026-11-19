@@ -381,13 +381,12 @@ void playerRestorePose(const Checkpoint *point)
     updateInfirmaryCamera();
 }
 
-bool playerFacingMedallion(void)
+bool playerFacingPoint(int worldX, int worldZ)
 {
-    // MAP_POINTS[17] and Event_CollideFacingCheck. The origin of the
-    // 0.8-metre sector is one eighth of a metre behind Harry.
-    if (roomVersion < 5) return false;
+    // Event_CollideFacingCheck puts the origin of the 0.8-metre sector
+    // one eighth of a metre behind Harry.
     int sx = sinLerp(yaw*8), sz = cosLerp(yaw*8);
-    int dx = -404684 - x + sx/8, dz = 93388 - z + sz/8;
+    int dx = worldX - x + sx/8, dz = worldZ - z + sz/8;
     if (abs(dx) > 3276 || abs(dz) > 3276 || dx*dx+dz*dz > 3276*3276)
         return false;
     int along = dx*sx + dz*sz;

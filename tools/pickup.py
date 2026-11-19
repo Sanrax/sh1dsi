@@ -1,11 +1,11 @@
-"""Prepare the USA music-room pickup model and top-screen dialog from the disc."""
+"""Prepare USA school pickup models and top-screen dialogs from the disc."""
 import re
 import struct
 
 
-def prompt_data(disc, latch=False):
-    overlay = disc.read("VIN/MAP1_S00.BIN" if latch else "VIN/MAP1_S01.BIN")
-    table = 0x800dd1bc if latch else 0x800dcf5c
+def prompt_data(disc, number, *, first_floor=False, choices=True):
+    overlay = disc.read("VIN/MAP1_S00.BIN" if first_floor else "VIN/MAP1_S01.BIN")
+    table = 0x800dd1bc if first_floor else 0x800dcf5c
     base = 0x800c9578
 
     def message(number):
@@ -34,14 +34,14 @@ def prompt_data(disc, latch=False):
         ink_width = 1 + max(i for line in mask for i, p in enumerate(line) if p)
         if c == "I":
             return ink_width + 2
-        return ink_width + (c not in "TYNakvu'")
+        return ink_width + (c not in "HTYNakvu'")
 
     # Keep the draw order for text rollout. Ink groups 2 and 3 let the
     # native selection flash by changing only their LCD palette entries.
     commands = []
     widths = []
     x = row = color = 0
-    for token in re.findall(r"~[A-Z][0-9]?|[^\s]", message(13 if latch else 30)):
+    for token in re.findall(r"~[A-Z][0-9]?|[^\s]", message(number)):
         if token == "~N":
             widths.append(x)
             x = 0
@@ -62,7 +62,7 @@ def prompt_data(disc, latch=False):
     start_x = 160-max(widths)//2
     commands = [(start_x+x, 196-16*row+16*r, ink, mask) for x,r,ink,mask in commands]
     prompt_length = len(commands)
-    for option in (() if latch else (0, 1)):
+    for option in ((0, 1) if choices else ()):
         x = 32
         for c in message(option):
             mask = glyph(c)
@@ -81,31 +81,46 @@ def prompt_data(disc, latch=False):
     return output
 
 
-def silver_pickup(disc):
-    tmd = disc.read("ITEM/UNQ62.TMD")
+def model_corners(tmd, counts, material, first_row, row_offset):
     magic, flags, objects, vp, nv, np, nn, pp, faces, scale = struct.unpack_from("<10I", tmd)
-    if (magic, flags, objects, nv, nn, faces, scale) != (65, 0, 1, 80, 108, 156, 0):
-        raise ValueError("unexpected silver medallion TMD")
+    if (magic, flags, objects, scale) != (65, 0, 1, 0) or (nv, nn, faces) != counts:
+        raise ValueError("unexpected pickup TMD")
     data = bytearray()
     for i in range(faces):
         p = 12+pp+28*i
         if tmd[p:p+4] != bytes((9,6,0,0x34)):
-            raise ValueError("unsupported silver medallion primitive")
+            raise ValueError("unsupported pickup primitive")
         for j in range(3):
             u,v,attr = struct.unpack_from("<BBH", tmd, p+4+4*j)
             n,k = struct.unpack_from("<HH", tmd, p+16+4*j)
-            if u >= 64 or not 128 <= v < 192 or k >= nv or n >= nn or (j < 2 and attr != (138,14)[j]):
-                raise ValueError("invalid silver medallion material or index")
+            if (u >= 64 or not first_row <= v < first_row+64 or k >= nv or n >= nn or
+                    (j < 2 and attr != material[j])):
+                raise ValueError("invalid pickup material or index")
             x,y,z = struct.unpack_from("<3h", tmd, 12+vp+8*k)
             nx,ny,nz = struct.unpack_from("<3h", tmd, 12+np+8*n)
             # Map PS1 view coordinates into the DS camera basis.
             normal = sum((max(-512,min(511,c//8)) & 1023) << (10*axis)
                          for axis,c in enumerate((nx,-ny,-nz)))
-            data.extend(struct.pack("<3hBBI", x,-y,-z,u,v-128,normal))
+            data.extend(struct.pack("<3hBBI", x,-y,-z,u,v-row_offset,normal))
+    return data
 
+
+def silver_pickup(disc):
+    data = model_corners(disc.read("ITEM/UNQ62.TMD"), (80, 108, 156), (138, 14), 128, 128)
     tim = disc.read("ITEM/TIM01.TIM")
     image = 8 + struct.unpack_from("<I", tim, 8)[0]
     if struct.unpack_from("<I4H", tim, image) != (32780, 0, 0, 64, 256):
         raise ValueError("unexpected key item texture")
     pixels = b"".join(tim[image+12+y*128:image+12+y*128+32] for y in range(128,192))
-    return data + prompt_data(disc), pixels, tim[20+2*32:20+3*32]
+    return data + prompt_data(disc, 30), pixels, tim[20+2*32:20+3*32]
+
+
+def medical_pickups(disc):
+    # TIM00 rows 0–127 and its first two CLUTs are shared with the props.
+    data = bytearray()
+    for name, counts, clut, first_row, message in (
+            ("UNQ21", (64, 66, 124), 75, 64, 6),
+            ("UNQ20", (40, 34, 76), 11, 0, 5)):
+        data.extend(model_corners(disc.read(f"ITEM/{name}.TMD"), counts, (clut, 15), first_row, 0))
+        data.extend(prompt_data(disc, message, first_floor=True))
+    return data

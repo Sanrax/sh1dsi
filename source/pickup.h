@@ -2,19 +2,21 @@
 #define SH1_PICKUP_H
 #include "player.h"
 
+typedef enum { SilverMedallion, HealthDrink, FirstAidKit } PickupItem;
+
 bool latchLoad(FILE *file);
 bool latchStart(void);
-bool pickupHasSilver(void);
-void pickupRestore(bool silver, bool doorOpen);
+unsigned pickupFlags(void);
+void pickupRestore(unsigned flags);
 bool latchActive(void);
 bool latchUnlocked(void);
 void latchTick(unsigned pressed);
-bool pickupLoad(FILE *file, unsigned textureOffset, unsigned palette);
+bool pickupLoad(FILE *file, PickupItem item, unsigned textureOffset, unsigned palette);
 void pickupStart(void);
 bool pickupActive(void);
 PlayerAction pickupAction(void);
 void pickupTick(unsigned pressed);
-bool pickupFloorHidden(void);
+bool pickupHidden(PickupItem item);
 void pickupDrawItem(void);
 void pickupDrawPrompt(int bg);
 #endif
