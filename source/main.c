@@ -6,6 +6,7 @@
 #include "room.h"
 #include "player.h"
 #include "pickup.h"
+#include "notebook.h"
 
 typedef struct {
     uint16_t palette[256];
@@ -175,6 +176,20 @@ int main(void)
     if (toneCount) soundEnable();
     Piano piano = {0};
     Medallion medal = {0};
+    Checkpoint point = {0};
+    NotebookResult boot = hasRoom ? notebookMenu(assetDir, true, &point) : NotebookClosed;
+    if (boot == NotebookMissingArt) stop("Missing notebook.dat");
+    if (boot == NotebookLoaded) {
+        FILE *savedRoom = openRoom(Infirmary);
+        if (!savedRoom) stop("Missing infirmary.dat");
+        bool ok = roomLoad(savedRoom, Infirmary);
+        fclose(savedRoom);
+        if (!ok) stop("Invalid infirmary data");
+        playerRestorePose(&point);
+        piano.solved = (point.flags & PianoSolved) != 0;
+        medal.phase = piano.solved ? MedalFinished : MedalHanging;
+        pickupRestore(point.flags & SilverHeld, point.flags & LatchOpen);
+    }
     bool inRoom = hasRoom;
     int previousImage = -1;
     bool enteringRoom = false;
@@ -199,6 +214,7 @@ int main(void)
         bool roomChanged = false;
         while (debt >= step) {
             int sound = -1;
+            if (point.ticks != UINT32_MAX) point.ticks++;
             if (inRoom) {
                 MedalPhase phase = medal.phase;
                 roomChanged |= medallionTick(&medal, pressed & KEY_START);
@@ -220,6 +236,15 @@ int main(void)
                     } else if (next != roomCurrent()) {
                         changeRoom(next);
                         enteringRoom = roomChanged = true;
+                        previousTime = systemCounterGetTicks();
+                        debt = step;
+                    } else if ((pressed & KEY_A) && playerFacingNotebook()) {
+                        playerSavePose(&point);
+                        point.flags = (point.flags & NotebookRead) | (piano.solved ? PianoSolved : 0) |
+                                      (pickupHasSilver() ? SilverHeld : 0) | (latchUnlocked() ? LatchOpen : 0);
+                        if (notebookMenu(assetDir, false, &point) == NotebookMissingArt)
+                            stop("Missing notebook.dat");
+                        roomChanged = true;
                         previousTime = systemCounterGetTicks();
                         debt = step;
                     } else if ((pressed & KEY_A) && roomCurrent() == MusicRoom) {

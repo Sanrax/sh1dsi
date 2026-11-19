@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from disc import open_disc
+from notebook import notebook_data
 from vab import school_bank
 from room import school_room
 
@@ -62,12 +63,14 @@ def prepare(cue):
                 + background(disc.read("TIM/PIANO1.TIM"))
                 + background(disc.read("TIM/PIANO2.TIM"))
                 + school_bank(disc.read("SND/MEP101.VAB"), disc.read("1ST/BASE.VAB")))
+        notebook = notebook_data(disc, background)
         room = school_room(disc)
         corridor = school_room(disc, 32)
         east = school_room(disc, 31)
         first_floor = school_room(disc, 12)
         south = school_room(disc, 13)
         infirmary = school_room(disc, 9)
+    write_asset(OUTPUT.with_name("notebook.dat"), notebook)
     write_asset(OUTPUT, data)
     write_asset(OUTPUT.with_name("room.dat"), room)
     write_asset(OUTPUT.with_name("corridor.dat"), corridor)

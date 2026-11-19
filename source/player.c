@@ -343,17 +343,42 @@ SchoolRoom playerDestination(bool action)
     return room;
 }
 
-bool playerFacingPiano(void)
+static bool facingEastEdge(int edgeX, int edgeZ, int halfWidth)
 {
-    if (roomVersion < 3) return true;
-    // Event_CollideObbFacingCheck, MAP_POINTS[16]. Intersect Harry's
-    // half-metre facing ray with the piano's north-south interaction edge.
-    int dx = -408371 - x, dz = 81510 - z;
+    // Event_CollideObbFacingCheck intersects a half-metre facing ray
+    // with a north-south interaction edge.
+    int dx = edgeX - x, dz = edgeZ - z;
     int rayX = sinLerp(yaw*8)/2, rayZ = cosLerp(yaw*8)/2;
     if (rayX <= 0 || dx < 0 || dx > rayX)
         return false;
     int along = rayZ*dx - dz*rayX;
-    return abs(along) <= 3072 * rayX;
+    return abs(along) <= halfWidth * rayX;
+}
+
+bool playerFacingPiano(void)
+{
+    return roomVersion < 3 || facingEastEdge(-408371, 81510, 3072);
+}
+
+bool playerFacingNotebook(void)
+{
+    // MAP1_S00 point 89, facing east, triggerParam1 = 4 sixteenths of a metre.
+    return roomCurrent() == Infirmary && facingEastEdge(252723, 575897, 1024);
+}
+
+void playerSavePose(Checkpoint *point)
+{
+    point->room = roomCurrent();
+    point->x = x;
+    point->z = z;
+    point->yaw = yaw;
+}
+
+void playerRestorePose(const Checkpoint *point)
+{
+    warp(point->x, point->z, point->yaw);
+    infirmaryRoad = 0;
+    updateInfirmaryCamera();
 }
 
 bool playerFacingMedallion(void)

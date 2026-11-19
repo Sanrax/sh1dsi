@@ -4,8 +4,8 @@ Harry starts at the Midwich piano. He can solve the keyboard puzzle, watch
 or skip the falling silver medallion, decline or accept it, walk through the
 eastern hallway, descend the stairs, unlatch the first-floor door and enter
 the southern hallway. He can enter the infirmary, walk to the desk and return.
-Inventory and unlocked doors last for the session. Saving and the full game
-remain unplayable.
+The notebook saves Harry’s pose, puzzle progress, medallion, latch and play
+time. A cold boot can resume at the desk. The full game remains unplayable.
 
 ## Build and media
 
@@ -97,11 +97,30 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   At the entrance none were in view. With items loaded, 300 idle intervals
   measured 16.717 / 33.318 / 33.430 ms, with 3.992 ms mean submission time.
 
+## Notebook checkpoint
+
+- The notebook at point 89 uses the original first-visit text, font and save
+  background. All 1,155 bright PS1 text pixels matched after resampling to
+  256×192. Slot selection and confirmation use native controls. The port
+  writes its own checkpoint format, distinct from a PS1 memory-card file.
+- In melonDS 1.1, DLDI loaded a seeded desk position with the medallion.
+  The port created slot 2, cancelled and confirmed overwrites, then cold-loaded
+  its own slot at (250931, 576228), yaw 1028. The inventory contained item
+  98 ×1 and the first-floor latch remained open. Host checks validated both
+  generations, all eleven slots and recovery at each of 32 truncated lengths.
+- On virtual console SD, the supplied melonDS 1.1 stalled during both the
+  SDK sample write and the port’s write. Upstream build `361ffa9` completed
+  both. A fresh playthrough walked from the piano, unlocked the latch and
+  created a checkpoint. With the emulator restarted, the same ROM returned
+  to (250982, 576220), yaw 1028, with the latch open and inventory empty.
+  Both modes reported 16 MB; physical storage remains untested.
+  [Upstream SD controller fix](https://github.com/melonDS-emu/melonDS/pull/2438)
+
 ## Next
 
-1. Implement the notebook interaction and original text at MAP1_S00 point 89.
-2. Write and reload the infirmary checkpoint across a fresh DSi boot, checking pose, inventory and flags.
-3. Implement the first-aid kit and health drink pickups, then compare the desk camera and lighting while walking.
+1. Trace the PS1 health drink and first-aid kit prompts, item poses and flags at points 97 and 98.
+2. Implement both pickups and preserve them across room changes and notebook saves.
+3. Compare the infirmary desk camera and shading against the PS1 approach, then measure the corrected scene.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
 shdecompilations. [Pinned upstream source](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce)

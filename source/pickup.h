@@ -4,6 +4,8 @@
 
 bool latchLoad(FILE *file);
 bool latchStart(void);
+bool pickupHasSilver(void);
+void pickupRestore(bool silver, bool doorOpen);
 bool latchActive(void);
 bool latchUnlocked(void);
 void latchTick(unsigned pressed);

@@ -91,9 +91,16 @@ void latchTick(unsigned pressed)
     }
 }
 
-static bool hasSilverMedallion(void)
+bool pickupHasSilver(void)
 {
     return inventoryItem.id == 98 && inventoryItem.count != 0;
+}
+
+void pickupRestore(bool silver, bool doorOpen)
+{
+    inventoryItem.id = silver ? 98 : 0;
+    inventoryItem.count = silver ? 1 : 0;
+    unlocked = doorOpen;
 }
 
 bool pickupActive(void)
@@ -103,7 +110,7 @@ bool pickupActive(void)
 
 void pickupStart(void)
 {
-    if (!pickupActive() && !hasSilverMedallion() && playerFacingMedallion())
+    if (!pickupActive() && !pickupHasSilver() && playerFacingMedallion())
         phase = Stopping;
 }
 
@@ -115,7 +122,7 @@ PlayerAction pickupAction(void)
 
 bool pickupFloorHidden(void)
 {
-    return phase == Inspecting || hasSilverMedallion();
+    return phase == Inspecting || pickupHasSilver();
 }
 
 void pickupTick(unsigned pressed)
