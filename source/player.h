@@ -12,7 +12,7 @@ bool playerActionDone(PlayerAction action);
 bool playerFacingMedallion(void);
 void playerWarpForMedal(void);
 bool playerFacingPiano(void);
-SchoolRoom playerDoorDestination(void);
+SchoolRoom playerDestination(bool action);
 void playerEnterRoom(SchoolRoom from);
 int playerSetCamera(void);
 void playerDraw(unsigned firstPalette);

@@ -13,15 +13,22 @@ enum { Radius = 1228 }; // Harry's 0.3-metre outer cylinder, Q12.
 
 bool collisionLoad(FILE *file, SchoolRoom room)
 {
-    edgeCount = room == EastCorridor ? 43 : room == SchoolCorridor ? 20 : 51;
+    switch (room) {
+    case FirstFloor: edgeCount = 39; break;
+    case EastCorridor: edgeCount = 43; break;
+    case SchoolCorridor: edgeCount = 20; break;
+    case MusicRoom: edgeCount = 51; break;
+    }
     int scale = room == MusicRoom ? 1 : 16;
+    // The first-floor south wall extends 0.21 m into the adjoining chunk.
+    int maxZ = room == FirstFloor ? 21*4096 : 20*4096;
     for (unsigned i = 0; i < edgeCount; i++) {
         int16_t in[6];
         if (fread(in, sizeof in, 1, file) != 1) return false;
         Edge *e = &edges[i];
         *e = (Edge){in[0]*scale, in[1]*scale, in[2]*scale, in[3]*scale, in[4], in[5]};
-        if (abs(e->ax) > 65536 || abs(e->az) > 81920 ||
-            abs(e->bx) > 65536 || abs(e->bz) > 81920 ||
+        if (abs(e->ax) > 65536 || abs(e->az) > maxZ ||
+            abs(e->bx) > 65536 || abs(e->bz) > maxZ ||
             abs(e->tx) > 4096 || abs(e->tz) > 4096 ||
             (e->ax == e->bx && e->az == e->bz))
             return false;
@@ -31,6 +38,21 @@ bool collisionLoad(FILE *file, SchoolRoom room)
 
 Floor collisionFloor(int x, int z)
 {
+    if (roomCurrent() == FirstFloor) {
+        // SC0201 surfaces 8/9 lead upstairs, while 4/7 descend south of
+        // the dividing wall. Both slopes use the original Q8 reference point.
+        int localX = (x >> 4) - 20480, localZ = (z >> 4) - 10240;
+        if (z >= 181248 && z <= 194832 && x >= 449328) {
+            if (x >= 459040) return (Floor){-409*16, 0};
+            return (Floor){(-205 + ((-2753*(localX-7906)) >> 12))*16, -2753};
+        }
+        if (z >= 162976 && z <= 180896 && x >= 449328) {
+            if (x >= 459088) return (Floor){412*16, 0};
+            int y = 204 + ((2778*(localX-7908)) >> 12) + ((5*(localZ-506)) >> 12);
+            return (Floor){y*16, 2778};
+        }
+        return (Floor){-16, 0};
+    }
     if (roomCurrent() != EastCorridor)
         return (Floor){roomCurrent() == SchoolCorridor ? 48 : 0, 0};
     // SCFE01 surfaces 11 and 12. The walls confine Harry to the stair

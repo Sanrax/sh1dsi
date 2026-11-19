@@ -5,7 +5,8 @@ He can walk, turn, approach and solve the keyboard puzzle, watch or skip the
 medallion fall, and collect the silver medallion. Declining leaves it on the
 floor. Accepting keeps one for the session. Harry can cross the second-floor hallway (room 32),
 enter the eastern hallway (room 31), walk down its stair ramp and return through
-both doors. The first-floor load and saving are pending. The full game is unplayable.
+both doors. The stair landing loads the first floor (room 12) and leads back upstairs.
+First-floor door interactions and saving are pending. The full game is unplayable.
 
 ## Verified build and inputs
 
@@ -41,6 +42,7 @@ Reproduction instructions are on `diagnostics/dsi`.
 | melonDS rotating silver pickup with prompt | 300 scene intervals | 16.713 / 33.374 / 33.432 ms min/mean/max, 3.291 ms mean ARM9 submission time |
 | melonDS idle corridor after collecting the medallion | 300 scene intervals | 16.713 / 33.317 / 33.432 ms min/mean/max, 4.137 ms mean ARM9 submission time |
 | melonDS idle eastern hallway with medallion | 300 scene intervals | 16.717 / 33.373 / 49.966 ms min/mean/max, 5.506 ms mean ARM9 submission time |
+| melonDS first-floor stair entry with medallion | 300 scene intervals | 16.717 / 33.374 / 33.438 ms min/mean/max, 5.468 ms mean ARM9 submission time |
 | melonDS idle keyboard | 600 display-loop intervals | 16.713 / 16.715 / 16.717 ms min/mean/max |
 
 The PS1 uncapped VBlank counter corroborated the display-buffer measurements.
@@ -111,16 +113,22 @@ The native simulation advances in 16.683 ms steps. Real DSi timing is pending.
   the bottom screen black. A console SD diagnostic solved the piano, collected
   the medallion and verified the inventory on return. Whole-frame RGB errors were 17.9/255 outbound and
   16.7/255 returning. The eastern doorway is darker than the reference.
-- The original game's `stairs` replay follows the ramp south of the eastern
-  entrance. Point 80 loads MAP1_S00 room 12 with one medallion. The native
-  collision replay reached the lower landing. Camera smoothing, enemies and
-  the transition to the first floor remain incomplete.
+- The stairs use two original 3 m square triggers. MAP1_S01 point 80 loads
+  MAP1_S00 room 12 at (454656, 188006). MAP1_S00 point 79 returns Harry to
+  room 31 at (-192512, 174899). Both headings are 3072. The PS1 replay took
+  236 and 203 VBlanks from the first overlay-load state to gameplay.
+- The native SC0201 chunk has 1,993 quads and 39 collision edges including
+  the two sloping stair flights. Both native spawns and the collected item
+  matched the PS1 replay on virtual console SD. The production DLDI build
+  walked down and back up without an action button. The bottom screen stayed
+  black. At room 12 entry the GPU retained 431 polygons and 1,666 vertices.
+  Whole-frame RGB errors were 17.5/255 on entry and 15.3/255 upstairs.
 
 ## Next
 
-1. Load SC0201 at the original stair trigger and verify the return trip with the medallion.
-2. Follow the first-floor doors toward the original save point.
-3. Match the original walking and turning sounds and check moving corridor lighting.
+1. Implement the first-floor latch at point 50 and enter the southern hallway (room 13).
+2. Reach the infirmary's original save point and verify a save/load round trip.
+3. Match the original footstep sounds and check lighting while the corridor camera moves.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
 shdecompilations. [Pinned upstream source](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce)

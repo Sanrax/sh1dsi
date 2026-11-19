@@ -31,7 +31,7 @@ enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, ToneCount };
 static Tone tones[ToneCount];
 static uint8_t samples[124 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
-static const char *roomPath, *corridorPath, *eastPath;
+static const char *roomPath, *corridorPath, *eastPath, *firstFloorPath;
 
 static bool loadTones(FILE *file, unsigned count)
 {
@@ -60,6 +60,7 @@ static bool loadPiano(void)
         cart = !cart;
         file = fopen(cart ? fat : sd, "rb");
     }
+    firstFloorPath = cart ? "fat:/sh1dsi/firstfloor.dat" : "sd:/sh1dsi/firstfloor.dat";
     eastPath = cart ? "fat:/sh1dsi/east.dat" : "sd:/sh1dsi/east.dat";
     corridorPath = cart ? "fat:/sh1dsi/corridor.dat" : "sd:/sh1dsi/corridor.dat";
     roomPath = cart ? "fat:/sh1dsi/room.dat" : "sd:/sh1dsi/room.dat";
@@ -96,14 +97,21 @@ static void playTone(int id)
                     tone->rate, tone->volume, tone->pan, false, 0);
 }
 
-static void crossDoor(SchoolRoom next)
+static void changeRoom(SchoolRoom next)
 {
     SchoolRoom from = roomCurrent();
     bool hall = next == EastCorridor || from == EastCorridor;
-    const char *path = next == EastCorridor ? eastPath : next == MusicRoom ? roomPath : corridorPath;
+    bool stairs = from == FirstFloor || next == FirstFloor;
+    const char *path = roomPath;
+    switch (next) {
+    case MusicRoom: break;
+    case SchoolCorridor: path = corridorPath; break;
+    case EastCorridor: path = eastPath; break;
+    case FirstFloor: path = firstFloorPath; break;
+    }
     FILE *file = fopen(path, "rb");
     if (!file) stop("Missing room data.\nRun the asset converter.");
-    playTone(hall ? HallOpen : DoorOpen);
+    if (!stairs) playTone(hall ? HallOpen : DoorOpen);
     uint32_t start = systemCounterGetTicks();
     // Let the last geometry submission retire before remapping texture VRAM.
     setBrightness(1, -16);
@@ -120,7 +128,7 @@ static void crossDoor(SchoolRoom next)
     // one second, including time already spent on disc or card reads.
     while ((uint32_t)(systemCounterGetTicks()-start) < systemCounterUsecsToTicks(1000000))
         swiWaitForVBlank();
-    playTone(hall ? HallClose : DoorClose);
+    if (!stairs) playTone(hall ? HallClose : DoorClose);
 }
 
 int main(void)
@@ -196,18 +204,17 @@ int main(void)
                 pickupTick(pressed);
                 if (phase == MedalDrop && medal.phase == MedalImpact)
                     sound = 9;
-                if ((pressed & KEY_A) && !wasActive) {
-                    SchoolRoom next = playerDoorDestination();
-                    if (phase == medal.phase && (phase == MedalHanging || phase == MedalFinished) &&
-                        next != roomCurrent()) {
-                        crossDoor(next);
+                if (!wasActive && phase == medal.phase && (phase == MedalHanging || phase == MedalFinished)) {
+                    SchoolRoom next = playerDestination(pressed & KEY_A);
+                    if (next != roomCurrent()) {
+                        changeRoom(next);
                         enteringRoom = roomChanged = true;
                         previousTime = systemCounterGetTicks();
                         debt = step;
-                    } else if (roomCurrent() == MusicRoom && !piano.solved && playerFacingPiano())
-                        inRoom = false;
-                    else if (roomCurrent() == MusicRoom && medal.phase == MedalFinished && phase == MedalFinished)
-                        pickupStart();
+                    } else if ((pressed & KEY_A) && roomCurrent() == MusicRoom) {
+                        if (!piano.solved && playerFacingPiano()) inRoom = false;
+                        else if (phase == MedalFinished) pickupStart();
+                    }
                 }
             } else if (!piano.checking && (pressed & KEY_B) && hasRoom) {
                 inRoom = true;

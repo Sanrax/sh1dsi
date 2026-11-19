@@ -65,10 +65,12 @@ def prepare(cue):
         room = school_room(disc)
         corridor = school_room(disc, 32)
         east = school_room(disc, 31)
+        first_floor = school_room(disc, 12)
     write_asset(OUTPUT, data)
     write_asset(OUTPUT.with_name("room.dat"), room)
     write_asset(OUTPUT.with_name("corridor.dat"), corridor)
     write_asset(OUTPUT.with_name("east.dat"), east)
+    write_asset(OUTPUT.with_name("firstfloor.dat"), first_floor)
 
 
 def write_asset(output, data):

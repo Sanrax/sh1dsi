@@ -30,9 +30,18 @@ static Page pages[4], skin;
 static SchoolRoom current = MusicRoom;
 
 SchoolRoom roomCurrent(void) { return current; }
-int roomOriginX(void) { return (current == EastCorridor ? -60 : current == SchoolCorridor ? -20 : -100)*4096; }
+int roomOriginX(void)
+{
+    switch (current) {
+    case MusicRoom: return -100*4096;
+    case SchoolCorridor: return -20*4096;
+    case EastCorridor: return -60*4096;
+    case FirstFloor: return 100*4096;
+    }
+    return 0;
+}
 
-int roomOriginZ(void) { return (current == EastCorridor ? 60 : 20)*4096; }
+int roomOriginZ(void) { return (current == EastCorridor || current == FirstFloor ? 60 : 20)*4096; }
 
 static Batch batches[128];
 static Vertex *vertices;
@@ -54,9 +63,10 @@ static bool upload(FILE *file, void *vram, unsigned size)
 bool roomLoad(FILE *file, SchoolRoom room)
 {
     bool corridor = room != MusicRoom;
-    bool east = room == EastCorridor;
+    bool stairwell = room == EastCorridor || room == FirstFloor;
+    const char *magic = room == FirstFloor ? "SHF1" : room == EastCorridor ? "SHE1" : "SHC1";
     if (fread(&header, sizeof header, 1, file) != 1 ||
-        (corridor ? (memcmp(header.magic, east ? "SHE1" : "SHC1", 4) || header.pages != (east ? 3 : 2) || !playerReady() ||
+        (corridor ? (memcmp(header.magic, magic, 4) || header.pages != (stairwell ? 3 : 2) || !playerReady() ||
                      header.textureBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
          !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
            (!memcmp(header.magic, "SHR", 3) && header.magic[3] >= '2' && header.magic[3] <= '5' && header.pages == 4))) ||
@@ -103,7 +113,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     long start = ftell(file);
     if (start < 0 || fseek(file, 0, SEEK_END)) return false;
     long bytes = ftell(file) - start - (long)(header.batches * sizeof(Batch));
-    if (bytes <= 0 || bytes > (east ? 8192 : 6144)*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)) ||
+    if (bytes <= 0 || bytes > (stairwell ? 8192 : 6144)*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)) ||
         fseek(file, start, SEEK_SET))
         return false;
     free(vertices);
@@ -166,7 +176,7 @@ void roomDraw(const Medallion *medal)
                          | (TEXTURE_SIZE_256 << 23) | (GL_RGB16 << 26);
         playerDraw(skin.firstPalette);
     }
-    if (current == EastCorridor) glScalef32(8192, 8192, 8192);
+    if (current == EastCorridor || current == FirstFloor) glScalef32(8192, 8192, 8192);
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];
         unsigned count = 4*b->quads;

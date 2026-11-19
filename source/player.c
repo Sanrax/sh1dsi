@@ -67,6 +67,9 @@ static void advanceRoadCamera(void)
     if (roomCurrent() == SchoolCorridor) {
         sx = limitToRoad(sx, -121088, -42496);
         sz = limitToRoad(sz, 75264, 88320);
+    } else if (roomCurrent() == FirstFloor) {
+        sx = limitToRoad(sx, 437760, 449536);
+        sz = limitToRoad(sz, 174080, 299264);
     } else {
         sx = limitToRoad(sx, -208384, -197376);
         sz = limitToRoad(sz, 175104, 299008);
@@ -234,6 +237,18 @@ static const Door doors[] = {
 
 void playerEnterRoom(SchoolRoom from)
 {
+    bool downstairs = roomCurrent() == FirstFloor;
+    if (downstairs || from == FirstFloor) {
+        // A LoadOverlay warp uses the map point directly, without the
+        // 0.4-metre offset applied to ordinary doors.
+        warp(downstairs ? 454656 : -192512, downstairs ? 188006 : 174899, 3072);
+        entryX = x;
+        entryZ = z;
+        followingRoad = doorRail = false;
+        roadEyeX = downstairs ? 441876 : -204178;
+        roadEyeZ = downstairs ? 179657 : 184306;
+        return;
+    }
     for (unsigned i = 0; i < sizeof doors / sizeof doors[0]; i++) {
         const Door *d = &doors[i];
         if (d->room == roomCurrent() && d->other == from) {
@@ -251,10 +266,16 @@ void playerEnterRoom(SchoolRoom from)
     }
 }
 
-SchoolRoom playerDoorDestination(void)
+SchoolRoom playerDestination(bool action)
 {
     SchoolRoom room = roomCurrent();
-    if (roomVersion < 5) return room;
+    // Event_Collide: MAP1_S01 point 80 / MAP1_S00 point 79 use a
+    // TouchAabb with both half-extents set to 6 quarter-metres.
+    if (room == EastCorridor && abs(x + 184320) <= 6144 && abs(z - 174899) <= 6144)
+        return FirstFloor;
+    if (room == FirstFloor && abs(x - 462848) <= 6144 && abs(z - 188006) <= 6144)
+        return EastCorridor;
+    if (!action || roomVersion < 5) return room;
     int rayX = sinLerp(yaw*8)/2, rayZ = cosLerp(yaw*8)/2;
     for (unsigned i = 0; i < sizeof doors / sizeof doors[0]; i++) {
         const Door *d = &doors[i];
@@ -302,7 +323,7 @@ int playerSetCamera(void)
     // Its one-metre watch circle extends away from the room camera whenever
     // the distance to Harry is below four metres.
     bool corridor = roomCurrent() == SchoolCorridor;
-    bool east = roomCurrent() == EastCorridor;
+    bool stairwell = roomCurrent() == EastCorridor || roomCurrent() == FirstFloor;
     int ground = collisionFloor(x, z).height;
     int origin = roomOriginX(), originZ = roomOriginZ();
     if (roomCurrent() == MusicRoom && x >= -419840 && x <= -416768 && z >= 94976 && z <= 98304) {
@@ -312,12 +333,14 @@ int playerSetCamera(void)
         return 768;
     }
     int eyeX = -417792, eyeZ = 74752, eyeHeight = 6144, targetHeight = -1024;
-    if (corridor || east) {
+    if (corridor || stairwell) {
         eyeX = roadEyeX;
         eyeZ = roadEyeZ;
         bool rail = doorRail && !followingRoad;
         eyeHeight = ((rail ? 7987 : 8600)-ground)/2;
         targetHeight = ((rail ? 3533 : 2816)-ground)/2;
+        // The small road limits the camera to 2.5 metres above map origin.
+        if (eyeHeight > 5120) eyeHeight = 5120;
     }
     int dx = x-eyeX, dz = z-eyeZ;
     int length = sqrt32(dx*dx + dz*dz);
@@ -327,7 +350,7 @@ int playerSetCamera(void)
         targetX += dx * extra / length;
         targetZ += dz * extra / length;
     }
-    if ((corridor || east) && length && !(doorRail && !followingRoad)) {
+    if ((corridor || stairwell) && length && !(doorRail && !followingRoad)) {
         // vcAdjCamOfsAngByCharaInScreen keeps Harry's feet inside the
         // vertical half-angle atan(224/224)/2. Work in slopes to avoid
         // converting the ray to Euler angles and back.
