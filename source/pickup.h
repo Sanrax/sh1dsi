@@ -2,6 +2,11 @@
 #define SH1_PICKUP_H
 #include "player.h"
 
+bool latchLoad(FILE *file);
+bool latchStart(void);
+bool latchActive(void);
+bool latchUnlocked(void);
+void latchTick(unsigned pressed);
 bool pickupLoad(FILE *file, unsigned textureOffset, unsigned palette);
 void pickupStart(void);
 bool pickupActive(void);

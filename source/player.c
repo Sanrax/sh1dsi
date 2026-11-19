@@ -67,6 +67,9 @@ static void advanceRoadCamera(void)
     if (roomCurrent() == SchoolCorridor) {
         sx = limitToRoad(sx, -121088, -42496);
         sz = limitToRoad(sz, 75264, 88320);
+    } else if (roomCurrent() == SouthHall) {
+        sx = limitToRoad(sx, 534016, 612608);
+        sz = limitToRoad(sz, 75264, 86272);
     } else if (roomCurrent() == FirstFloor) {
         sx = limitToRoad(sx, 437760, 449536);
         sz = limitToRoad(sz, 174080, 299264);
@@ -232,13 +235,15 @@ static const Door doors[] = {
     {MusicRoom, SchoolCorridor, -417792, 97075, 0, -1, 2304},
     {SchoolCorridor, MusicRoom, -116326, 75366, 0, 1, 2304},
     {SchoolCorridor, EastCorridor, -42598, 81920, -1, 0, 3584},
-    {EastCorridor, SchoolCorridor, -210534, 201113, 1, 0, 3584}
+    {EastCorridor, SchoolCorridor, -210534, 201113, 1, 0, 3584},
+    {FirstFloor, SouthHall, 436633, 201113, 1, 0, 3584},
+    {SouthHall, FirstFloor, 612761, 81920, -1, 0, 3584}
 };
 
 void playerEnterRoom(SchoolRoom from)
 {
     bool downstairs = roomCurrent() == FirstFloor;
-    if (downstairs || from == FirstFloor) {
+    if ((downstairs && from == EastCorridor) || (from == FirstFloor && roomCurrent() == EastCorridor)) {
         // A LoadOverlay warp uses the map point directly, without the
         // 0.4-metre offset applied to ordinary doors.
         warp(downstairs ? 454656 : -192512, downstairs ? 188006 : 174899, 3072);
@@ -261,6 +266,11 @@ void playerEnterRoom(SchoolRoom from)
             // Camera entry anchors for MAP_POINTS 39, 51 and 36.
             roadEyeX = !doorRail ? -116992 : d->room == EastCorridor ? -209108 : -41644;
             roadEyeZ = !doorRail ? 83807 : z;
+            if (d->room == SouthHall || from == SouthHall) {
+                doorRail = true;
+                roadEyeX = d->room == SouthHall ? 611329 : x-212;
+                roadEyeZ = z;
+            }
             return;
         }
     }
@@ -322,7 +332,7 @@ int playerSetCamera(void)
     // vcMakeNormalWatchTgtPos / vcSetWatchTgtXzPos, small chase road.
     // Its one-metre watch circle extends away from the room camera whenever
     // the distance to Harry is below four metres.
-    bool corridor = roomCurrent() == SchoolCorridor;
+    bool corridor = roomCurrent() == SchoolCorridor || roomCurrent() == SouthHall;
     bool stairwell = roomCurrent() == EastCorridor || roomCurrent() == FirstFloor;
     int ground = collisionFloor(x, z).height;
     int origin = roomOriginX(), originZ = roomOriginZ();

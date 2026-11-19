@@ -4,14 +4,15 @@ import math
 import struct
 
 from harry import player_data
-from pickup import silver_pickup
+from pickup import prompt_data, silver_pickup
 
 
 def collision_edges(ipd, room):
     collision = memoryview(ipd)[0x54:]
     x, z, vertices, surfaces, count, cylinders, vert, surface, polygon = struct.unpack_from("<ii4B3I", collision)
     expected = {39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
-                31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0)}[room]
+                31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0),
+                13: (30720, 0, 80, 12, 80, 0)}[room]
     if (x, z, vertices, surfaces, count, cylinders) != expected:
         raise ValueError("unexpected school collision header")
     output = bytearray()
@@ -29,6 +30,8 @@ def collision_edges(ipd, room):
             continue
         # The upper and basement stair flights share this first-floor chunk.
         if room == 12 and (floor not in (3, 4, 5, 6, 7, 8, 9, 12, 13, 14, 16, 18, 20) or other != 255):
+            continue
+        if room == 13 and floor in (3, 4, 10):
             continue
         if other != 255:
             raise ValueError("unexpected shared collision edge")
@@ -48,7 +51,7 @@ def collision_edges(ipd, room):
 
 
 def school_room(disc, room=39):
-    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1)}[room]
+    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0)}[room]
     data = disc.read(f"BG/SC{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -128,8 +131,8 @@ def school_room(disc, room=39):
                 raise ValueError("music room references an external PLM")
             add_model(bytes(data[info+4:info+12]).rstrip(b"\0"), pose[:9], pose[9:])
     if room != 39:
-        magic = {12: b"SHF1", 31: b"SHE1", 32: b"SHC1"}[room]
-        extra = b""
+        magic = {12: b"SHF2", 13: b"SHS1", 31: b"SHE1", 32: b"SHC1"}[room]
+        extra = prompt_data(disc, latch=True) if room == 12 else b""
     else:
         magic = b"SHR5"
         # Map_WorldObjectsInit and Map_WorldObjectsUpdate, EventFlag_71 set.

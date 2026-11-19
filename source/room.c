@@ -37,6 +37,7 @@ int roomOriginX(void)
     case SchoolCorridor: return -20*4096;
     case EastCorridor: return -60*4096;
     case FirstFloor: return 100*4096;
+    case SouthHall: return 140*4096;
     }
     return 0;
 }
@@ -63,10 +64,14 @@ static bool upload(FILE *file, void *vram, unsigned size)
 bool roomLoad(FILE *file, SchoolRoom room)
 {
     bool corridor = room != MusicRoom;
-    bool stairwell = room == EastCorridor || room == FirstFloor;
-    const char *magic = room == FirstFloor ? "SHF1" : room == EastCorridor ? "SHE1" : "SHC1";
-    if (fread(&header, sizeof header, 1, file) != 1 ||
-        (corridor ? (memcmp(header.magic, magic, 4) || header.pages != (stairwell ? 3 : 2) || !playerReady() ||
+    const char *magic = "SHC1";
+    if (room == FirstFloor) magic = "SHF1";
+    if (room == EastCorridor) magic = "SHE1";
+    if (room == SouthHall) magic = "SHS1";
+    if (fread(&header, sizeof header, 1, file) != 1) return false;
+    bool latchText = room == FirstFloor && !memcmp(header.magic, "SHF2", 4);
+    if (latchText) magic = "SHF2";
+    if ((corridor ? (memcmp(header.magic, magic, 4) || header.pages != (room == SchoolCorridor ? 2 : 3) || !playerReady() ||
                      header.textureBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
          !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
            (!memcmp(header.magic, "SHR", 3) && header.magic[3] >= '2' && header.magic[3] <= '5' && header.pages == 4))) ||
@@ -100,6 +105,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     vramSetBankC(VRAM_C_TEXTURE_SLOT0);
     vramSetBankE(VRAM_E_TEX_PALETTE);
     if ((corridor || header.magic[3] >= '4') && !collisionLoad(file, room)) return false;
+    if (latchText && !latchLoad(file)) return false;
     if (header.pages == 4 &&
         (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))
         return false;
@@ -113,7 +119,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     long start = ftell(file);
     if (start < 0 || fseek(file, 0, SEEK_END)) return false;
     long bytes = ftell(file) - start - (long)(header.batches * sizeof(Batch));
-    if (bytes <= 0 || bytes > (stairwell ? 8192 : 6144)*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)) ||
+    if (bytes <= 0 || bytes > (room == MusicRoom || room == SchoolCorridor ? 6144 : 8192)*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)) ||
         fseek(file, start, SEEK_SET))
         return false;
     free(vertices);

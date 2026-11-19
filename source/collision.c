@@ -15,6 +15,7 @@ bool collisionLoad(FILE *file, SchoolRoom room)
 {
     switch (room) {
     case FirstFloor: edgeCount = 39; break;
+    case SouthHall:
     case EastCorridor: edgeCount = 43; break;
     case SchoolCorridor: edgeCount = 20; break;
     case MusicRoom: edgeCount = 51; break;

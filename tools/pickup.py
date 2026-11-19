@@ -3,12 +3,13 @@ import re
 import struct
 
 
-def prompt_data(disc):
-    overlay = disc.read("VIN/MAP1_S01.BIN")
+def prompt_data(disc, latch=False):
+    overlay = disc.read("VIN/MAP1_S00.BIN" if latch else "VIN/MAP1_S01.BIN")
+    table = 0x800dd1bc if latch else 0x800dcf5c
     base = 0x800c9578
 
     def message(number):
-        address, = struct.unpack_from("<I", overlay, 0x800dcf5c-base+4*number)
+        address, = struct.unpack_from("<I", overlay, table-base+4*number)
         offset = address-base
         return overlay[offset:overlay.index(0, offset)].decode("ascii")
 
@@ -31,14 +32,16 @@ def prompt_data(disc):
         # These font bearings consume the last ink column without an extra
         # gap in FONT_12X16_GLYPH_WIDTHS for the USA pickup dialog.
         ink_width = 1 + max(i for line in mask for i, p in enumerate(line) if p)
-        return ink_width + (c not in "TYNakv")
+        if c == "I":
+            return ink_width + 2
+        return ink_width + (c not in "TYNakvu'")
 
     # Keep the draw order for text rollout. Ink groups 2 and 3 let the
     # native selection flash by changing only their LCD palette entries.
     commands = []
     widths = []
     x = row = color = 0
-    for token in re.findall(r"~[A-Z][0-9]?|[^\s]", message(30)):
+    for token in re.findall(r"~[A-Z][0-9]?|[^\s]", message(13 if latch else 30)):
         if token == "~N":
             widths.append(x)
             x = 0
@@ -47,7 +50,7 @@ def prompt_data(disc):
             color = 1
         elif token == "~C7":
             color = 0
-        elif token == "~S4":
+        elif token in ("~S4", "~E"):
             break
         elif token == "_":
             x += 6
@@ -59,7 +62,7 @@ def prompt_data(disc):
     start_x = 160-max(widths)//2
     commands = [(start_x+x, 196-16*row+16*r, ink, mask) for x,r,ink,mask in commands]
     prompt_length = len(commands)
-    for option in range(2):
+    for option in (() if latch else (0, 1)):
         x = 32
         for c in message(option):
             mask = glyph(c)

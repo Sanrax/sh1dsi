@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include "medallion.h"
 
-typedef enum { MusicRoom = 39, SchoolCorridor = 32, EastCorridor = 31, FirstFloor = 12 } SchoolRoom;
+typedef enum { MusicRoom = 39, SchoolCorridor = 32, EastCorridor = 31, FirstFloor = 12, SouthHall = 13 } SchoolRoom;
 SchoolRoom roomCurrent(void);
 int roomOriginX(void);
 int roomOriginZ(void);

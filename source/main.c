@@ -27,11 +27,11 @@ typedef struct {
     uint8_t volume, pan;
 } Tone;
 
-enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, ToneCount };
+enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, DoorUnlock, ToneCount };
 static Tone tones[ToneCount];
-static uint8_t samples[124 * 1024] __attribute__((aligned(32)));
+static uint8_t samples[144 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
-static const char *roomPath, *corridorPath, *eastPath, *firstFloorPath;
+static const char *roomPath, *corridorPath, *eastPath, *firstFloorPath, *southPath;
 
 static bool loadTones(FILE *file, unsigned count)
 {
@@ -60,6 +60,7 @@ static bool loadPiano(void)
         cart = !cart;
         file = fopen(cart ? fat : sd, "rb");
     }
+    southPath = cart ? "fat:/sh1dsi/south.dat" : "sd:/sh1dsi/south.dat";
     firstFloorPath = cart ? "fat:/sh1dsi/firstfloor.dat" : "sd:/sh1dsi/firstfloor.dat";
     eastPath = cart ? "fat:/sh1dsi/east.dat" : "sd:/sh1dsi/east.dat";
     corridorPath = cart ? "fat:/sh1dsi/corridor.dat" : "sd:/sh1dsi/corridor.dat";
@@ -68,9 +69,9 @@ static bool loadPiano(void)
         return false;
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets
                  && memcmp(assets.magic, "SHP", 3) == 0 &&
-                 assets.magic[3] >= '1' && assets.magic[3] <= '5';
+                 assets.magic[3] >= '1' && assets.magic[3] <= '6';
     if (valid && assets.magic[3] != '1') {
-        static const unsigned counts[] = {0, 9, 10, 12, ToneCount};
+        static const unsigned counts[] = {0, 9, 10, 12, 14, ToneCount};
         toneCount = counts[assets.magic[3]-'1'];
         valid = loadTones(file, toneCount);
     }
@@ -100,14 +101,16 @@ static void playTone(int id)
 static void changeRoom(SchoolRoom next)
 {
     SchoolRoom from = roomCurrent();
-    bool hall = next == EastCorridor || from == EastCorridor;
-    bool stairs = from == FirstFloor || next == FirstFloor;
+    bool east = next == EastCorridor || from == EastCorridor;
+    bool stairs = east && (from == FirstFloor || next == FirstFloor);
+    bool hall = east || from == SouthHall || next == SouthHall;
     const char *path = roomPath;
     switch (next) {
     case MusicRoom: break;
     case SchoolCorridor: path = corridorPath; break;
     case EastCorridor: path = eastPath; break;
     case FirstFloor: path = firstFloorPath; break;
+    case SouthHall: path = southPath; break;
     }
     FILE *file = fopen(path, "rb");
     if (!file) stop("Missing room data.\nRun the asset converter.");
@@ -195,18 +198,21 @@ int main(void)
                 MedalPhase phase = medal.phase;
                 roomChanged |= medallionTick(&medal, pressed & KEY_START);
                 int turn = 0, walk = 0;
-                bool wasActive = pickupActive();
+                bool wasActive = pickupActive() || latchActive();
                 if (!wasActive && (medal.phase == MedalHanging || medal.phase == MedalFinished)) {
                     turn = !!(held & KEY_RIGHT) - !!(held & KEY_LEFT);
                     walk = !!(held & KEY_UP) - !!(held & KEY_DOWN);
                 }
                 roomChanged |= playerTick(turn, walk, pickupAction());
                 pickupTick(pressed);
+                latchTick(pressed);
                 if (phase == MedalDrop && medal.phase == MedalImpact)
                     sound = 9;
                 if (!wasActive && phase == medal.phase && (phase == MedalHanging || phase == MedalFinished)) {
                     SchoolRoom next = playerDestination(pressed & KEY_A);
-                    if (next != roomCurrent()) {
+                    if (next == SouthHall && roomCurrent() == FirstFloor && !latchUnlocked()) {
+                        if (latchStart()) sound = DoorUnlock;
+                    } else if (next != roomCurrent()) {
                         changeRoom(next);
                         enteringRoom = roomChanged = true;
                         previousTime = systemCounterGetTicks();

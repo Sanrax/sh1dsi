@@ -2,6 +2,7 @@
 // Adapted from MAP1_S01 event 11 and Gfx_PickupItemAnimate.
 // Copyright (C) 2026 shdecompilations
 #include <nds.h>
+#include <string.h>
 #include "pickup.h"
 
 typedef struct {
@@ -22,6 +23,24 @@ static enum { Inactive, Stopping, Kneeling, Inspecting, Rising } phase;
 static unsigned ticks, selected, flash, shown;
 static struct { uint8_t id, count; } inventoryItem;
 
+static Glyph latchGlyphs[24];
+static uint16_t latchCount;
+static bool unlocked;
+static unsigned latchAge, latchShown;
+
+static bool readGlyphs(FILE *file, Glyph *data, unsigned count)
+{
+    if (fread(data, sizeof *data, count, file) != count) return false;
+    for (unsigned i = 0; i < count; i++) {
+        const Glyph *g = &data[i];
+        if (g->x > 256-11 || g->y > 192-14 || g->ink > 3) return false;
+        for (unsigned y = 0; y < 14; y++)
+            for (unsigned x = 0; x < 11; x++)
+                if (g->mask[y][x] > 15) return false;
+    }
+    return true;
+}
+
 bool pickupLoad(FILE *file, unsigned textureOffset, unsigned palette)
 {
     textureAddress = textureOffset >> 3;
@@ -30,16 +49,46 @@ bool pickupLoad(FILE *file, unsigned textureOffset, unsigned palette)
         fread(&glyphCount, 2, 1, file) != 1 || glyphCount > 64 ||
         fread(&messageLength, 2, 1, file) != 1 || !messageLength || messageLength >= glyphCount ||
         fread(fontPalette, sizeof fontPalette, 1, file) != 1 ||
-        fread(glyphs, sizeof(Glyph), glyphCount, file) != glyphCount)
+        !readGlyphs(file, glyphs, glyphCount))
         return false;
-    for (unsigned i = 0; i < glyphCount; i++) {
-        const Glyph *g = &glyphs[i];
-        if (g->x > 256-11 || g->y > 192-14 || g->ink > 3) return false;
-        for (unsigned y = 0; y < 14; y++)
-            for (unsigned x = 0; x < 11; x++)
-                if (g->mask[y][x] > 15) return false;
-    }
     return true;
+}
+
+bool latchLoad(FILE *file)
+{
+    uint16_t count, length, palette[16];
+    if (fread(&count, 2, 1, file) != 1 || !count || count > 24 ||
+        fread(&length, 2, 1, file) != 1 || count != length ||
+        fread(palette, sizeof palette, 1, file) != 1 ||
+        memcmp(palette, fontPalette, sizeof palette) || !readGlyphs(file, latchGlyphs, count))
+        return false;
+    latchCount = count;
+    return true;
+}
+
+bool latchStart(void)
+{
+    if (unlocked || !latchCount || latchAge) return false;
+    latchAge = 1;
+    latchShown = 0;
+    return true;
+}
+
+bool latchUnlocked(void) { return unlocked; }
+
+bool latchActive(void) { return latchAge != 0; }
+
+void latchTick(unsigned pressed)
+{
+    if (!latchAge) return;
+    // Event_DisplayMapMsgWithSfx waits 0.2 seconds before starting the text.
+    if (++latchAge <= 12) return;
+    if (latchShown < latchCount) {
+        latchShown = (pressed & (KEY_A | KEY_B)) ? latchCount : latchShown+1;
+    } else if (pressed & (KEY_A | KEY_B)) {
+        unlocked = true;
+        latchAge = latchShown = 0;
+    }
 }
 
 static bool hasSilverMedallion(void)
@@ -148,7 +197,9 @@ void pickupDrawItem(void)
 void pickupDrawPrompt(int bg)
 {
     static unsigned lastShown, lastHighlight;
-    if (phase != Inspecting || !shown) {
+    unsigned visible = latchAge ? latchShown : phase == Inspecting ? shown : 0;
+    const Glyph *text = latchAge ? latchGlyphs : glyphs;
+    if (!visible) {
         bgHide(bg);
         lastShown = 0;
         return;
@@ -156,8 +207,8 @@ void pickupDrawPrompt(int bg)
     uint16_t *pixels = bgGetGfxPtr(bg);
     if (!lastShown)
         dmaFillHalfWords(0, pixels, 256*192);
-    for (unsigned i = lastShown; i < shown; i++) {
-        const Glyph *g = &glyphs[i];
+    for (unsigned i = lastShown; i < visible; i++) {
+        const Glyph *g = &text[i];
         for (unsigned y = 0; y < 14; y++) {
             uint16_t *row = pixels+(g->y+y)*128;
             for (unsigned x = 0; x < 11; x++) {
@@ -182,6 +233,6 @@ void pickupDrawPrompt(int bg)
         }
         lastHighlight = highlight;
     }
-    lastShown = shown;
+    lastShown = visible;
     bgShow(bg);
 }

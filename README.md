@@ -20,7 +20,7 @@ python3 tools/prepare_assets.py "/path/to/Silent Hill (USA).cue"
 ```
 
 Run `make sdcard` after conversion. Copy the contents of `dist/` to the
-card root. The directory includes the ROM and the five local data files. Keep
+card root. The directory includes the ROM and the six local data files. Keep
 the generated game data on your own devices.
 
 The build starts with Harry standing at Midwich's piano. Up and Down walk forward and backward.
@@ -34,5 +34,7 @@ inventory for the session. Face the music-room door and press A to enter the
 corridor. Turn back toward the same door to return, or follow the corridor
 east and press A as you approach the double door. It leads to the adjoining
 second-floor hallway. Walk onto the stair landing to reach the first floor.
-Turn back up the same stairs to return. The piano and pickup states survive
-both door and stair transitions. First-floor doors and saving are pending.
+Turn back up the same stairs to return. On the first floor, face the double
+door on the western wall near the stairs and press A to unlock it. Dismiss the
+message with A or B, then press A to enter the southern hallway. The door
+stays unlocked for the session. The infirmary and saving are pending.
