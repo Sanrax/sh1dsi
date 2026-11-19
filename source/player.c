@@ -105,6 +105,9 @@ static void advanceRoadCamera(void)
     } else if (roomCurrent() == SouthHall) {
         sx = limitToRoad(sx, 534016, 612608);
         sz = limitToRoad(sz, 75264, 86272);
+    } else if (roomCurrent() == NorthHall) {
+        sx = limitToRoad(sx, 507392, 585984);
+        sz = limitToRoad(sz, 779008, 790784);
     } else if (roomCurrent() == Courtyard) {
         // MAP1_S00 courtyard chase road bounds.
         sx = limitToRoad(sx, -111616, -50176);
@@ -297,7 +300,8 @@ void playerEnterRoom(SchoolRoom from)
             if (d->room == Courtyard || from == Courtyard) {
                 doorRail = true;
                 roadEyeX = x;
-                roadEyeZ = z + (d->room == Courtyard ? -210 : 206);
+                if (d->room == Courtyard) roadEyeZ = z + (from == NorthHall ? 210 : -210);
+                else roadEyeZ = z + (d->room == NorthHall ? -219 : 206);
             } else if (d->room == Infirmary) {
                 infirmaryRoad = 0;
             } else if (from == Infirmary) {
@@ -418,17 +422,25 @@ int playerSetCamera(void)
     // Its one-metre watch circle extends away from the room camera whenever
     // the distance to Harry is below four metres.
     SchoolRoom room = roomCurrent();
-    bool corridor = room == SchoolCorridor || room == SouthHall;
+    bool corridor = room == SchoolCorridor || room == SouthHall || room == NorthHall;
     bool stairwell = room == EastCorridor || room == FirstFloor;
     bool infirmary = room == Infirmary;
     bool courtyard = room == Courtyard;
     int ground = collisionFloor(x, z).height;
     int origin = roomOriginX(room), originZ = roomOriginZ(room);
-    if (courtyard && !followingRoad) {
-        // Through-door view at MAP1_S00 point 3.
-        gluLookAtf32((roadEyeX-origin)/2, 5225, (originZ-roadEyeZ)/2,
-                     (-80899-origin)/2, 3023, (originZ+258222)/2, 0,4096,0);
-        return 5225;
+    if (!followingRoad && (courtyard || room == NorthHall)) {
+        // Through-door views at MAP1_S00 points 3, 4 and 6.
+        static const struct { int x, y, z, eyeHeight; } entryViews[] = {
+            {-80899, 3023, -258222, 5225},
+            {-80449, 2926, -238997, 5225},
+            {546561, 1702, 795226, 4001}
+        };
+        unsigned view = room == NorthHall ? 2 : entryZ > -250000;
+        int height = entryViews[view].eyeHeight;
+        gluLookAtf32((roadEyeX-origin)/2, height, (originZ-roadEyeZ)/2,
+                     (entryViews[view].x-origin)/2, entryViews[view].y,
+                     (originZ-entryViews[view].z)/2, 0,4096,0);
+        return height;
     }
     if (room == MusicRoom && x >= -419840 && x <= -416768 && z >= 94976 && z <= 98304) {
         // Fixed-angle road looking back through the music-room doorway.

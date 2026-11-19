@@ -42,7 +42,9 @@ const Door schoolDoors[] = {
     {SouthHall, Infirmary, 591462, 75366, 0, 1, 2304},
     {Infirmary, SouthHall, 233472, 589004, 0, -1, 2304},
     {SouthHall, Courtyard, 573440, 95027, 0, -1, 4864},
-    {Courtyard, SouthHall, -80691, -282214, 0, 1, 4864}
+    {Courtyard, SouthHall, -80691, -282214, 0, 1, 4864},
+    {Courtyard, NorthHall, -80691, -215040, 0, -1, 4864},
+    {NorthHall, Courtyard, 546816, 771276, 0, 1, 4864}
 };
 const unsigned schoolDoorCount = sizeof schoolDoors/sizeof schoolDoors[0];
 
@@ -56,6 +58,7 @@ int roomOriginX(SchoolRoom room)
     case EastCorridor: return -60*4096;
     case FirstFloor: return 100*4096;
     case Infirmary: return 60*4096;
+    case NorthHall:
     case SouthHall: return 140*4096;
     }
     return 0;
@@ -64,6 +67,7 @@ int roomOriginX(SchoolRoom room)
 int roomOriginZ(SchoolRoom room)
 {
     if (room == Infirmary) return 140*4096;
+    if (room == NorthHall) return 180*4096;
     if (room == Courtyard) return -60*4096;
     return (room == EastCorridor || room == FirstFloor ? 60 : 20)*4096;
 }
@@ -92,6 +96,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     if (room == FirstFloor) magic = "SHF1";
     if (room == EastCorridor) magic = "SHE1";
     if (room == SouthHall) magic = "SHS1";
+    if (room == NorthHall) magic = "SHU1";
     if (room == Infirmary) magic = "SHI1";
     if (room == Courtyard) magic = "SHY1";
     if (fread(&header, sizeof header, 1, file) != 1) return false;
@@ -236,7 +241,7 @@ void roomDraw(const Medallion *medal)
                          | (TEXTURE_SIZE_256 << 23) | (GL_RGB16 << 26);
         playerDraw(skin.firstPalette);
     }
-    if (current == EastCorridor || current == FirstFloor) glScalef32(8192, 8192, 8192);
+    if (current == EastCorridor || current == FirstFloor || current == NorthHall) glScalef32(8192, 8192, 8192);
     bool visible[] = {
         [StaticBatch] = true,
         [HangingSilverBatch] = !solved,

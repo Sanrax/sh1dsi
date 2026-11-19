@@ -47,6 +47,7 @@ static FILE *openRoom(SchoolRoom room)
     case EastCorridor: name = "east"; break;
     case FirstFloor: name = "firstfloor"; break;
     case SouthHall: name = "south"; break;
+    case NorthHall: name = "north"; break;
     case Infirmary: name = "infirmary"; break;
     case Courtyard: name = "courtyard"; break;
     default: return NULL;

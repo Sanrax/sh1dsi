@@ -69,6 +69,7 @@ bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles)
     case Infirmary: edgeCount = 45; break;
     case FirstFloor: edgeCount = fullObstacles ? 51 : 39; break;
     case SouthHall: edgeCount = fullObstacles ? 47 : 43; break;
+    case NorthHall: edgeCount = 24; break;
     case EastCorridor: edgeCount = 43; break;
     case SchoolCorridor: edgeCount = 20; break;
     case MusicRoom: edgeCount = 51; break;
@@ -77,13 +78,14 @@ bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles)
     int originX = roomOriginX(room), originZ = roomOriginZ(room);
     // The first-floor south wall extends 0.21 m into the adjoining chunk.
     int maxZ = room == FirstFloor ? 21*4096 : 20*4096;
+    int maxX = room == NorthHall ? 17*4096 : 16*4096;
     for (unsigned i = 0; i < edgeCount; i++) {
         int16_t in[6];
         if (fread(in, sizeof in, 1, file) != 1) return false;
         Edge *e = &edges[i];
         *e = (Edge){in[0]*scale, in[1]*scale, in[2]*scale, in[3]*scale, in[4], in[5]};
-        if (abs(e->ax) > 65536 || abs(e->az) > maxZ ||
-            abs(e->bx) > 65536 || abs(e->bz) > maxZ ||
+        if (abs(e->ax) > maxX || abs(e->az) > maxZ ||
+            abs(e->bx) > maxX || abs(e->bz) > maxZ ||
             abs(e->tx) > 4096 || abs(e->tz) > 4096 ||
             (e->ax == e->bx && e->az == e->bz))
             return false;
@@ -139,6 +141,7 @@ Floor collisionFloor(int x, int z)
         return (Floor){.height = -16};
     }
     if (roomCurrent() == Infirmary) return (Floor){.height = -48};
+    if (roomCurrent() == NorthHall) return (Floor){.height = -16};
     if (roomCurrent() != EastCorridor)
         return (Floor){.height = roomCurrent() == SchoolCorridor ? 48 : 0};
     // SCFE01 surfaces 11 and 12. The walls confine Harry to the stair

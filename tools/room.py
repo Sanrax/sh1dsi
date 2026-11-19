@@ -13,7 +13,7 @@ def collision_edges(ipd, room):
     expected = {39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
                 31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0),
                 13: (30720, 0, 80, 12, 80, 0), 9: (10240, 30720, 45, 11, 49, 0),
-                23: (-10240, -20480, 204, 61, 236, 0)}[room]
+                23: (-10240, -20480, 204, 61, 236, 0), 16: (30720, 40960, 33, 6, 34, 0)}[room]
     if (x, z, vertices, surfaces, count, cylinders) != expected:
         raise ValueError("unexpected school collision header")
     output = bytearray()
@@ -33,6 +33,9 @@ def collision_edges(ipd, room):
         if room == 12 and (floor in (0, 1, 2, 10, 11) or other != 255):
             continue
         if room == 13 and floor in (3, 4):
+            continue
+        # SC0304's inner shell follows the usable hallway around its alcove.
+        if room == 16 and (floor == 1 or (floor == 0 and not 5 <= i <= 12)):
             continue
         # The infirmary walls meet at shared splits. Keep their exposed faces.
         if room == 9 and other != 255:
@@ -141,7 +144,7 @@ def vertical_rectangle(points):
 
 def school_room(disc, room=39):
     cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3),
-              23: (255, 254)}[room]
+              23: (255, 254), 16: (3, 4)}[room]
     data = disc.read(f"BG/SC{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -198,7 +201,7 @@ def school_room(disc, room=39):
     groups = defaultdict(bytearray)
     walls = defaultdict(list)
     decorations = []
-    vertex_scale = 4 if room in (12, 31) else 8
+    vertex_scale = 4 if room in (12, 16, 31) else 8
     def add_model(name, matrix, position, state=0, *, item_page=None):
         model_data, meshes, base, ptr = models[name]
         for j in range(meshes):
@@ -210,7 +213,7 @@ def school_room(disc, room=39):
                 transformed = [position[a] + (sum(matrix[3*a+k]*coord[k] for k in range(3)) >> 12)
                                for a in range(3)]
                 x, y, zpos = transformed
-                # Room 31 is longer than the V16 range at two metres per unit.
+                # The longer hallways need the wider V16 range.
                 vertices.append(((x-5120)*vertex_scale, -y*vertex_scale, -(zpos-5120)*vertex_scale))
             for k in range(faces):
                 face = model_data[prim+20*k:prim+20*(k+1)]
@@ -306,7 +309,7 @@ def school_room(disc, room=39):
             add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-10240, y>>4, (z>>4)-30720), state,
                       item_page=page)
     if room != 39:
-        magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 31: b"SHE1", 32: b"SHC1", 23: b"SHY2"}[room]
+        magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 16: b"SHU1", 23: b"SHY2", 31: b"SHE1", 32: b"SHC1"}[room]
         extra = b""
         if room == 9:
             extra = medical_pickups(disc)

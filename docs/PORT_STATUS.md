@@ -3,7 +3,7 @@
 Harry starts at the Midwich piano. He can solve the keyboard puzzle, watch
 or skip the falling silver medallion, decline or accept it, walk through the
 eastern hallway, descend the stairs, unlatch the first-floor door and enter
-the southern hallway. The hall's double doors lead to the courtyard and back.
+the southern hallway. The courtyard connects the southern and northern halls.
 Harry can inspect the clock tower door and both medallion slots.
 In the infirmary he can pick up both medical supplies and use the notebook.
 A cold boot can resume at the desk with the puzzle,
@@ -12,7 +12,7 @@ door latch and pickups intact. The full game remains unplayable.
 ## Build and media
 
 - BlocksDS 1.24.0 and Wonderful GCC 16.2.0 produce a TWL-exclusive ROM
-  (unit code 3). The converter reproduces all ten local data files byte for
+  (unit code 3). The converter reproduces all eleven local data files byte for
   byte.
 - USA 1.1 CUE, one MODE2/2352 track, 616,494,480 bytes, SHA-1
   `34278d31d9b9b12b3b5db5e45bcbe548991ecbc7`. Non-XA file entries agreed
@@ -43,6 +43,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | PS1 infirmary from entrance to save interaction | 255 buffer-change intervals | 1 at 16.68 ms, 247 at 33.37 ms and 7 at 50.05 ms |
 | PS1 health drink and first-aid kit events | 130 drink and 126 kit buffer-change intervals | Drink had 9 at 33.37 ms and 121 at 50.05 ms. Kit intervals were all 50.05 ms |
 | PS1 courtyard entry, walk and return approach | 183 buffer-change intervals | 45 at 33.37 ms, 117 at 50.05 ms and 21 at 66.73 ms. Mean 47.86 ms |
+| PS1 northern hallway entry and walk to the return door | 206 buffer-change intervals | 1 at 16.68 ms, 203 at 33.37 ms and 2 at 50.05 ms. Mean 33.45 ms |
 | melonDS idle music room with Harry | 300 scene submissions | 16.715 / 33.317 / 33.432 ms min/mean/max, 2.893 ms mean ARM9 submission time |
 | melonDS rotating silver pickup with prompt | 300 scene intervals | 16.713 / 33.374 / 33.432 ms min/mean/max, 3.291 ms mean ARM9 submission time |
 | melonDS idle corridor after collecting the medallion | 300 scene intervals | 16.713 / 33.317 / 33.432 ms min/mean/max, 4.137 ms mean ARM9 submission time |
@@ -53,6 +54,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | melonDS infirmary entrance with medallion | 300 scene intervals | 16.711 / 33.317 / 33.434 ms min/mean/max, 3.920 ms mean ARM9 submission time |
 | melonDS infirmary health drink | 300 scene submissions during the pickup event | 16.713 / 33.374 / 33.432 ms min/mean/max, 4.263 ms mean ARM9 submission time |
 | melonDS courtyard entry, straight walk and turn | 300 scene intervals | 16.711 / 33.318 / 33.457 ms min/mean/max, 6.911 ms mean ARM9 submission time |
+| melonDS northern hallway entry, walk and turn | 300 scene intervals | 16.711 / 33.374 / 33.443 ms min/mean/max, 3.756 ms mean ARM9 submission time |
 
 ## Scene and interaction checks
 
@@ -186,7 +188,20 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - The PS1 trace had fog disabled in this scene. Low-light shading and
   camera following still differ. In the DLDI replay, whole-frame mean RGB
   error was 20.6/255 on entry, 17.1/255 after descending the ramp and
-  13.9/255 after returning to the hall. The north exit remains to be implemented.
+  13.9/255 after returning to the hall.
+
+## North hallway
+
+- MAP1_S00 points 4 and 6 connect the courtyard to first-floor room 16.
+  SC0304 streams 1,143 quads, 24 IPD collision edges and 80 KiB of
+  textures. The transition uses the original double-door sound pair.
+- In melonDS DSi mode, both DLDI and virtual console SD crossed the
+  courtyard, entered at Q12 X/Z (546816, 772914), yaw 0, and returned at
+  (−80691, −216678), yaw 2048. Both poses matched the original and kept
+  the medallion, supplies and latch. Mean whole-frame RGB error was
+  11.9/255 on entry, 17.8/255 while walking and 19.9/255 on return.
+- The PS1 trace had fog off in the hall. The port still differs in
+  lighting and chase camera motion. The other hallway doors are pending.
 
 ## Clock tower
 
@@ -218,7 +233,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 
 ## Next
 
-1. Trace the north exit and the school route to the gold medallion.
+1. Trace the chemistry lab entrance and the event that releases the gold medallion.
 2. Port medallion placement and its clock tower state changes.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
