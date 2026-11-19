@@ -10,6 +10,6 @@ include $(BLOCKSDS)/sys/default_makefiles/rom_arm9/Makefile
 
 .PHONY: sdcard
 sdcard: $(ROM)
-	@test -f dist/sh1dsi/piano.dat && test -f dist/sh1dsi/room.dat && test -f dist/sh1dsi/corridor.dat || { echo "Run tools/prepare_assets.py with your CUE first."; exit 1; }
+	@test -f dist/sh1dsi/piano.dat && test -f dist/sh1dsi/room.dat && test -f dist/sh1dsi/corridor.dat && test -f dist/sh1dsi/east.dat || { echo "Run tools/prepare_assets.py with your CUE first."; exit 1; }
 	@mkdir -p dist
 	cp $(ROM) dist/

@@ -30,7 +30,9 @@ static Page pages[4], skin;
 static SchoolRoom current = MusicRoom;
 
 SchoolRoom roomCurrent(void) { return current; }
-int roomOriginX(void) { return (current == SchoolCorridor ? -20 : -100)*4096; }
+int roomOriginX(void) { return (current == EastCorridor ? -60 : current == SchoolCorridor ? -20 : -100)*4096; }
+
+int roomOriginZ(void) { return (current == EastCorridor ? 60 : 20)*4096; }
 
 static Batch batches[128];
 static Vertex *vertices;
@@ -51,9 +53,10 @@ static bool upload(FILE *file, void *vram, unsigned size)
 
 bool roomLoad(FILE *file, SchoolRoom room)
 {
-    bool corridor = room == SchoolCorridor;
+    bool corridor = room != MusicRoom;
+    bool east = room == EastCorridor;
     if (fread(&header, sizeof header, 1, file) != 1 ||
-        (corridor ? (memcmp(header.magic, "SHC1", 4) || header.pages != 2 || !playerReady() ||
+        (corridor ? (memcmp(header.magic, east ? "SHE1" : "SHC1", 4) || header.pages != (east ? 3 : 2) || !playerReady() ||
                      header.textureBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
          !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
            (!memcmp(header.magic, "SHR", 3) && header.magic[3] >= '2' && header.magic[3] <= '5' && header.pages == 4))) ||
@@ -74,9 +77,19 @@ bool roomLoad(FILE *file, SchoolRoom room)
     vramSetBankE(VRAM_E_LCD);
     if (!upload(file, VRAM_C, header.textureBytes) || !upload(file, VRAM_E, header.paletteBytes))
         return false;
+    if (room == MusicRoom && header.pages == 4) {
+        // Keep actor CLUTs above the largest streamed scenery palette.
+        // The music room file also has item data directly after its skin.
+        skin = pages[3];
+        if (skin.palettes != 15 || skin.firstPalette + skin.palettes > 64 ||
+            skin.firstPalette + skin.palettes > header.paletteBytes/32)
+            return false;
+        memcpy((uint8_t *)VRAM_E + 64*32, (uint8_t *)VRAM_E + skin.firstPalette*32, skin.palettes*32);
+        skin.firstPalette = 64;
+    }
     vramSetBankC(VRAM_C_TEXTURE_SLOT0);
     vramSetBankE(VRAM_E_TEX_PALETTE);
-    if ((corridor || header.magic[3] >= '4') && !collisionLoad(file, corridor)) return false;
+    if ((corridor || header.magic[3] >= '4') && !collisionLoad(file, room)) return false;
     if (header.pages == 4 &&
         (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))
         return false;
@@ -86,13 +99,11 @@ bool roomLoad(FILE *file, SchoolRoom room)
          !pickupLoad(file, header.textureBytes-2048, header.paletteBytes/32-1)))
         return false;
 
-    if (header.pages == 4) skin = pages[3];
-
     // One tightly packed stream in RAM. The file length bounds every batch read.
     long start = ftell(file);
     if (start < 0 || fseek(file, 0, SEEK_END)) return false;
     long bytes = ftell(file) - start - (long)(header.batches * sizeof(Batch));
-    if (bytes <= 0 || bytes > 6144*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)) ||
+    if (bytes <= 0 || bytes > (east ? 8192 : 6144)*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)) ||
         fseek(file, start, SEEK_SET))
         return false;
     free(vertices);
@@ -155,6 +166,7 @@ void roomDraw(const Medallion *medal)
                          | (TEXTURE_SIZE_256 << 23) | (GL_RGB16 << 26);
         playerDraw(skin.firstPalette);
     }
+    if (current == EastCorridor) glScalef32(8192, 8192, 8192);
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];
         unsigned count = 4*b->quads;

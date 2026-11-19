@@ -59,10 +59,10 @@ def convert_tones(vab, notes, samples):
 
 
 def school_bank(map_vab, base_vab):
-    # MAP1_S01, g_Vab_InfoTable and SFX_PAIRS[1]. The last two sounds
-    # are Sfx_DoorOpen0 and Sfx_DoorClose0 (1309, 1310) in BASE.VAB.
+    # MAP1_S01 and g_Vab_InfoTable: SFX_PAIRS[1, 2] use BASE.VAB.
     samples = bytearray()
     notes = [(1, n, 127) for n in (48, 51, 52, 53, 54, 56, 59, 61)]
     tones = convert_tones(map_vab, notes + [(0, 60, 97), (0, 52, 127)], samples)
-    tones.extend(convert_tones(base_vab, [(0, 53, 127), (0, 54, 107)], samples))
+    tones.extend(convert_tones(base_vab, [(0, 53, 127), (0, 54, 107),
+                                         (1, 54, 57), (1, 55, 57)], samples))
     return tones + samples

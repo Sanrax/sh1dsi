@@ -3,8 +3,9 @@
 The native build starts in Midwich's music room with Harry at the piano.
 He can walk, turn, approach and solve the keyboard puzzle, watch or skip the
 medallion fall, and collect the silver medallion. Declining leaves it on the
-floor. Accepting keeps one for the session. Harry can use the door to enter
-room 32 and return to the music room. Other exits and saving are pending. The full game is unplayable.
+floor. Accepting keeps one for the session. Harry can cross the second-floor hallway (room 32),
+enter the eastern hallway (room 31), walk down its stair ramp and return through
+both doors. The first-floor load and saving are pending. The full game is unplayable.
 
 ## Verified build and inputs
 
@@ -34,14 +35,19 @@ Reproduction instructions are on `diagnostics/dsi`.
 | PS1 opening street | 368 buffer-change intervals | All 2 VBlanks, 33.37 ms |
 | PS1 school keyboard | 1,322 buffer-change intervals | All 1 VBlank, 16.68 ms |
 | PS1 silver pickup and first corridor view | 47 intervals on each of two prompts and 67 in room 32 | All 2 VBlanks, 33.37 ms |
+| PS1 crossing room 32 after pickup | 474 buffer-change intervals | 442 at 33.37 ms and 32 at 50.05 ms |
+| PS1 eastern hallway through stair descent | 357 buffer-change intervals | All 33.37 ms |
 | melonDS idle music room with Harry | 300 scene submissions | 16.715 / 33.317 / 33.432 ms min/mean/max, 2.893 ms mean ARM9 submission time |
 | melonDS rotating silver pickup with prompt | 300 scene intervals | 16.713 / 33.374 / 33.432 ms min/mean/max, 3.291 ms mean ARM9 submission time |
 | melonDS idle corridor after collecting the medallion | 300 scene intervals | 16.713 / 33.317 / 33.432 ms min/mean/max, 4.137 ms mean ARM9 submission time |
+| melonDS idle eastern hallway with medallion | 300 scene intervals | 16.717 / 33.373 / 49.966 ms min/mean/max, 5.506 ms mean ARM9 submission time |
 | melonDS idle keyboard | 600 display-loop intervals | 16.713 / 16.715 / 16.717 ms min/mean/max |
 
 The PS1 uncapped VBlank counter corroborated the display-buffer measurements.
 The pickup and corridor each had a one-VBlank minimum and no intervals over 34 ms.
-At the corridor spawn the GPU retained 246 polygons and 922 vertices in one frame.
+At the room 32 spawn the GPU retained 246 polygons and 922 vertices in one
+frame. Room 31 retained 77 polygons and 309 vertices and had one interval
+above 34 ms in the 300 samples.
 The native simulation advances in 16.683 ms steps. Real DSi timing is pending.
 
 ## Scene and interaction checks
@@ -94,11 +100,27 @@ The native simulation advances in 16.683 ms steps. Real DSi timing is pending.
   rates within 0.3%). The PS1 recording gave 0.89–0.96. Opening to closing
   took 1.00 s in both melonDS crossings and 1.34/1.01 s in the PS1 replay.
 
+- The east exit (MAP_POINTS 36 ↔ 51) streams SCFE01. Its 1,958 quads use
+  80 KiB of textures. Actor palettes stay resident while the scenery changes.
+  The 43 collision edges include the stair ramp and landing. The two doors
+  use different original BASE.VAB sound pairs. In isolated recordings the
+  second pair's playback rates were within 0.3% of the PS1 reference.
+- The eastern doorway matched both original player spawns. Room 31 starts at
+  (-208896, 201113), yaw 1024, and room 32 resumes at (-44236, 81920), yaw 3072
+  (Q12). On emulated DLDI the production ROM completed the round trip with
+  the bottom screen black. A console SD diagnostic solved the piano, collected
+  the medallion and verified the inventory on return. Whole-frame RGB errors were 17.9/255 outbound and
+  16.7/255 returning. The eastern doorway is darker than the reference.
+- The original game's `stairs` replay follows the ramp south of the eastern
+  entrance. Point 80 loads MAP1_S00 room 12 with one medallion. The native
+  collision replay reached the lower landing. Camera smoothing, enemies and
+  the transition to the first floor remain incomplete.
+
 ## Next
 
-1. Trace the corridor's next exit and carry inventory and event flags toward an original save point.
-2. Match the original walking and turning sounds on the two school floors.
-3. Compare the moving corridor camera and lighting against the same PS1 traversal.
+1. Load SC0201 at the original stair trigger and verify the return trip with the medallion.
+2. Follow the first-floor doors toward the original save point.
+3. Match the original walking and turning sounds and check moving corridor lighting.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
 shdecompilations. [Pinned upstream source](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce)

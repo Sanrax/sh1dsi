@@ -27,11 +27,11 @@ typedef struct {
     uint8_t volume, pan;
 } Tone;
 
-enum { DoorOpen = 10, DoorClose, ToneCount };
+enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, ToneCount };
 static Tone tones[ToneCount];
-static uint8_t samples[88 * 1024] __attribute__((aligned(32)));
+static uint8_t samples[124 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
-static const char *roomPath, *corridorPath;
+static const char *roomPath, *corridorPath, *eastPath;
 
 static bool loadTones(FILE *file, unsigned count)
 {
@@ -60,15 +60,16 @@ static bool loadPiano(void)
         cart = !cart;
         file = fopen(cart ? fat : sd, "rb");
     }
+    eastPath = cart ? "fat:/sh1dsi/east.dat" : "sd:/sh1dsi/east.dat";
     corridorPath = cart ? "fat:/sh1dsi/corridor.dat" : "sd:/sh1dsi/corridor.dat";
     roomPath = cart ? "fat:/sh1dsi/room.dat" : "sd:/sh1dsi/room.dat";
     if (!file)
         return false;
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets
                  && memcmp(assets.magic, "SHP", 3) == 0 &&
-                 assets.magic[3] >= '1' && assets.magic[3] <= '4';
+                 assets.magic[3] >= '1' && assets.magic[3] <= '5';
     if (valid && assets.magic[3] != '1') {
-        static const unsigned counts[] = {0, 9, 10, ToneCount};
+        static const unsigned counts[] = {0, 9, 10, 12, ToneCount};
         toneCount = counts[assets.magic[3]-'1'];
         valid = loadTones(file, toneCount);
     }
@@ -95,12 +96,14 @@ static void playTone(int id)
                     tone->rate, tone->volume, tone->pan, false, 0);
 }
 
-static void crossDoor(void)
+static void crossDoor(SchoolRoom next)
 {
-    SchoolRoom next = roomCurrent() == MusicRoom ? SchoolCorridor : MusicRoom;
-    FILE *file = fopen(next == MusicRoom ? roomPath : corridorPath, "rb");
+    SchoolRoom from = roomCurrent();
+    bool hall = next == EastCorridor || from == EastCorridor;
+    const char *path = next == EastCorridor ? eastPath : next == MusicRoom ? roomPath : corridorPath;
+    FILE *file = fopen(path, "rb");
     if (!file) stop("Missing room data.\nRun the asset converter.");
-    playTone(DoorOpen);
+    playTone(hall ? HallOpen : DoorOpen);
     uint32_t start = systemCounterGetTicks();
     // Let the last geometry submission retire before remapping texture VRAM.
     setBrightness(1, -16);
@@ -112,12 +115,12 @@ static void crossDoor(void)
         setBrightness(1, 0);
         stop("Invalid school room data.");
     }
-    playerEnterRoom();
+    playerEnterRoom(from);
     // GameBoot_InGameStartup step 11 keeps the load screen for at least
     // one second, including time already spent on disc or card reads.
     while ((uint32_t)(systemCounterGetTicks()-start) < systemCounterUsecsToTicks(1000000))
         swiWaitForVBlank();
-    playTone(DoorClose);
+    playTone(hall ? HallClose : DoorClose);
 }
 
 int main(void)
@@ -194,9 +197,10 @@ int main(void)
                 if (phase == MedalDrop && medal.phase == MedalImpact)
                     sound = 9;
                 if ((pressed & KEY_A) && !wasActive) {
+                    SchoolRoom next = playerDoorDestination();
                     if (phase == medal.phase && (phase == MedalHanging || phase == MedalFinished) &&
-                        playerFacingDoor()) {
-                        crossDoor();
+                        next != roomCurrent()) {
+                        crossDoor(next);
                         enteringRoom = roomChanged = true;
                         previousTime = systemCounterGetTicks();
                         debt = step;

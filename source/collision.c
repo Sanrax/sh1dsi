@@ -2,7 +2,6 @@
 // come from the IPD splits used by the original character query.
 #include <nds.h>
 #include "collision.h"
-#include "room.h"
 
 typedef struct {
     int ax, az, bx, bz;
@@ -12,22 +11,36 @@ static Edge edges[51];
 static unsigned edgeCount;
 enum { Radius = 1228 }; // Harry's 0.3-metre outer cylinder, Q12.
 
-bool collisionLoad(FILE *file, bool corridor)
+bool collisionLoad(FILE *file, SchoolRoom room)
 {
-    edgeCount = corridor ? 20 : 51;
-    int scale = corridor ? 16 : 1;
+    edgeCount = room == EastCorridor ? 43 : room == SchoolCorridor ? 20 : 51;
+    int scale = room == MusicRoom ? 1 : 16;
     for (unsigned i = 0; i < edgeCount; i++) {
         int16_t in[6];
         if (fread(in, sizeof in, 1, file) != 1) return false;
         Edge *e = &edges[i];
         *e = (Edge){in[0]*scale, in[1]*scale, in[2]*scale, in[3]*scale, in[4], in[5]};
-        if (abs(e->ax) > 65536 || abs(e->az) > 65536 ||
-            abs(e->bx) > 65536 || abs(e->bz) > 65536 ||
+        if (abs(e->ax) > 65536 || abs(e->az) > 81920 ||
+            abs(e->bx) > 65536 || abs(e->bz) > 81920 ||
             abs(e->tx) > 4096 || abs(e->tz) > 4096 ||
             (e->ax == e->bx && e->az == e->bz))
             return false;
     }
     return true;
+}
+
+Floor collisionFloor(int x, int z)
+{
+    if (roomCurrent() != EastCorridor)
+        return (Floor){roomCurrent() == SchoolCorridor ? 48 : 0, 0};
+    // SCFE01 surfaces 11 and 12. The walls confine Harry to the stair
+    // footprint. Evaluate the ramp in the same Q8 chunk space as the IPD.
+    if (z >= 168000 && z <= 184720 && x >= -188240) return (Floor){6560, 0};
+    if (z >= 168000 && z <= 181376 && x >= -198080 && x < -188240) {
+        int y = 204 + ((2731*((x >> 4) + 20480 - 8407)) >> 12);
+        return (Floor){y > 0 ? y*16 : 0, 2731};
+    }
+    return (Floor){0, 0};
 }
 
 static bool pushFromEdge(const Edge *e, int *x, int *z)
@@ -66,7 +79,7 @@ static bool pushFromEdge(const Edge *e, int *x, int *z)
 
 void collisionMove(int *worldX, int *worldZ, int dx, int dz)
 {
-    int x = *worldX - roomOriginX() + dx, z = *worldZ - 81920 + dz;
+    int x = *worldX - roomOriginX() + dx, z = *worldZ - roomOriginZ() + dz;
     // The largest walking step is under five centimetres. A second pass
     // resolves adjacent segments when sliding into a corner.
     for (unsigned pass = 0; pass < 2; pass++) {
@@ -76,5 +89,5 @@ void collisionMove(int *worldX, int *worldZ, int dx, int dz)
         if (!contact) break;
     }
     *worldX = x + roomOriginX();
-    *worldZ = z + 81920;
+    *worldZ = z + roomOriginZ();
 }

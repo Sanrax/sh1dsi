@@ -7,38 +7,47 @@ from harry import player_data
 from pickup import silver_pickup
 
 
-def collision_edges(ipd, corridor):
+def collision_edges(ipd, room):
     collision = memoryview(ipd)[0x54:]
     x, z, vertices, surfaces, count, cylinders, vert, surface, polygon = struct.unpack_from("<ii4B3I", collision)
-    expected = (-10240, 0, 60, 10, 60, 0) if corridor else (-30720, 0, 51, 8, 51, 0)
+    expected = {39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
+                31: (-20480, 10240, 69, 15, 71, 0)}[room]
     if (x, z, vertices, surfaces, count, cylinders) != expected:
         raise ValueError("unexpected school collision header")
     output = bytearray()
     for i in range(count):
         tx, tz, length, a, b, floor, other = struct.unpack_from("<HHh4B", collision, polygon+10*i)
-        if max(a, b) >= vertices or floor >= surfaces or other != 255 or length <= 0:
-            raise ValueError("invalid music-room split")
+        if max(a, b) >= vertices or floor >= surfaces or length <= 0:
+            raise ValueError("invalid school collision split")
         # Room 32's level path intersects the floor boundary, benches and
         # counter. The other surfaces are overhead or on the floor below.
-        if corridor and floor not in (1, 2, 3, 4, 6):
+        if room == 32 and floor not in (1, 2, 3, 4, 6):
             continue
+        # SCFE01 includes the connected stair ramp and landing. Keep their
+        # outside walls and leave the two shared walkable edges open.
+        if room == 31 and (floor in (1, 6, 10, 14) or other != 255):
+            continue
+        if other != 255:
+            raise ValueError("unexpected shared collision edge")
         ax, _, az = struct.unpack_from("<3h", collision, vert+6*a)
         bx, _, bz = struct.unpack_from("<3h", collision, vert+6*b)
         # The top two bits of each tangent component are trigger flags.
-        # SCFD00 has no conditional collision or sloped surfaces.
-        if (tx | tz) & 0xc000 or any(struct.unpack_from("<2h", collision, surface+12*floor+8)):
-            raise ValueError("unsupported conditional or sloping music-room split")
+        slope = struct.unpack_from("<2h", collision, surface+12*floor+8)
+        expected_slope = (2731, 0) if room == 31 and floor == 11 else (0, 0)
+        if (tx | tz) & 0xc000 or slope != expected_slope:
+            raise ValueError("unsupported school collision flags or slope")
         tx = ((tx ^ 8192) - 8192)
         tz = ((tz ^ 8192) - 8192)
-        scale = 1 if corridor else 16
+        scale = 16 if room == 39 else 1
         output.extend(struct.pack("<6h", (ax-5120)*scale, (az-5120)*scale,
                                   (bx-5120)*scale, (bz-5120)*scale, tx, tz))
     return output
 
 
-def school_room(disc, corridor=False):
-    data = disc.read("BG/SCFF00.IPD" if corridor else "BG/SCFD00.IPD")
-    if data[:4] != bytes((20, 0, 255 if corridor else 253, 0)):
+def school_room(disc, room=39):
+    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1)}[room]
+    data = disc.read(f"BG/SC{cx:02X}{cz:02X}.IPD")
+    if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
     lm, = struct.unpack_from("<I", data, 4)
     mat_count = data[lm + 3]
@@ -76,6 +85,7 @@ def school_room(disc, corridor=False):
 
     # Group opaque polygons by texture and CLUT without duplicating any texture.
     groups = defaultdict(bytearray)
+    vertex_scale = 4 if room == 31 else 8
     def add_model(name, matrix, position, state=0):
         meshes, base, ptr = models[name]
         for j in range(meshes):
@@ -87,8 +97,8 @@ def school_room(disc, corridor=False):
                 transformed = [position[a] + (sum(matrix[3*a+k]*coord[k] for k in range(3)) >> 12)
                                for a in range(3)]
                 x, y, zpos = transformed
-                # Q8 chunk space to DS V16, centered at (-100, 0, 20).
-                vertices.append(((x-5120)*8, -y*8, -(zpos-5120)*8))
+                # Room 31 is longer than the V16 range at two metres per unit.
+                vertices.append(((x-5120)*vertex_scale, -y*vertex_scale, -(zpos-5120)*vertex_scale))
             for k in range(faces):
                 face = data[lm+prim+20*k:lm+prim+20*(k+1)]
                 mat = face[7] & 127
@@ -114,8 +124,8 @@ def school_room(disc, corridor=False):
             if data[info]:
                 raise ValueError("music room references an external PLM")
             add_model(bytes(data[info+4:info+12]).rstrip(b"\0"), pose[:9], pose[9:])
-    if corridor:
-        magic = b"SHC1"
+    if room != 39:
+        magic = b"SHE1" if room == 31 else b"SHC1"
         extra = b""
     else:
         magic = b"SHR5"
@@ -142,7 +152,7 @@ def school_room(disc, corridor=False):
         result.extend(struct.pack("<IHHI", *page))
     result.extend(pages)
     result.extend(palettes)
-    result.extend(collision_edges(data, corridor))
+    result.extend(collision_edges(data, room))
     result.extend(extra)
     for key, quads in sorted(groups.items(), key=lambda g: (g[0][3] & 1, g[0])):
         result.extend(struct.pack("<4BI", *key, len(quads)//32))

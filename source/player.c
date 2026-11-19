@@ -46,6 +46,35 @@ static int speed;
 static unsigned roomVersion;
 static bool ready, halfFrame;
 
+static int roadEyeX, roadEyeZ, entryX, entryZ;
+static bool followingRoad, doorRail;
+
+static int limitToRoad(int value, int low, int high)
+{
+    return value < low ? low : value > high ? high : value;
+}
+
+static void advanceRoadCamera(void)
+{
+    if (roomCurrent() == MusicRoom) return;
+    // Leave the entry view as Harry walks out along the road. The small
+    // chase road places the ideal eye two metres away, twelve degrees to
+    // one side of the heading opposite Harry (vcMakeIdealCamPosUseVC_ROAD_DATA).
+    if (abs(x-entryX) > 8192 || abs(z-entryZ) > 8192) followingRoad = true;
+    if (!followingRoad) return;
+    int angle = (yaw + 2048 - 136)*8;
+    int sx = x + 2*sinLerp(angle), sz = z + 2*cosLerp(angle);
+    if (roomCurrent() == SchoolCorridor) {
+        sx = limitToRoad(sx, -121088, -42496);
+        sz = limitToRoad(sz, 75264, 88320);
+    } else {
+        sx = limitToRoad(sx, -208384, -197376);
+        sz = limitToRoad(sz, 175104, 299008);
+    }
+    roadEyeX += (sx-roadEyeX)/10;
+    roadEyeZ += (sz-roadEyeZ)/10;
+}
+
 bool playerReady(void)
 {
     return ready;
@@ -113,6 +142,12 @@ static unsigned locomotion(int turn, int walk, int dt)
         int heading = yaw*8 + (walk < 0 ? 16384 : 0);
         int sx = sinLerp(heading), sz = cosLerp(heading);
         int vx = (speed*sx) >> 12, vz = (speed*sz) >> 12;
+        Floor floor = collisionFloor(x, z);
+        if (floor.slopeX) {
+            // Player_Control applies cos(gradient/8) twice before computing speed.
+            int alpha = cosLerp((floor.slopeX/8)*8);
+            vx = (((vx*alpha) >> 12)*alpha) >> 12;
+        }
         unsigned square = vx*vx + vz*vz;
         // SquareRoot0 indexes its table with a normalized eight-bit value.
         // Preserve that quantization when using the ARM9 square-root unit.
@@ -149,6 +184,7 @@ bool playerTick(int turn, int walk, PlayerAction action)
     unsigned next = action == PlayerMove ?
         locomotion(roomVersion >= 3 ? turn : 0, roomVersion >= 4 ? walk : 0, dt) :
         action == PlayerKneel ? Kneel : Rise;
+    advanceRoadCamera();
     if (next != clip) {
         blendFrom = firstFrame[clip] + (frameQ12 >> 12);
         clip = next;
@@ -183,25 +219,54 @@ void playerWarpForMedal(void)
     warp(-100*4096, 82329, 3840);
 }
 
-void playerEnterRoom(void)
+// MAP_POINTS 41/39 and 36/51. Each normal points from the threshold into
+// its room. Trigger half-widths are in Q12 metres.
+typedef struct {
+    SchoolRoom room, other;
+    int x, z, nx, nz, halfWidth;
+} Door;
+static const Door doors[] = {
+    {MusicRoom, SchoolCorridor, -417792, 97075, 0, -1, 2304},
+    {SchoolCorridor, MusicRoom, -116326, 75366, 0, 1, 2304},
+    {SchoolCorridor, EastCorridor, -42598, 81920, -1, 0, 3584},
+    {EastCorridor, SchoolCorridor, -210534, 201113, 1, 0, 3584}
+};
+
+void playerEnterRoom(SchoolRoom from)
 {
-    // AreaLoad_UpdatePlayerPosition places Harry 0.4 m inside the door.
-    if (roomCurrent() == SchoolCorridor)
-        warp(-116326, 77004, 0);
-    else
-        warp(-417792, 95437, 2048);
+    for (unsigned i = 0; i < sizeof doors / sizeof doors[0]; i++) {
+        const Door *d = &doors[i];
+        if (d->room == roomCurrent() && d->other == from) {
+            int heading = d->nx ? (d->nx > 0 ? 1024 : 3072) : (d->nz > 0 ? 0 : 2048);
+            warp(d->x + 1638*d->nx, d->z + 1638*d->nz, heading);
+            entryX = x;
+            entryZ = z;
+            followingRoad = false;
+            doorRail = from == EastCorridor || d->room == EastCorridor;
+            // Camera entry anchors for MAP_POINTS 39, 51 and 36.
+            roadEyeX = !doorRail ? -116992 : d->room == EastCorridor ? -209108 : -41644;
+            roadEyeZ = !doorRail ? 83807 : z;
+            return;
+        }
+    }
 }
 
-bool playerFacingDoor(void)
+SchoolRoom playerDoorDestination(void)
 {
-    if (roomVersion < 5) return false;
-    bool corridor = roomCurrent() == SchoolCorridor;
-    int dx = (corridor ? -116326 : -417792)-x;
-    int dz = (corridor ? 75366 : 97075)-z;
+    SchoolRoom room = roomCurrent();
+    if (roomVersion < 5) return room;
     int rayX = sinLerp(yaw*8)/2, rayZ = cosLerp(yaw*8)/2;
-    if (corridor) { dz = -dz; rayZ = -rayZ; }
-    if (rayZ <= 0 || dz < 0 || dz > rayZ) return false;
-    return abs(rayX*dz - dx*rayZ) <= 2304*rayZ;
+    for (unsigned i = 0; i < sizeof doors / sizeof doors[0]; i++) {
+        const Door *d = &doors[i];
+        if (d->room != room) continue;
+        int dx = d->x-x, dz = d->z-z;
+        int along = -dx*d->nx - dz*d->nz;
+        int reach = -rayX*d->nx - rayZ*d->nz;
+        if (reach > 0 && along >= 0 && along <= reach &&
+            abs(rayX*dz - dx*rayZ) <= d->halfWidth*reach)
+            return d->other;
+    }
+    return room;
 }
 
 bool playerFacingPiano(void)
@@ -237,22 +302,22 @@ int playerSetCamera(void)
     // Its one-metre watch circle extends away from the room camera whenever
     // the distance to Harry is below four metres.
     bool corridor = roomCurrent() == SchoolCorridor;
-    int origin = roomOriginX();
-    if (!corridor && x >= -419840 && x <= -416768 && z >= 94976 && z <= 98304) {
+    bool east = roomCurrent() == EastCorridor;
+    int ground = collisionFloor(x, z).height;
+    int origin = roomOriginX(), originZ = roomOriginZ();
+    if (roomCurrent() == MusicRoom && x >= -419840 && x <= -416768 && z >= 94976 && z <= 98304) {
         // Fixed-angle road looking back through the music-room doorway.
         gluLookAtf32((-420864-origin)/2, 768, (81920-82688)/2,
                      (-414400-origin)/2, 3904, (81920-96368)/2, 0,4096,0);
         return 768;
     }
     int eyeX = -417792, eyeZ = 74752, eyeHeight = 6144, targetHeight = -1024;
-    if (corridor) {
-        // Keep the chase camera on the room 32 road within its XZ limits.
-        eyeX = x-666;
-        eyeZ = 83807;
-        if (eyeX < -121088) eyeX = -121088;
-        if (eyeX > -42496) eyeX = -42496;
-        eyeHeight = 4276;
-        targetHeight = 1384;
+    if (corridor || east) {
+        eyeX = roadEyeX;
+        eyeZ = roadEyeZ;
+        bool rail = doorRail && !followingRoad;
+        eyeHeight = ((rail ? 7987 : 8600)-ground)/2;
+        targetHeight = ((rail ? 3533 : 2816)-ground)/2;
     }
     int dx = x-eyeX, dz = z-eyeZ;
     int length = sqrt32(dx*dx + dz*dz);
@@ -262,11 +327,11 @@ int playerSetCamera(void)
         targetX += dx * extra / length;
         targetZ += dz * extra / length;
     }
-    if (corridor && length) {
+    if ((corridor || east) && length && !(doorRail && !followingRoad)) {
         // vcAdjCamOfsAngByCharaInScreen keeps Harry's feet inside the
         // vertical half-angle atan(224/224)/2. Work in slopes to avoid
         // converting the ray to Euler angles and back.
-        int height = eyeHeight*2+48;
+        int height = eyeHeight*2+ground;
         int watchX = targetX-eyeX, watchZ = targetZ-eyeZ;
         int watchDistance = sqrt32(watchX*watchX + watchZ*watchZ);
         int drop = (int)((int64_t)watchDistance*(height-(length*1697 >> 12)) /
@@ -274,8 +339,8 @@ int playerSetCamera(void)
         int limit = eyeHeight-drop/2;
         if (targetHeight > limit) targetHeight = limit;
     }
-    gluLookAtf32((eyeX-origin)/2, eyeHeight, (81920-eyeZ)/2,
-                 (targetX-origin)/2, targetHeight, (81920-targetZ)/2, 0, 4096, 0);
+    gluLookAtf32((eyeX-origin)/2, eyeHeight, (originZ-eyeZ)/2,
+                 (targetX-origin)/2, targetHeight, (originZ-targetZ)/2, 0, 4096, 0);
     return eyeHeight;
 }
 
@@ -331,7 +396,7 @@ void playerDraw(unsigned firstPalette)
 
     glPushMatrix();
     // PS1 bone coordinates are in Q8. Convert root pose to room-local DS units.
-    glTranslatef32(((x-roomOriginX()) >> 4)*8, roomCurrent() == SchoolCorridor ? -24 : 0, (5120-(z >> 4))*8);
+    glTranslatef32(((x-roomOriginX()) >> 4)*8, -collisionFloor(x, z).height/2, ((roomOriginZ() >> 4)-(z >> 4))*8);
     glRotateYi(-yaw*8);
     glPolyFmt(POLY_ALPHA(31) | POLY_CULL_FRONT);
     const Corner *c = corners;

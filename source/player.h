@@ -1,6 +1,6 @@
 #ifndef SH1_PLAYER_H
 #define SH1_PLAYER_H
-#include <stdbool.h>
+#include "room.h"
 #include <stdio.h>
 
 bool playerLoad(FILE *file, unsigned version);
@@ -12,8 +12,8 @@ bool playerActionDone(PlayerAction action);
 bool playerFacingMedallion(void);
 void playerWarpForMedal(void);
 bool playerFacingPiano(void);
-bool playerFacingDoor(void);
-void playerEnterRoom(void);
+SchoolRoom playerDoorDestination(void);
+void playerEnterRoom(SchoolRoom from);
 int playerSetCamera(void);
 void playerDraw(unsigned firstPalette);
 
