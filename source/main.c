@@ -27,8 +27,9 @@ typedef struct {
     uint8_t volume, pan;
 } Tone;
 
-static Tone tones[10];
-static uint8_t samples[72 * 1024] __attribute__((aligned(32)));
+enum { DoorOpen = 10, DoorClose, ToneCount };
+static Tone tones[ToneCount];
+static uint8_t samples[88 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
 static const char *roomPath, *corridorPath;
 
@@ -64,11 +65,11 @@ static bool loadPiano(void)
     if (!file)
         return false;
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets
-                 && (memcmp(assets.magic, "SHP1", 4) == 0 ||
-                     memcmp(assets.magic, "SHP2", 4) == 0 ||
-                     memcmp(assets.magic, "SHP3", 4) == 0);
+                 && memcmp(assets.magic, "SHP", 3) == 0 &&
+                 assets.magic[3] >= '1' && assets.magic[3] <= '4';
     if (valid && assets.magic[3] != '1') {
-        toneCount = assets.magic[3] == '3' ? 10 : 9;
+        static const unsigned counts[] = {0, 9, 10, ToneCount};
+        toneCount = counts[assets.magic[3]-'1'];
         valid = loadTones(file, toneCount);
     }
     valid = valid && fgetc(file) == EOF && !ferror(file);
@@ -86,11 +87,20 @@ static void stop(const char *message)
     for (;;) swiWaitForVBlank();
 }
 
+static void playTone(int id)
+{
+    if (id < 0 || (unsigned)id >= toneCount) return;
+    const Tone *tone = &tones[id];
+    soundPlaySample(samples + tone->offset, SoundFormat_16Bit, tone->bytes,
+                    tone->rate, tone->volume, tone->pan, false, 0);
+}
+
 static void crossDoor(void)
 {
     SchoolRoom next = roomCurrent() == MusicRoom ? SchoolCorridor : MusicRoom;
     FILE *file = fopen(next == MusicRoom ? roomPath : corridorPath, "rb");
     if (!file) stop("Missing room data.\nRun the asset converter.");
+    playTone(DoorOpen);
     uint32_t start = systemCounterGetTicks();
     // Let the last geometry submission retire before remapping texture VRAM.
     setBrightness(1, -16);
@@ -107,6 +117,7 @@ static void crossDoor(void)
     // one second, including time already spent on disc or card reads.
     while ((uint32_t)(systemCounterGetTicks()-start) < systemCounterUsecsToTicks(1000000))
         swiWaitForVBlank();
+    playTone(DoorClose);
 }
 
 int main(void)
@@ -207,11 +218,7 @@ int main(void)
                     medallionStart(&medal);
                 }
             }
-            if (sound >= 0 && (unsigned)sound < toneCount) {
-                const Tone *tone = &tones[sound];
-                soundPlaySample(samples + tone->offset, SoundFormat_16Bit, tone->bytes,
-                                tone->rate, tone->volume, tone->pan, false, 0);
-            }
+            playTone(sound);
             pressed = 0;
             debt -= step;
         }

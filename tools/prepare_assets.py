@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 from disc import open_disc
-from vab import piano_bank
+from vab import school_bank
 from room import school_room
 
 OUTPUT = Path(__file__).resolve().parents[1] / "dist/sh1dsi/piano.dat"
@@ -58,10 +58,10 @@ def prepare(cue):
         # USA/maps/sym.map1_s01.txt and map1_s01.yaml identify the two tables.
         offset = 0x800DD500 - 0x800C9578
         tables = overlay[offset:offset+11] + overlay[offset+12:offset+17]
-        data = (b"SHP3" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
+        data = (b"SHP4" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
                 + background(disc.read("TIM/PIANO1.TIM"))
                 + background(disc.read("TIM/PIANO2.TIM"))
-                + piano_bank(disc.read("SND/MEP101.VAB")))
+                + school_bank(disc.read("SND/MEP101.VAB"), disc.read("1ST/BASE.VAB")))
         room = school_room(disc)
         corridor = school_room(disc, corridor=True)
     write_asset(OUTPUT, data)

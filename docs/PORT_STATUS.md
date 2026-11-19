@@ -36,10 +36,12 @@ Reproduction instructions are on `diagnostics/dsi`.
 | PS1 silver pickup and first corridor view | 47 intervals on each of two prompts and 67 in room 32 | All 2 VBlanks, 33.37 ms |
 | melonDS idle music room with Harry | 300 scene submissions | 16.715 / 33.317 / 33.432 ms min/mean/max, 2.893 ms mean ARM9 submission time |
 | melonDS rotating silver pickup with prompt | 300 scene intervals | 16.713 / 33.374 / 33.432 ms min/mean/max, 3.291 ms mean ARM9 submission time |
+| melonDS idle corridor after collecting the medallion | 300 scene intervals | 16.713 / 33.317 / 33.432 ms min/mean/max, 4.137 ms mean ARM9 submission time |
 | melonDS idle keyboard | 600 display-loop intervals | 16.713 / 16.715 / 16.717 ms min/mean/max |
 
 The PS1 uncapped VBlank counter corroborated the display-buffer measurements.
-The native pickup had a one-VBlank minimum interval and no intervals over 34 ms.
+The pickup and corridor each had a one-VBlank minimum and no intervals over 34 ms.
+At the corridor spawn the GPU retained 246 polygons and 922 vertices in one frame.
 The native simulation advances in 16.683 ms steps. Real DSi timing is pending.
 
 ## Scene and interaction checks
@@ -80,20 +82,23 @@ The native simulation advances in 16.683 ms steps. Real DSi timing is pending.
   outbound and 63 returning in this replay. Corridor spawn X/Z was
   (-116326, 77004) in Q12, yaw 0. Returning placed Harry at (-417792, 95437),
   yaw 2048. A melonDS diagnostic recorded both native spawns and headings
-  exactly. The console SD production replay solved the puzzle, collected the
+  exactly and confirmed the collected medallion after both crossings. The console SD production replay solved the puzzle, collected the
   medallion and crossed both doors. DLDI also completed an unsolved round trip.
 - SCFF00 loads 1,263 corridor quads, two 4-bit textures (64 KiB) and 20
   level-path collision edges. Harry's texture stays in VRAM during the
   crossing. The load screen includes the original one-second minimum.
   Whole-frame mean absolute RGB errors were 19.3/255 at corridor entry and
-  27.6/255 at reentry. The corridor chase camera, lighting and door audio
-  still differ from the original.
+  27.6/255 at reentry. The corridor chase camera and lighting still differ.
+- Both doors play the original BASE.VAB opening and closing samples. On DLDI,
+  all four onsets matched the local samples (correlation 0.74–0.90, best-fit
+  rates within 0.3%). The PS1 recording gave 0.89–0.96. Opening to closing
+  took 1.00 s in both melonDS crossings and 1.34/1.01 s in the PS1 replay.
 
 ## Next
 
-1. Match the original door sounds and measure room 32 frame timing.
-2. Trace the corridor's next exit and carry inventory and event flags toward an original save point.
-3. Match the corridor chase camera, lighting and footsteps against PS1 traversal.
+1. Trace the corridor's next exit and carry inventory and event flags toward an original save point.
+2. Match the original walking and turning sounds on the two school floors.
+3. Compare the moving corridor camera and lighting against the same PS1 traversal.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
 shdecompilations. [Pinned upstream source](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce)
