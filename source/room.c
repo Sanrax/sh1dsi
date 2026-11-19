@@ -31,10 +31,23 @@ static struct {
 static Page pages[4], skin;
 static SchoolRoom current = MusicRoom;
 
+// MAP1_S00 and MAP1_S01 door points. Normals point into the room.
+const Door schoolDoors[] = {
+    {MusicRoom, SchoolCorridor, -417792, 97075, 0, -1, 2304},
+    {SchoolCorridor, MusicRoom, -116326, 75366, 0, 1, 2304},
+    {SchoolCorridor, EastCorridor, -42598, 81920, -1, 0, 3584},
+    {EastCorridor, SchoolCorridor, -210534, 201113, 1, 0, 3584},
+    {FirstFloor, SouthHall, 436633, 201113, 1, 0, 3584},
+    {SouthHall, FirstFloor, 612761, 81920, -1, 0, 3584},
+    {SouthHall, Infirmary, 591462, 75366, 0, 1, 2304},
+    {Infirmary, SouthHall, 233472, 589004, 0, -1, 2304}
+};
+const unsigned schoolDoorCount = sizeof schoolDoors/sizeof schoolDoors[0];
+
 SchoolRoom roomCurrent(void) { return current; }
-int roomOriginX(void)
+int roomOriginX(SchoolRoom room)
 {
-    switch (current) {
+    switch (room) {
     case MusicRoom: return -100*4096;
     case SchoolCorridor: return -20*4096;
     case EastCorridor: return -60*4096;
@@ -45,10 +58,10 @@ int roomOriginX(void)
     return 0;
 }
 
-int roomOriginZ(void)
+int roomOriginZ(SchoolRoom room)
 {
-    if (current == Infirmary) return 140*4096;
-    return (current == EastCorridor || current == FirstFloor ? 60 : 20)*4096;
+    if (room == Infirmary) return 140*4096;
+    return (room == EastCorridor || room == FirstFloor ? 60 : 20)*4096;
 }
 
 static Batch batches[128];
@@ -77,14 +90,17 @@ bool roomLoad(FILE *file, SchoolRoom room)
     if (room == SouthHall) magic = "SHS1";
     if (room == Infirmary) magic = "SHI1";
     if (fread(&header, sizeof header, 1, file) != 1) return false;
-    bool latchText = room == FirstFloor && !memcmp(header.magic, "SHF2", 4);
+    bool firstFloorObstacles = room == FirstFloor && !memcmp(header.magic, "SHF3", 4);
+    bool southHallObstacles = room == SouthHall && !memcmp(header.magic, "SHS2", 4);
+    bool latchText = firstFloorObstacles || (room == FirstFloor && !memcmp(header.magic, "SHF2", 4));
     bool medical = room == Infirmary && !memcmp(header.magic, "SHI3", 4);
     bool items = medical || (room == Infirmary && !memcmp(header.magic, "SHI2", 4));
     enum { ItemPageBytes = 64*256/2, ItemPageOffset = 128*1024-ItemPageBytes };
     if (items && header.textureBytes < ItemPageBytes) return false;
     unsigned sceneBytes = header.textureBytes - (items ? ItemPageBytes : 0);
     unsigned scenePages = room == SchoolCorridor ? 2 : 3;
-    if (latchText) magic = "SHF2";
+    if (latchText) magic = firstFloorObstacles ? "SHF3" : "SHF2";
+    if (southHallObstacles) magic = "SHS2";
     if (items) magic = medical ? "SHI3" : "SHI2";
     if ((corridor ? (memcmp(header.magic, magic, 4) || header.pages != scenePages + items || !playerReady() ||
                      sceneBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
@@ -129,7 +145,8 @@ bool roomLoad(FILE *file, SchoolRoom room)
     }
     vramSetBankC(VRAM_C_TEXTURE_SLOT0);
     vramSetBankE(VRAM_E_TEX_PALETTE);
-    if ((corridor || header.magic[3] >= '4') && !collisionLoad(file, room)) return false;
+    if ((corridor || header.magic[3] >= '4') &&
+        !collisionLoad(file, room, firstFloorObstacles || southHallObstacles)) return false;
     if (latchText && !latchLoad(file)) return false;
     if (room == MusicRoom && header.pages == 4 &&
         (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))

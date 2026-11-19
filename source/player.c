@@ -260,23 +260,6 @@ void playerWarpForMedal(void)
     warp(-100*4096, 82329, 3840);
 }
 
-// MAP_POINTS 41/39 and 36/51. Each normal points from the threshold into
-// its room. Trigger half-widths are in Q12 metres.
-typedef struct {
-    SchoolRoom room, other;
-    int x, z, nx, nz, halfWidth;
-} Door;
-static const Door doors[] = {
-    {MusicRoom, SchoolCorridor, -417792, 97075, 0, -1, 2304},
-    {SchoolCorridor, MusicRoom, -116326, 75366, 0, 1, 2304},
-    {SchoolCorridor, EastCorridor, -42598, 81920, -1, 0, 3584},
-    {EastCorridor, SchoolCorridor, -210534, 201113, 1, 0, 3584},
-    {FirstFloor, SouthHall, 436633, 201113, 1, 0, 3584},
-    {SouthHall, FirstFloor, 612761, 81920, -1, 0, 3584},
-    {SouthHall, Infirmary, 591462, 75366, 0, 1, 2304},
-    {Infirmary, SouthHall, 233472, 589004, 0, -1, 2304}
-};
-
 void playerEnterRoom(SchoolRoom from)
 {
     bool downstairs = roomCurrent() == FirstFloor;
@@ -291,8 +274,8 @@ void playerEnterRoom(SchoolRoom from)
         roadEyeZ = downstairs ? 179657 : 184306;
         return;
     }
-    for (unsigned i = 0; i < sizeof doors / sizeof doors[0]; i++) {
-        const Door *d = &doors[i];
+    for (unsigned i = 0; i < schoolDoorCount; i++) {
+        const Door *d = &schoolDoors[i];
         if (d->room == roomCurrent() && d->other == from) {
             int heading = d->nx ? (d->nx > 0 ? 1024 : 3072) : (d->nz > 0 ? 0 : 2048);
             warp(d->x + 1638*d->nx, d->z + 1638*d->nz, heading);
@@ -330,8 +313,8 @@ SchoolRoom playerDestination(bool action)
         return EastCorridor;
     if (!action || roomVersion < 5) return room;
     int rayX = sinLerp(yaw*8)/2, rayZ = cosLerp(yaw*8)/2;
-    for (unsigned i = 0; i < sizeof doors / sizeof doors[0]; i++) {
-        const Door *d = &doors[i];
+    for (unsigned i = 0; i < schoolDoorCount; i++) {
+        const Door *d = &schoolDoors[i];
         if (d->room != room) continue;
         int dx = d->x-x, dz = d->z-z;
         int along = -dx*d->nx - dz*d->nz;
@@ -402,7 +385,7 @@ int playerSetCamera(void)
     bool corridor = roomCurrent() == SchoolCorridor || roomCurrent() == SouthHall;
     bool stairwell = roomCurrent() == EastCorridor || roomCurrent() == FirstFloor;
     int ground = collisionFloor(x, z).height;
-    int origin = roomOriginX(), originZ = roomOriginZ();
+    int origin = roomOriginX(roomCurrent()), originZ = roomOriginZ(roomCurrent());
     if (roomCurrent() == MusicRoom && x >= -419840 && x <= -416768 && z >= 94976 && z <= 98304) {
         // Fixed-angle road looking back through the music-room doorway.
         gluLookAtf32((-420864-origin)/2, 768, (81920-82688)/2,
@@ -502,7 +485,8 @@ void playerDraw(unsigned firstPalette)
 
     glPushMatrix();
     // PS1 bone coordinates are in Q8. Convert root pose to room-local DS units.
-    glTranslatef32(((x-roomOriginX()) >> 4)*8, -collisionFloor(x, z).height/2, ((roomOriginZ() >> 4)-(z >> 4))*8);
+    SchoolRoom room = roomCurrent();
+    glTranslatef32(((x-roomOriginX(room)) >> 4)*8, -collisionFloor(x, z).height/2, ((roomOriginZ(room) >> 4)-(z >> 4))*8);
     glRotateYi(-yaw*8);
     glPolyFmt(POLY_ALPHA(31) | POLY_CULL_FRONT);
     const Corner *c = corners;

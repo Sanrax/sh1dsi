@@ -130,13 +130,23 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   Harry declined and then took each item, left and re-entered the infirmary,
   and wrote a new notebook slot with both sets of pickups and the latch.
   After restarting melonDS, the same build loaded the saved pose and flags.
+  The same replay passed on virtual console SD in upstream build `361ffa9`.
   The regenerated sidecar is required for the interactions.
+
+## Downstairs collision
+
+- Four matched PS1 and melonDS approaches reproduced walk-through at the
+  first-floor double doors, the western wall fixture, the southern hall
+  lockers and the infirmary door. The port now keeps the relevant IPD
+  edges and blocks walking across the closed doors. All four stops are
+  within 1 cm of PS1 along the blocked axis. The first-floor latch and
+  both action-button transitions still work.
 
 ## Next
 
-1. Reproduce the reported downstairs door and locker collision failures and compare the affected boundaries with the PS1.
-2. Identify the wall surfaces involved in the poster flicker and stabilize their depth ordering.
-3. Compare the infirmary camera transitions and final view matrix against a PS1 replay at the same poses.
+1. Stabilize the depth ordering of the coplanar first-floor posters and verify a moving camera view.
+2. Compare the infirmary camera transitions and final view matrix against a PS1 replay at the same poses.
+3. Trace the route toward the courtyard and identify the next room and door assets.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
 shdecompilations. [Pinned upstream source](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce)

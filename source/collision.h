@@ -3,7 +3,7 @@
 #include "room.h"
 #include <stdio.h>
 
-bool collisionLoad(FILE *file, SchoolRoom room);
+bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles);
 typedef struct { int height, slopeX; } Floor;
 Floor collisionFloor(int x, int z);
 void collisionMove(int *worldX, int *worldZ, int dx, int dz);

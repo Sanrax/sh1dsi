@@ -29,9 +29,9 @@ def collision_edges(ipd, room):
         if room == 31 and (floor in (1, 6, 10, 14) or other != 255):
             continue
         # The upper and basement stair flights share this first-floor chunk.
-        if room == 12 and (floor not in (3, 4, 5, 6, 7, 8, 9, 12, 13, 14, 16, 18, 20) or other != 255):
+        if room == 12 and (floor in (0, 1, 2, 10, 11) or other != 255):
             continue
-        if room == 13 and floor in (3, 4, 10):
+        if room == 13 and floor in (3, 4):
             continue
         # The infirmary walls meet at shared splits. Keep their exposed faces.
         if room == 9 and other != 255:
@@ -204,7 +204,7 @@ def school_room(disc, room=39):
             add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-10240, y>>4, (z>>4)-30720), state,
                       item_page=page)
     if room != 39:
-        magic = {9: b"SHI3", 12: b"SHF2", 13: b"SHS1", 31: b"SHE1", 32: b"SHC1"}[room]
+        magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 31: b"SHE1", 32: b"SHC1"}[room]
         extra = b""
         if room == 9:
             extra = medical_pickups(disc)

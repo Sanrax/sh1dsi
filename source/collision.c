@@ -7,21 +7,22 @@ typedef struct {
     int ax, az, bx, bz;
     int16_t tx, tz;
 } Edge;
-static Edge edges[51];
+static Edge edges[51 + 2]; // Largest IPD stream plus both doorways in its room.
 static unsigned edgeCount;
 enum { Radius = 1228 }; // Harry's 0.3-metre outer cylinder, Q12.
 
-bool collisionLoad(FILE *file, SchoolRoom room)
+bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles)
 {
     switch (room) {
     case Infirmary: edgeCount = 45; break;
-    case FirstFloor: edgeCount = 39; break;
-    case SouthHall:
+    case FirstFloor: edgeCount = fullObstacles ? 51 : 39; break;
+    case SouthHall: edgeCount = fullObstacles ? 47 : 43; break;
     case EastCorridor: edgeCount = 43; break;
     case SchoolCorridor: edgeCount = 20; break;
     case MusicRoom: edgeCount = 51; break;
     }
     int scale = room == MusicRoom ? 1 : 16;
+    int originX = roomOriginX(room), originZ = roomOriginZ(room);
     // The first-floor south wall extends 0.21 m into the adjoining chunk.
     int maxZ = room == FirstFloor ? 21*4096 : 20*4096;
     for (unsigned i = 0; i < edgeCount; i++) {
@@ -34,6 +35,21 @@ bool collisionLoad(FILE *file, SchoolRoom room)
             abs(e->tx) > 4096 || abs(e->tz) > 4096 ||
             (e->ax == e->bx && e->az == e->bz))
             return false;
+        e->ax += originX;
+        e->bx += originX;
+        e->az += originZ;
+        e->bz += originZ;
+    }
+    // Actor collision stops at the closed leaves. The facing ray can still
+    // cross the threshold, and a room transition spawns beyond the radius.
+    for (unsigned i = 0; i < schoolDoorCount; i++) {
+        const Door *d = &schoolDoors[i];
+        if (d->room != room) continue;
+        if (edgeCount == sizeof edges/sizeof edges[0]) return false;
+        int tx = d->nz, tz = -d->nx;
+        int halfX = tx*d->halfWidth, halfZ = tz*d->halfWidth;
+        edges[edgeCount++] = (Edge){d->x+halfX, d->z+halfZ, d->x-halfX, d->z-halfZ,
+                                    tx*4096, tz*4096};
     }
     return true;
 }
@@ -104,7 +120,7 @@ static bool pushFromEdge(const Edge *e, int *x, int *z)
 
 void collisionMove(int *worldX, int *worldZ, int dx, int dz)
 {
-    int x = *worldX - roomOriginX() + dx, z = *worldZ - roomOriginZ() + dz;
+    int x = *worldX + dx, z = *worldZ + dz;
     // The largest walking step is under five centimetres. A second pass
     // resolves adjacent segments when sliding into a corner.
     for (unsigned pass = 0; pass < 2; pass++) {
@@ -113,6 +129,6 @@ void collisionMove(int *worldX, int *worldZ, int dx, int dz)
             contact |= pushFromEdge(&edges[i], &x, &z);
         if (!contact) break;
     }
-    *worldX = x + roomOriginX();
-    *worldZ = z + roomOriginZ();
+    *worldX = x;
+    *worldZ = z;
 }
