@@ -382,18 +382,20 @@ int playerSetCamera(void)
     // vcMakeNormalWatchTgtPos / vcSetWatchTgtXzPos, small chase road.
     // Its one-metre watch circle extends away from the room camera whenever
     // the distance to Harry is below four metres.
-    bool corridor = roomCurrent() == SchoolCorridor || roomCurrent() == SouthHall;
-    bool stairwell = roomCurrent() == EastCorridor || roomCurrent() == FirstFloor;
+    SchoolRoom room = roomCurrent();
+    bool corridor = room == SchoolCorridor || room == SouthHall;
+    bool stairwell = room == EastCorridor || room == FirstFloor;
+    bool infirmary = room == Infirmary;
     int ground = collisionFloor(x, z).height;
-    int origin = roomOriginX(roomCurrent()), originZ = roomOriginZ(roomCurrent());
-    if (roomCurrent() == MusicRoom && x >= -419840 && x <= -416768 && z >= 94976 && z <= 98304) {
+    int origin = roomOriginX(room), originZ = roomOriginZ(room);
+    if (room == MusicRoom && x >= -419840 && x <= -416768 && z >= 94976 && z <= 98304) {
         // Fixed-angle road looking back through the music-room doorway.
         gluLookAtf32((-420864-origin)/2, 768, (81920-82688)/2,
                      (-414400-origin)/2, 3904, (81920-96368)/2, 0,4096,0);
         return 768;
     }
     int eyeX = -417792, eyeZ = 74752, eyeHeight = 6144, targetHeight = -1024;
-    if (roomCurrent() == Infirmary) {
+    if (infirmary) {
         const InfirmaryRoad *r = &infirmaryRoads[infirmaryRoad];
         eyeX = r->eyeX*256;
         eyeZ = r->eyeZ*256;
@@ -416,7 +418,7 @@ int playerSetCamera(void)
         targetX += dx * extra / length;
         targetZ += dz * extra / length;
     }
-    if ((corridor || stairwell) && length && !(doorRail && !followingRoad)) {
+    if ((corridor || stairwell || infirmary) && length && !(doorRail && !followingRoad)) {
         // vcAdjCamOfsAngByCharaInScreen keeps Harry's feet inside the
         // vertical half-angle atan(224/224)/2. Work in slopes to avoid
         // converting the ray to Euler angles and back.

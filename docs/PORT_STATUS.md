@@ -152,10 +152,17 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   angles. In the updated data, all 13 samples showed the poster with zero
   wall-only texels in that region.
 
+## Infirmary camera
+
+- The infirmary now applies the PS1 vertical framing limit that keeps
+  Harry in view. With matching player poses in PS1 and melonDS, whole-frame
+  mean RGB error fell from 46.2 to 32.2/255 by the drink and from 32.7 to
+  27.5/255 by the kit. Lighting and camera transitions still differ.
+
 ## Next
 
-1. Match the PS1 pitch near the infirmary cabinet and kit.
-2. Compare the remaining infirmary camera transitions and lighting with the PS1.
+1. Compare the remaining infirmary camera transitions and lighting with the PS1.
+2. Trace the original pickup menu sounds and add the BASE.VAB samples.
 3. Trace the route toward the courtyard and identify the next room and door assets.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
