@@ -7,13 +7,24 @@ typedef struct {
     int ax, az, bx, bz;
     int16_t tx, tz;
 } Edge;
-static Edge edges[51 + 2]; // Largest IPD stream plus both doorways in its room.
+static Edge edges[128]; // Exterior boundaries and obstacles, plus door planes.
 static unsigned edgeCount;
+typedef struct {
+    int16_t minX0, maxX0, minX1, maxX1, minZ, maxZ, height, refZ, slope;
+} Ramp;
+static Ramp courtyardRamps[4];
 enum { Radius = 1228 }; // Harry's 0.3-metre outer cylinder, Q12.
 
 bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles)
 {
     switch (room) {
+    case Courtyard: {
+        uint16_t count;
+        if (fread(&count, sizeof count, 1, file) != 1 || !count || count >= sizeof edges/sizeof edges[0])
+            return false;
+        edgeCount = count;
+        break;
+    }
     case Infirmary: edgeCount = 45; break;
     case FirstFloor: edgeCount = fullObstacles ? 51 : 39; break;
     case SouthHall: edgeCount = fullObstacles ? 47 : 43; break;
@@ -40,6 +51,15 @@ bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles)
         e->az += originZ;
         e->bz += originZ;
     }
+    if (room == Courtyard) {
+        if (fread(courtyardRamps, sizeof courtyardRamps, 1, file) != 1) return false;
+        for (unsigned i = 0; i < sizeof courtyardRamps/sizeof courtyardRamps[0]; i++) {
+            const Ramp *r = &courtyardRamps[i];
+            if (r->minX0 >= r->maxX0 || r->minX1 >= r->maxX1 || r->minZ >= r->maxZ || abs(r->refZ) > 5120 ||
+                abs(r->height) > 256 || abs(r->slope) > 4096)
+                return false;
+        }
+    }
     // Actor collision stops at the closed leaves. The facing ray can still
     // cross the threshold, and a room transition spawns beyond the radius.
     for (unsigned i = 0; i < schoolDoorCount; i++) {
@@ -56,32 +76,48 @@ bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles)
 
 Floor collisionFloor(int x, int z)
 {
+    if (roomCurrent() == Courtyard) {
+        int localX = (x-roomOriginX(Courtyard)) >> 4, localZ = (z-roomOriginZ(Courtyard)) >> 4;
+        Floor floor = {0};
+        for (unsigned i = 0; i < sizeof courtyardRamps/sizeof courtyardRamps[0]; i++) {
+            const Ramp *r = &courtyardRamps[i];
+            if (localZ < r->minZ || localZ > r->maxZ) continue;
+            int dz = localZ-r->minZ, span = r->maxZ-r->minZ;
+            int minX = r->minX0 + (r->minX1-r->minX0)*dz/span;
+            int maxX = r->maxX0 + (r->maxX1-r->maxX0)*dz/span;
+            if (localX < minX || localX > maxX) continue;
+            int height = r->height + ((r->slope*(localZ-r->refZ)) >> 12);
+            if (height*16 < floor.height)
+                floor = (Floor){.height = height*16, .slopeZ = r->slope};
+        }
+        return floor;
+    }
     if (roomCurrent() == FirstFloor) {
         // SC0201 surfaces 8/9 lead upstairs, while 4/7 descend south of
         // the dividing wall. Both slopes use the original Q8 reference point.
         int localX = (x >> 4) - 20480, localZ = (z >> 4) - 10240;
         if (z >= 181248 && z <= 194832 && x >= 449328) {
-            if (x >= 459040) return (Floor){-409*16, 0};
-            return (Floor){(-205 + ((-2753*(localX-7906)) >> 12))*16, -2753};
+            if (x >= 459040) return (Floor){.height = -409*16};
+            return (Floor){.height = (-205 + ((-2753*(localX-7906)) >> 12))*16, .slopeX = -2753};
         }
         if (z >= 162976 && z <= 180896 && x >= 449328) {
-            if (x >= 459088) return (Floor){412*16, 0};
+            if (x >= 459088) return (Floor){.height = 412*16};
             int y = 204 + ((2778*(localX-7908)) >> 12) + ((5*(localZ-506)) >> 12);
-            return (Floor){y*16, 2778};
+            return (Floor){.height = y*16, .slopeX = 2778};
         }
-        return (Floor){-16, 0};
+        return (Floor){.height = -16};
     }
-    if (roomCurrent() == Infirmary) return (Floor){-48, 0};
+    if (roomCurrent() == Infirmary) return (Floor){.height = -48};
     if (roomCurrent() != EastCorridor)
-        return (Floor){roomCurrent() == SchoolCorridor ? 48 : 0, 0};
+        return (Floor){.height = roomCurrent() == SchoolCorridor ? 48 : 0};
     // SCFE01 surfaces 11 and 12. The walls confine Harry to the stair
     // footprint. Evaluate the ramp in the same Q8 chunk space as the IPD.
-    if (z >= 168000 && z <= 184720 && x >= -188240) return (Floor){6560, 0};
+    if (z >= 168000 && z <= 184720 && x >= -188240) return (Floor){.height = 6560};
     if (z >= 168000 && z <= 181376 && x >= -198080 && x < -188240) {
         int y = 204 + ((2731*((x >> 4) + 20480 - 8407)) >> 12);
-        return (Floor){y > 0 ? y*16 : 0, 2731};
+        return (Floor){.height = y > 0 ? y*16 : 0, .slopeX = 2731};
     }
-    return (Floor){0, 0};
+    return (Floor){0};
 }
 
 static bool pushFromEdge(const Edge *e, int *x, int *z)

@@ -40,7 +40,9 @@ const Door schoolDoors[] = {
     {FirstFloor, SouthHall, 436633, 201113, 1, 0, 3584},
     {SouthHall, FirstFloor, 612761, 81920, -1, 0, 3584},
     {SouthHall, Infirmary, 591462, 75366, 0, 1, 2304},
-    {Infirmary, SouthHall, 233472, 589004, 0, -1, 2304}
+    {Infirmary, SouthHall, 233472, 589004, 0, -1, 2304},
+    {SouthHall, Courtyard, 573440, 95027, 0, -1, 4864},
+    {Courtyard, SouthHall, -80691, -282214, 0, 1, 4864}
 };
 const unsigned schoolDoorCount = sizeof schoolDoors/sizeof schoolDoors[0];
 
@@ -49,6 +51,7 @@ int roomOriginX(SchoolRoom room)
 {
     switch (room) {
     case MusicRoom: return -100*4096;
+    case Courtyard:
     case SchoolCorridor: return -20*4096;
     case EastCorridor: return -60*4096;
     case FirstFloor: return 100*4096;
@@ -61,6 +64,7 @@ int roomOriginX(SchoolRoom room)
 int roomOriginZ(SchoolRoom room)
 {
     if (room == Infirmary) return 140*4096;
+    if (room == Courtyard) return -60*4096;
     return (room == EastCorridor || room == FirstFloor ? 60 : 20)*4096;
 }
 
@@ -89,6 +93,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     if (room == EastCorridor) magic = "SHE1";
     if (room == SouthHall) magic = "SHS1";
     if (room == Infirmary) magic = "SHI1";
+    if (room == Courtyard) magic = "SHY1";
     if (fread(&header, sizeof header, 1, file) != 1) return false;
     bool firstFloorObstacles = room == FirstFloor && !memcmp(header.magic, "SHF3", 4);
     bool southHallObstacles = room == SouthHall && !memcmp(header.magic, "SHS2", 4);
@@ -164,7 +169,8 @@ bool roomLoad(FILE *file, SchoolRoom room)
     long start = ftell(file);
     if (start < 0 || fseek(file, 0, SEEK_END)) return false;
     long bytes = ftell(file) - start - (long)(header.batches * sizeof(Batch));
-    if (bytes <= 0 || bytes > (room == MusicRoom || room == SchoolCorridor ? 6144 : 8192)*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)) ||
+    unsigned maxVerts = room == Courtyard ? 11000 : room == MusicRoom || room == SchoolCorridor ? 6144 : 8192;
+    if (bytes <= 0 || bytes > maxVerts*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)) ||
         fseek(file, start, SEEK_SET))
         return false;
     free(vertices);
@@ -175,7 +181,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     for (unsigned i = 0; i < header.batches; i++) {
         Batch *b = &batches[i];
         if (fread(b, sizeof *b, 1, file) != 1 || b->page >= header.pages ||
-            b->state > maxState || b->flags > 3 || b->palette >= pages[b->page].palettes ||
+            b->state > maxState || b->flags > (room == Courtyard ? 7 : 3) || b->palette >= pages[b->page].palettes ||
             b->quads > (total-pos)/4 ||
             fread(vertices+pos, sizeof(Vertex)*4, b->quads, file) != b->quads)
             return false;
@@ -251,7 +257,8 @@ void roomDraw(const Medallion *medal)
             const Page *p = &pages[b->page];
             unsigned width = p->width == 64 ? TEXTURE_SIZE_64 :
                              p->width == 128 ? TEXTURE_SIZE_128 : TEXTURE_SIZE_256;
-            GFX_TEX_FORMAT = (p->offset >> 3) | (width << 20) | (TEXTURE_SIZE_256 << 23)
+            GFX_TEX_FORMAT = (b->flags & 4) ? 0 :
+                             (p->offset >> 3) | (width << 20) | (TEXTURE_SIZE_256 << 23)
                              | (GL_RGB16 << 26) | ((b->flags & 2) ? GL_TEXTURE_COLOR0_TRANSPARENT : 0);
             GFX_PAL_FORMAT = (p->firstPalette + b->palette) * 2;
             // PS1 visible faces wind clockwise in these screen coordinates.

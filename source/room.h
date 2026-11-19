@@ -4,7 +4,8 @@
 #include <stdio.h>
 #include "medallion.h"
 
-typedef enum { MusicRoom = 39, SchoolCorridor = 32, EastCorridor = 31, FirstFloor = 12, SouthHall = 13, Infirmary = 9 } SchoolRoom;
+typedef enum { MusicRoom = 39, SchoolCorridor = 32, EastCorridor = 31, Courtyard = 23,
+               FirstFloor = 12, SouthHall = 13, Infirmary = 9 } SchoolRoom;
 
 typedef struct {
     SchoolRoom room, other;

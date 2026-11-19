@@ -3,14 +3,16 @@
 Harry starts at the Midwich piano. He can solve the keyboard puzzle, watch
 or skip the falling silver medallion, decline or accept it, walk through the
 eastern hallway, descend the stairs, unlatch the first-floor door and enter
-the southern hallway. In the infirmary he can pick up both medical supplies
-and use the notebook. A cold boot can resume at the desk with the puzzle,
+the southern hallway. The hall's double doors lead to the courtyard and back.
+In the infirmary he can pick up both medical supplies and use the notebook.
+A cold boot can resume at the desk with the puzzle,
 door latch and pickups intact. The full game remains unplayable.
 
 ## Build and media
 
 - BlocksDS 1.24.0 and Wonderful GCC 16.2.0 produce a TWL-exclusive ROM
-  (unit code 3). Conversion and clean compilation are reproducible.
+  (unit code 3). Rebuilding reproduced the ROM and nine local data files
+  byte for byte.
 - USA 1.1 CUE, one MODE2/2352 track, 616,494,480 bytes, SHA-1
   `34278d31d9b9b12b3b5db5e45bcbe548991ecbc7`. Non-XA file entries agreed
   with upstream silentassets. All converted data stays on the owner's machine.
@@ -39,6 +41,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | PS1 crossing the southern hallway | 176 buffer-change intervals | 70 at 33.37 ms and 106 at 50.05 ms |
 | PS1 infirmary from entrance to save interaction | 255 buffer-change intervals | 1 at 16.68 ms, 247 at 33.37 ms and 7 at 50.05 ms |
 | PS1 health drink and first-aid kit events | 130 drink and 126 kit buffer-change intervals | Drink had 9 at 33.37 ms and 121 at 50.05 ms. Kit intervals were all 50.05 ms |
+| PS1 courtyard entry, walk and return approach | 183 buffer-change intervals | 45 at 33.37 ms, 117 at 50.05 ms and 21 at 66.73 ms. Mean 47.86 ms |
 | melonDS idle music room with Harry | 300 scene submissions | 16.715 / 33.317 / 33.432 ms min/mean/max, 2.893 ms mean ARM9 submission time |
 | melonDS rotating silver pickup with prompt | 300 scene intervals | 16.713 / 33.374 / 33.432 ms min/mean/max, 3.291 ms mean ARM9 submission time |
 | melonDS idle corridor after collecting the medallion | 300 scene intervals | 16.713 / 33.317 / 33.432 ms min/mean/max, 4.137 ms mean ARM9 submission time |
@@ -48,6 +51,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | melonDS southern hallway with medallion | 300 scene intervals | 16.717 / 33.373 / 49.968 ms min/mean/max, 5.138 ms mean ARM9 submission time |
 | melonDS infirmary entrance with medallion | 300 scene intervals | 16.711 / 33.317 / 33.434 ms min/mean/max, 3.920 ms mean ARM9 submission time |
 | melonDS infirmary health drink | 300 scene submissions during the pickup event | 16.713 / 33.374 / 33.432 ms min/mean/max, 4.263 ms mean ARM9 submission time |
+| melonDS courtyard entry, straight walk and turn | 300 scene intervals | 16.711 / 33.318 / 33.457 ms min/mean/max, 6.911 ms mean ARM9 submission time |
 
 ## Scene and interaction checks
 
@@ -163,10 +167,31 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   mean RGB error fell from 46.2 to 32.2/255 by the drink and from 32.7 to
   27.5/255 by the kit. Lighting and camera transitions still differ.
 
+## Courtyard
+
+- MAP1_S00 points 5 and 3 connect the southern hallway to room 23. The
+  room streams SCFFFE with 2,648 scenery quads, 83 collision edges, four
+  entrance ramp and landing planes, and three paletted texture pages
+  occupying 80 KiB. The conversion retains the tree and window cutouts.
+- The original NTSC-U replay measured the entry at X/Z (−80691, −280576),
+  yaw 0, and the return at (573440, 93389), yaw 2048, in Q12 coordinates.
+  The production ROM matched both poses in melonDS 1.1 over DLDI and
+  `361ffa9` over virtual console SD. Both replays kept the medallion,
+  medical supplies and first-floor latch. A separate probe verified the
+  0.60 m entry landing and ground height after the ramp.
+- A diagnostic pass reading geometry RAM before each swap peaked at 1,025
+  polygons and 4,071 vertices with no overflow during the entry, walk and
+  turn. That pass included one 49.97 ms interval.
+- The PS1 trace had fog disabled in this scene. Low-light shading and
+  camera following still differ. In the DLDI replay, whole-frame mean RGB
+  error was 20.6/255 on entry, 17.1/255 after descending the ramp and
+  13.9/255 after returning to the hall. The clock tower interactions and
+  north exit remain to be implemented.
+
 ## Next
 
-1. Compare the remaining infirmary camera transitions and lighting with the PS1.
-2. Trace the route toward the courtyard and identify the next room and door assets.
+1. Trace the clock tower inscription and gate interactions in the PS1 courtyard.
+2. Match the courtyard's camera and low-light shading against the PS1 replay.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

@@ -105,6 +105,10 @@ static void advanceRoadCamera(void)
     } else if (roomCurrent() == SouthHall) {
         sx = limitToRoad(sx, 534016, 612608);
         sz = limitToRoad(sz, 75264, 86272);
+    } else if (roomCurrent() == Courtyard) {
+        // MAP1_S00 courtyard chase road bounds.
+        sx = limitToRoad(sx, -111616, -50176);
+        sz = limitToRoad(sz, -280576, -217088);
     } else if (roomCurrent() == FirstFloor) {
         sx = limitToRoad(sx, 437760, 449536);
         sz = limitToRoad(sz, 174080, 299264);
@@ -188,6 +192,10 @@ static unsigned locomotion(int turn, int walk, int dt)
             // Player_Control applies cos(gradient/8) twice before computing speed.
             int alpha = cosLerp((floor.slopeX/8)*8);
             vx = (((vx*alpha) >> 12)*alpha) >> 12;
+        }
+        if (floor.slopeZ) {
+            int alpha = cosLerp((floor.slopeZ/8)*8);
+            vz = (((vz*alpha) >> 12)*alpha) >> 12;
         }
         unsigned square = vx*vx + vz*vz;
         // SquareRoot0 indexes its table with a normalized eight-bit value.
@@ -286,7 +294,11 @@ void playerEnterRoom(SchoolRoom from)
             // Camera entry anchors for MAP_POINTS 39, 51 and 36.
             roadEyeX = !doorRail ? -116992 : d->room == EastCorridor ? -209108 : -41644;
             roadEyeZ = !doorRail ? 83807 : z;
-            if (d->room == Infirmary) {
+            if (d->room == Courtyard || from == Courtyard) {
+                doorRail = true;
+                roadEyeX = x;
+                roadEyeZ = z + (d->room == Courtyard ? -210 : 206);
+            } else if (d->room == Infirmary) {
                 infirmaryRoad = 0;
             } else if (from == Infirmary) {
                 doorRail = true;
@@ -386,8 +398,15 @@ int playerSetCamera(void)
     bool corridor = room == SchoolCorridor || room == SouthHall;
     bool stairwell = room == EastCorridor || room == FirstFloor;
     bool infirmary = room == Infirmary;
+    bool courtyard = room == Courtyard;
     int ground = collisionFloor(x, z).height;
     int origin = roomOriginX(room), originZ = roomOriginZ(room);
+    if (courtyard && !followingRoad) {
+        // Through-door view at MAP1_S00 point 3.
+        gluLookAtf32((roadEyeX-origin)/2, 5225, (originZ-roadEyeZ)/2,
+                     (-80899-origin)/2, 3023, (originZ+258222)/2, 0,4096,0);
+        return 5225;
+    }
     if (room == MusicRoom && x >= -419840 && x <= -416768 && z >= 94976 && z <= 98304) {
         // Fixed-angle road looking back through the music-room doorway.
         gluLookAtf32((-420864-origin)/2, 768, (81920-82688)/2,
@@ -401,7 +420,7 @@ int playerSetCamera(void)
         eyeZ = r->eyeZ*256;
         eyeHeight = -r->eyeY*128;
         targetHeight = (-r->watchY*256-ground)/2;
-    } else if (corridor || stairwell) {
+    } else if (corridor || stairwell || courtyard) {
         eyeX = roadEyeX;
         eyeZ = roadEyeZ;
         bool rail = doorRail && !followingRoad;
@@ -418,7 +437,7 @@ int playerSetCamera(void)
         targetX += dx * extra / length;
         targetZ += dz * extra / length;
     }
-    if ((corridor || stairwell || infirmary) && length && !(doorRail && !followingRoad)) {
+    if ((corridor || stairwell || infirmary || courtyard) && length && !(doorRail && !followingRoad)) {
         // vcAdjCamOfsAngByCharaInScreen keeps Harry's feet inside the
         // vertical half-angle atan(224/224)/2. Work in slopes to avoid
         // converting the ray to Euler angles and back.

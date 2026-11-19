@@ -12,7 +12,8 @@ def collision_edges(ipd, room):
     x, z, vertices, surfaces, count, cylinders, vert, surface, polygon = struct.unpack_from("<ii4B3I", collision)
     expected = {39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
                 31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0),
-                13: (30720, 0, 80, 12, 80, 0), 9: (10240, 30720, 45, 11, 49, 0)}[room]
+                13: (30720, 0, 80, 12, 80, 0), 9: (10240, 30720, 45, 11, 49, 0),
+                23: (-10240, -20480, 204, 61, 236, 0)}[room]
     if (x, z, vertices, surfaces, count, cylinders) != expected:
         raise ValueError("unexpected school collision header")
     output = bytearray()
@@ -36,6 +37,10 @@ def collision_edges(ipd, room):
         # The infirmary walls meet at shared splits. Keep their exposed faces.
         if room == 9 and other != 255:
             continue
+        # Keep the exterior perimeter and raised planters, trees and posts.
+        # The four entrance landing and ramp surfaces remain traversable.
+        if room == 23 and (floor in (0, 1, 30, 37, 38, 39, 40) or 50 <= floor < 60 or other != 255):
+            continue
         if other != 255:
             raise ValueError("unexpected shared collision edge")
         ax, _, az = struct.unpack_from("<3h", collision, vert+6*a)
@@ -50,7 +55,28 @@ def collision_edges(ipd, room):
         scale = 16 if room == 39 else 1
         output.extend(struct.pack("<6h", (ax-5120)*scale, (az-5120)*scale,
                                   (bx-5120)*scale, (bz-5120)*scale, tx, tz))
-    return output
+    if room != 23:
+        return output
+
+    floors = bytearray()
+    for plane in (37, 38, 39, 40):
+        corners = set()
+        for i in range(count):
+            a, b, left, right = struct.unpack_from("4B", collision, polygon+10*i+6)
+            if plane in (left, right):
+                corners.update(struct.unpack_from("<3h", collision, vert+6*k)[::2] for k in (a, b))
+        zs = sorted({z for _, z in corners})
+        if len(zs) != 2 or len(corners) != 4:
+            raise ValueError("unexpected courtyard walkway bounds")
+        limits = [sorted(x-5120 for x, z in corners if z == end) for end in zs]
+        if any(len(pair) != 2 for pair in limits):
+            raise ValueError("unexpected courtyard walkway ends")
+        _, y, zref, _, sx, sz = struct.unpack_from("<3hH2h", collision, surface+12*plane)
+        if sx:
+            raise ValueError("unexpected courtyard walkway gradient")
+        floors.extend(struct.pack("<9h", *limits[0], *limits[1], zs[0]-5120, zs[1]-5120,
+                                  y, zref-5120, sz))
+    return struct.pack("<H", len(output)//12) + output + floors
 
 
 def model_directory(data):
@@ -116,7 +142,8 @@ def vertical_rectangle(points):
 
 
 def school_room(disc, room=39):
-    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3)}[room]
+    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3),
+              23: (255, 254)}[room]
     data = disc.read(f"BG/SC{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -129,6 +156,7 @@ def school_room(disc, room=39):
     palettes = bytearray()
     page_info = []
     color_keys = []
+    remapped_regions = {}
     for i in range(mat_count):
         material = lm + mat_ptr + i*24
         name = data[material:material+8].rstrip(b"\0").decode("ascii")
@@ -140,6 +168,23 @@ def school_room(disc, room=39):
             raise ValueError(f"unexpected texture layout for {name}")
         page_info.append((len(pages), words*4, len(palettes)//32, rows))
         cluts = list(struct.iter_unpack("<16H", tim[20:20 + rows*32]))
+        pixels = bytearray(tim[image+12:image+size])
+        if room == 23 and name == "SC1FSE2":
+            # The two tree and window palettes have different transparent
+            # indices, but their tiles occupy separate rectangles on the page.
+            for row, key, rect in ((2, 14, (0, 63, 0, 127)), (4, 15, (64, 159, 0, 63))):
+                if {j for j, value in enumerate(cluts[row]) if not value} != {key}:
+                    raise ValueError("unexpected courtyard cutout palette")
+                remapped_regions[i, row] = rect
+                left, right, top, bottom = rect
+                for y in range(top, bottom+1):
+                    for j in range(y*words*2+left//2, y*words*2+right//2+1):
+                        pixels[j] ^= key | key << 4
+                cluts[row] = tuple(cluts[row][j ^ key] for j in range(16))
+        if room == 23 and name == "SC1FSEH":
+            # The last CLUT is unreferenced in this IPD.
+            cluts = cluts[:7]
+            page_info[-1] = (*page_info[-1][:3], len(cluts))
         # A PS1 transparent texel is a zero palette word. DS paletted textures
         # support a transparent index of zero only. Permute the page once.
         indices = {idx for clut in cluts for idx, color in enumerate(clut) if color == 0}
@@ -147,7 +192,7 @@ def school_room(disc, room=39):
             raise ValueError(f"incompatible transparent indices on {name}")
         key = next(iter(indices), 0)
         color_keys.append([clut[key] == 0 for clut in cluts])
-        pages.extend(byte ^ (key | key << 4) for byte in tim[image+12:image+size])
+        pages.extend(byte ^ (key | key << 4) for byte in pixels)
         for clut in cluts:
             palettes.extend(struct.pack("<16H", *(clut[idx ^ key] for idx in range(16))))
 
@@ -174,6 +219,10 @@ def school_room(disc, room=39):
                 mat = face[7] & 127
                 row = int.from_bytes(face[2:4], "little") >> 6
                 v_offset = 0
+                untextured = room == 23 and mat == 127
+                if untextured:
+                    # Model_MaterialFlagsApply uses the no-material sentinel.
+                    mat = row = 0
                 if item_page is not None:
                     # BG_ETC rows 9/10 occupy CLUTs 2/3 in the atlas.
                     if (mat, row) not in ((0, 0), (0, 1), (1, 9), (1, 10)):
@@ -183,8 +232,19 @@ def school_room(disc, room=39):
                         v_offset = 128
                     mat = item_page
                 if mat >= len(page_info) or row >= page_info[mat][3]:
-                    raise ValueError("invalid material or CLUT")
-                flags = (face[7] >> 7) | (color_keys[mat][row] << 1)
+                    raise ValueError(f"invalid material {mat} or CLUT {row} on {name!r}")
+                if remapped_regions:
+                    us, vs = zip(*(face[i:i+2] for i in (0, 4, 8, 10)))
+                    for (page, clut), (left, right, top, bottom) in remapped_regions.items():
+                        if page != mat:
+                            continue
+                        if row == clut:
+                            valid = left <= min(us) <= max(us) <= right and top <= min(vs) <= max(vs) <= bottom
+                        else:
+                            valid = max(us) < left or min(us) > right or max(vs) < top or min(vs) > bottom
+                        if not valid:
+                            raise ValueError("courtyard texture region overlaps a different palette")
+                flags = (face[7] >> 7) | (color_keys[mat][row] << 1) | (untextured << 2)
                 group = groups[state, mat, row, flags]
                 start = len(group)
                 points = []
@@ -245,7 +305,7 @@ def school_room(disc, room=39):
             add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-10240, y>>4, (z>>4)-30720), state,
                       item_page=page)
     if room != 39:
-        magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 31: b"SHE1", 32: b"SHC1"}[room]
+        magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 31: b"SHE1", 32: b"SHC1", 23: b"SHY1"}[room]
         extra = b""
         if room == 9:
             extra = medical_pickups(disc)

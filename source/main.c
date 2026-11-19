@@ -48,6 +48,7 @@ static FILE *openRoom(SchoolRoom room)
     case FirstFloor: name = "firstfloor"; break;
     case SouthHall: name = "south"; break;
     case Infirmary: name = "infirmary"; break;
+    case Courtyard: name = "courtyard"; break;
     default: return NULL;
     }
     char path[40];
@@ -121,7 +122,8 @@ static void changeRoom(SchoolRoom next)
     SchoolRoom from = roomCurrent();
     bool east = next == EastCorridor || from == EastCorridor;
     bool stairs = east && (from == FirstFloor || next == FirstFloor);
-    bool hall = east || (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
+    bool hall = east || from == Courtyard || next == Courtyard ||
+                (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
     FILE *file = openRoom(next);
     if (!file) stop("Missing room data.\nRun the asset converter.");
     if (!stairs) playTone(hall ? HallOpen : DoorOpen);
