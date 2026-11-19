@@ -3,8 +3,9 @@
 Harry starts at the Midwich piano. He can solve the keyboard puzzle, watch
 or skip the falling silver medallion, decline or accept it, walk through the
 eastern hallway, descend the stairs, unlatch the first-floor door and enter
-the southern hallway. Inventory and unlocked doors last for the session.
-The infirmary, saving and the full game remain unplayable.
+the southern hallway. He can enter the infirmary, walk to the desk and return.
+Inventory and unlocked doors last for the session. Saving and the full game
+remain unplayable.
 
 ## Build and media
 
@@ -34,6 +35,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | PS1 crossing room 32 after pickup | 474 buffer-change intervals | 442 at 33.37 ms and 32 at 50.05 ms |
 | PS1 eastern hallway through stair descent | 357 buffer-change intervals | All 33.37 ms |
 | PS1 crossing the southern hallway | 176 buffer-change intervals | 70 at 33.37 ms and 106 at 50.05 ms |
+| PS1 infirmary from entrance to save interaction | 255 buffer-change intervals | 1 at 16.68 ms, 247 at 33.37 ms and 7 at 50.05 ms |
 | melonDS idle music room with Harry | 300 scene submissions | 16.715 / 33.317 / 33.432 ms min/mean/max, 2.893 ms mean ARM9 submission time |
 | melonDS rotating silver pickup with prompt | 300 scene intervals | 16.713 / 33.374 / 33.432 ms min/mean/max, 3.291 ms mean ARM9 submission time |
 | melonDS idle corridor after collecting the medallion | 300 scene intervals | 16.713 / 33.317 / 33.432 ms min/mean/max, 4.137 ms mean ARM9 submission time |
@@ -41,6 +43,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | melonDS first-floor stair entry with medallion | 300 scene intervals | 16.717 / 33.374 / 33.438 ms min/mean/max, 5.468 ms mean ARM9 submission time |
 | melonDS idle keyboard | 600 display-loop intervals | 16.713 / 16.715 / 16.717 ms min/mean/max |
 | melonDS southern hallway with medallion | 300 scene intervals | 16.717 / 33.373 / 49.968 ms min/mean/max, 5.138 ms mean ARM9 submission time |
+| melonDS infirmary entrance with medallion | 300 scene intervals | 16.711 / 33.317 / 33.434 ms min/mean/max, 3.920 ms mean ARM9 submission time |
 
 ## Scene and interaction checks
 
@@ -75,9 +78,19 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   medallion into room 9, and operates the save point at MAP1_S00 point 89.
   It stops at the save interaction before writing a memory card.
 
+- The DLDI production build streamed room 9 (1,211 scenery quads, 30 batches,
+  three indexed textures, 45 collision edges). Harry landed at (233472, 587366),
+  yaw 2048, and returned to room 13 at (591462, 77004), yaw 0. Both matched
+  the PS1 trace. He could reach the eastern desk camera, walk into the counter
+  twice to the same stopping X position and back away. A console SD replay
+  kept the medallion through both doors. At entry the GPU retained 411
+  polygons and 1,589 vertices. Whole-frame RGB error
+  was 23.2/255 at entry and 27.0/255 at return. Lighting, camera transitions,
+  the notebook and the two medical items still differ from PS1.
+
 ## Next
 
-1. Stream the infirmary via points 37 and 40 and verify its camera, collision and return door.
+1. Load the original notebook, first-aid kit and health drink models at their map positions.
 2. Implement the original save-point interaction and verify save/load across a fresh DSi boot.
 3. Match walking and turning sounds, then compare camera movement and lighting along the hallway.
 

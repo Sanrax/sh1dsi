@@ -37,12 +37,17 @@ int roomOriginX(void)
     case SchoolCorridor: return -20*4096;
     case EastCorridor: return -60*4096;
     case FirstFloor: return 100*4096;
+    case Infirmary: return 60*4096;
     case SouthHall: return 140*4096;
     }
     return 0;
 }
 
-int roomOriginZ(void) { return (current == EastCorridor || current == FirstFloor ? 60 : 20)*4096; }
+int roomOriginZ(void)
+{
+    if (current == Infirmary) return 140*4096;
+    return (current == EastCorridor || current == FirstFloor ? 60 : 20)*4096;
+}
 
 static Batch batches[128];
 static Vertex *vertices;
@@ -68,6 +73,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     if (room == FirstFloor) magic = "SHF1";
     if (room == EastCorridor) magic = "SHE1";
     if (room == SouthHall) magic = "SHS1";
+    if (room == Infirmary) magic = "SHI1";
     if (fread(&header, sizeof header, 1, file) != 1) return false;
     bool latchText = room == FirstFloor && !memcmp(header.magic, "SHF2", 4);
     if (latchText) magic = "SHF2";

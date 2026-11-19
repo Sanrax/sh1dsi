@@ -12,7 +12,7 @@ def collision_edges(ipd, room):
     x, z, vertices, surfaces, count, cylinders, vert, surface, polygon = struct.unpack_from("<ii4B3I", collision)
     expected = {39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
                 31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0),
-                13: (30720, 0, 80, 12, 80, 0)}[room]
+                13: (30720, 0, 80, 12, 80, 0), 9: (10240, 30720, 45, 11, 49, 0)}[room]
     if (x, z, vertices, surfaces, count, cylinders) != expected:
         raise ValueError("unexpected school collision header")
     output = bytearray()
@@ -33,6 +33,9 @@ def collision_edges(ipd, room):
             continue
         if room == 13 and floor in (3, 4, 10):
             continue
+        # The infirmary walls meet at shared splits. Keep their exposed faces.
+        if room == 9 and other != 255:
+            continue
         if other != 255:
             raise ValueError("unexpected shared collision edge")
         ax, _, az = struct.unpack_from("<3h", collision, vert+6*a)
@@ -51,7 +54,7 @@ def collision_edges(ipd, room):
 
 
 def school_room(disc, room=39):
-    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0)}[room]
+    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3)}[room]
     data = disc.read(f"BG/SC{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -131,7 +134,7 @@ def school_room(disc, room=39):
                 raise ValueError("music room references an external PLM")
             add_model(bytes(data[info+4:info+12]).rstrip(b"\0"), pose[:9], pose[9:])
     if room != 39:
-        magic = {12: b"SHF2", 13: b"SHS1", 31: b"SHE1", 32: b"SHC1"}[room]
+        magic = {9: b"SHI1", 12: b"SHF2", 13: b"SHS1", 31: b"SHE1", 32: b"SHC1"}[room]
         extra = prompt_data(disc, latch=True) if room == 12 else b""
     else:
         magic = b"SHR5"

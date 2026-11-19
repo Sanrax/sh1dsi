@@ -54,8 +54,43 @@ static int limitToRoad(int value, int low, int high)
     return value < low ? low : value > high ? high : value;
 }
 
+// MAP1_S00 camera_paths: two fixed positions and a higher priority road by
+// the cabinet. Horizontal bounds and camera coordinates use the PS1 Q4 units.
+typedef struct {
+    int16_t lowX, highX, lowZ, highZ, eyeX, eyeZ, eyeY, watchY;
+} InfirmaryRoad;
+static const InfirmaryRoad infirmaryRoads[] = {
+    {896, 960, 2208, 2304, 984, 2256, -24, -23},
+    {960, 1008, 2208, 2304, 955, 2281, -43, -20},
+    {976, 1008, 2281, 2304, 968, 2265, -43, -20}
+};
+static unsigned infirmaryRoad;
+
+static int roadDistance(const InfirmaryRoad *r)
+{
+    int dx = x - limitToRoad(x, r->lowX*256, r->highX*256);
+    int dz = z - limitToRoad(z, r->lowZ*256, r->highZ*256);
+    return abs(dx) + abs(dz);
+}
+
+static void updateInfirmaryCamera(void)
+{
+    // vcSetCurNearRoadInVC_WORK gives the current road a 0.35-metre
+    // advantage and holds an effect road until twice that distance outside.
+    int distances[3];
+    for (unsigned i = 0; i < 3; i++) distances[i] = roadDistance(&infirmaryRoads[i]);
+    unsigned next = distances[0] < distances[1] ? 0 : 1;
+    if (!distances[2]) infirmaryRoad = 2;
+    else if (infirmaryRoad == 2 && distances[2] < 2*1433) return;
+    else if (distances[next] < distances[infirmaryRoad]-1433) infirmaryRoad = next;
+}
+
 static void advanceRoadCamera(void)
 {
+    if (roomCurrent() == Infirmary) {
+        updateInfirmaryCamera();
+        return;
+    }
     if (roomCurrent() == MusicRoom) return;
     // Leave the entry view as Harry walks out along the road. The small
     // chase road places the ideal eye two metres away, twelve degrees to
@@ -237,7 +272,9 @@ static const Door doors[] = {
     {SchoolCorridor, EastCorridor, -42598, 81920, -1, 0, 3584},
     {EastCorridor, SchoolCorridor, -210534, 201113, 1, 0, 3584},
     {FirstFloor, SouthHall, 436633, 201113, 1, 0, 3584},
-    {SouthHall, FirstFloor, 612761, 81920, -1, 0, 3584}
+    {SouthHall, FirstFloor, 612761, 81920, -1, 0, 3584},
+    {SouthHall, Infirmary, 591462, 75366, 0, 1, 2304},
+    {Infirmary, SouthHall, 233472, 589004, 0, -1, 2304}
 };
 
 void playerEnterRoom(SchoolRoom from)
@@ -266,7 +303,13 @@ void playerEnterRoom(SchoolRoom from)
             // Camera entry anchors for MAP_POINTS 39, 51 and 36.
             roadEyeX = !doorRail ? -116992 : d->room == EastCorridor ? -209108 : -41644;
             roadEyeZ = !doorRail ? 83807 : z;
-            if (d->room == SouthHall || from == SouthHall) {
+            if (d->room == Infirmary) {
+                infirmaryRoad = 0;
+            } else if (from == Infirmary) {
+                doorRail = true;
+                roadEyeX = x;
+                roadEyeZ = z-212;
+            } else if (d->room == SouthHall || from == SouthHall) {
                 doorRail = true;
                 roadEyeX = d->room == SouthHall ? 611329 : x-212;
                 roadEyeZ = z;
@@ -343,7 +386,13 @@ int playerSetCamera(void)
         return 768;
     }
     int eyeX = -417792, eyeZ = 74752, eyeHeight = 6144, targetHeight = -1024;
-    if (corridor || stairwell) {
+    if (roomCurrent() == Infirmary) {
+        const InfirmaryRoad *r = &infirmaryRoads[infirmaryRoad];
+        eyeX = r->eyeX*256;
+        eyeZ = r->eyeZ*256;
+        eyeHeight = -r->eyeY*128;
+        targetHeight = (-r->watchY*256-ground)/2;
+    } else if (corridor || stairwell) {
         eyeX = roadEyeX;
         eyeZ = roadEyeZ;
         bool rail = doorRail && !followingRoad;

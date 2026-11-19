@@ -14,6 +14,7 @@ enum { Radius = 1228 }; // Harry's 0.3-metre outer cylinder, Q12.
 bool collisionLoad(FILE *file, SchoolRoom room)
 {
     switch (room) {
+    case Infirmary: edgeCount = 45; break;
     case FirstFloor: edgeCount = 39; break;
     case SouthHall:
     case EastCorridor: edgeCount = 43; break;
@@ -54,6 +55,7 @@ Floor collisionFloor(int x, int z)
         }
         return (Floor){-16, 0};
     }
+    if (roomCurrent() == Infirmary) return (Floor){-48, 0};
     if (roomCurrent() != EastCorridor)
         return (Floor){roomCurrent() == SchoolCorridor ? 48 : 0, 0};
     // SCFE01 surfaces 11 and 12. The walls confine Harry to the stair

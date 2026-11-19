@@ -31,7 +31,24 @@ enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, DoorUnlock, ToneCount };
 static Tone tones[ToneCount];
 static uint8_t samples[144 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
-static const char *roomPath, *corridorPath, *eastPath, *firstFloorPath, *southPath;
+static const char *assetDir;
+
+static FILE *openRoom(SchoolRoom room)
+{
+    const char *name;
+    switch (room) {
+    case MusicRoom: name = "room"; break;
+    case SchoolCorridor: name = "corridor"; break;
+    case EastCorridor: name = "east"; break;
+    case FirstFloor: name = "firstfloor"; break;
+    case SouthHall: name = "south"; break;
+    case Infirmary: name = "infirmary"; break;
+    default: return NULL;
+    }
+    char path[40];
+    snprintf(path, sizeof path, "%s/%s.dat", assetDir, name);
+    return fopen(path, "rb");
+}
 
 static bool loadTones(FILE *file, unsigned count)
 {
@@ -60,11 +77,7 @@ static bool loadPiano(void)
         cart = !cart;
         file = fopen(cart ? fat : sd, "rb");
     }
-    southPath = cart ? "fat:/sh1dsi/south.dat" : "sd:/sh1dsi/south.dat";
-    firstFloorPath = cart ? "fat:/sh1dsi/firstfloor.dat" : "sd:/sh1dsi/firstfloor.dat";
-    eastPath = cart ? "fat:/sh1dsi/east.dat" : "sd:/sh1dsi/east.dat";
-    corridorPath = cart ? "fat:/sh1dsi/corridor.dat" : "sd:/sh1dsi/corridor.dat";
-    roomPath = cart ? "fat:/sh1dsi/room.dat" : "sd:/sh1dsi/room.dat";
+    assetDir = cart ? "fat:/sh1dsi" : "sd:/sh1dsi";
     if (!file)
         return false;
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets
@@ -103,16 +116,8 @@ static void changeRoom(SchoolRoom next)
     SchoolRoom from = roomCurrent();
     bool east = next == EastCorridor || from == EastCorridor;
     bool stairs = east && (from == FirstFloor || next == FirstFloor);
-    bool hall = east || from == SouthHall || next == SouthHall;
-    const char *path = roomPath;
-    switch (next) {
-    case MusicRoom: break;
-    case SchoolCorridor: path = corridorPath; break;
-    case EastCorridor: path = eastPath; break;
-    case FirstFloor: path = firstFloorPath; break;
-    case SouthHall: path = southPath; break;
-    }
-    FILE *file = fopen(path, "rb");
+    bool hall = east || (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
+    FILE *file = openRoom(next);
     if (!file) stop("Missing room data.\nRun the asset converter.");
     if (!stairs) playTone(hall ? HallOpen : DoorOpen);
     uint32_t start = systemCounterGetTicks();
@@ -146,7 +151,7 @@ int main(void)
 
     videoSetMode(MODE_5_3D);
     glInit();
-    FILE *roomFile = fopen(roomPath, "rb");
+    FILE *roomFile = openRoom(MusicRoom);
     bool hasRoom = roomFile != NULL;
     if (roomFile) {
         bool ok = roomLoad(roomFile, MusicRoom);
