@@ -4,6 +4,7 @@ Harry starts at the Midwich piano. He can solve the keyboard puzzle, watch
 or skip the falling silver medallion, decline or accept it, walk through the
 eastern hallway, descend the stairs, unlatch the first-floor door and enter
 the southern hallway. The hall's double doors lead to the courtyard and back.
+Harry can inspect the clock tower door and both medallion slots.
 In the infirmary he can pick up both medical supplies and use the notebook.
 A cold boot can resume at the desk with the puzzle,
 door latch and pickups intact. The full game remains unplayable.
@@ -11,8 +12,8 @@ door latch and pickups intact. The full game remains unplayable.
 ## Build and media
 
 - BlocksDS 1.24.0 and Wonderful GCC 16.2.0 produce a TWL-exclusive ROM
-  (unit code 3). Rebuilding reproduced the ROM and nine local data files
-  byte for byte.
+  (unit code 3). The converter reproduces all ten local data files byte for
+  byte.
 - USA 1.1 CUE, one MODE2/2352 track, 616,494,480 bytes, SHA-1
   `34278d31d9b9b12b3b5db5e45bcbe548991ecbc7`. Non-XA file entries agreed
   with upstream silentassets. All converted data stays on the owner's machine.
@@ -185,13 +186,29 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - The PS1 trace had fog disabled in this scene. Low-light shading and
   camera following still differ. In the DLDI replay, whole-frame mean RGB
   error was 20.6/255 on entry, 17.1/255 after descending the ramp and
-  13.9/255 after returning to the hall. The clock tower interactions and
-  north exit remain to be implemented.
+  13.9/255 after returning to the hall. The north exit remains to be implemented.
+
+## Clock tower
+
+- MAP1_S00 points 13–15 show the locked door, the stopped clock and both
+  empty medallion slots. The port loads the original messages and TIM art
+  from the locally converted sidecar. The views use the PS1 texture sample
+  positions and 5-bit dither at native 256×192.
+- The PS1 lock message drew at 50.05 ms intervals. The three close-ups
+  drew at 16.68 ms intervals when fully visible. The PS1 inspection replays
+  returned to the courtyard with the medallion and latch intact.
+- A melonDS 1.1 DSi/DLDI replay walked from the infirmary to all three
+  interaction points, displayed and dismissed each view, and kept the
+  inventory, latch and player pose. All 830 sampled bright text pixels
+  matched the PS1 at 5-bit precision. In the top 152 rows, 99.5–99.7% of
+  close-up pixels were within one 5-bit step per channel.
+- The medallion-use events and tower interior are pending. The owner
+  reported flickering plaques and Harry sinking into the stairs.
 
 ## Next
 
-1. Trace the clock tower inscription and gate interactions in the PS1 courtyard.
-2. Match the courtyard's camera and low-light shading against the PS1 replay.
+1. Fix the tower plaques and stair collision against the PS1 scene.
+2. Trace the north exit and the school route to the gold medallion.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

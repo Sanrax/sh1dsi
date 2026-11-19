@@ -20,7 +20,7 @@ python3 tools/prepare_assets.py "/path/to/Silent Hill (USA).cue"
 ```
 
 Run `make sdcard` after conversion. Copy the contents of `dist/` to the
-card root. The directory includes the ROM and nine local data files. Keep
+card root. The directory includes the ROM and ten local data files. Keep
 the generated game data on your own devices.
 
 The build starts with Harry standing at Midwich's piano. Up and Down walk forward and backward.
@@ -42,6 +42,7 @@ the single door on the south wall to enter the infirmary. Face the health
 drink or first-aid kit and press A to inspect it. Choose Yes to take it or
 press B to leave it. The double doors on the other side of the southern
 hallway lead to the courtyard. Turn around and face those doors to return.
+Face the clock tower door or either medallion slot and press A to inspect it.
 Rerun the asset converter when updating an existing installation.
 
 Face the notebook on the eastern desk and press A. A or B advances the first

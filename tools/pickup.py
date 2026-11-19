@@ -2,8 +2,10 @@
 import re
 import struct
 
+from notebook import font_advance
 
-def prompt_data(disc, number, *, first_floor=False, choices=True):
+
+def prompt_data(disc, number, *, first_floor=False, choices=True, map_bearings=False):
     overlay = disc.read("VIN/MAP1_S00.BIN" if first_floor else "VIN/MAP1_S01.BIN")
     table = 0x800dd1bc if first_floor else 0x800dcf5c
     base = 0x800c9578
@@ -32,6 +34,8 @@ def prompt_data(disc, number, *, first_floor=False, choices=True):
         # These font bearings consume the last ink column without an extra
         # gap in FONT_12X16_GLYPH_WIDTHS for the USA pickup dialog.
         ink_width = 1 + max(i for line in mask for i, p in enumerate(line) if p)
+        if map_bearings:
+            return font_advance(c, ink_width)
         if c == "I":
             return ink_width + 2
         return ink_width + (c not in "HTYNakvu'")
@@ -48,6 +52,8 @@ def prompt_data(disc, number, *, first_floor=False, choices=True):
             row += 1
         elif token == "~C2":
             color = 1
+        elif token == "~C3" and not choices:
+            color = 2
         elif token == "~C7":
             color = 0
         elif token in ("~S4", "~E"):

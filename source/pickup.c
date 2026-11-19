@@ -5,16 +5,13 @@
 #include <nds.h>
 #include <string.h>
 #include "pickup.h"
+#include "glyph.h"
 
 typedef struct {
     int16_t x, y, z;
     uint8_t u, v;
     uint32_t normal;
 } Corner;
-
-typedef struct {
-    uint8_t x, y, ink, reserved, mask[14][11];
-} Glyph;
 
 typedef struct {
     bool loaded;
@@ -46,19 +43,6 @@ static uint16_t latchCount;
 static bool unlocked;
 static unsigned latchAge, latchShown;
 
-static bool readGlyphs(FILE *file, Glyph *data, unsigned count)
-{
-    if (fread(data, sizeof *data, count, file) != count) return false;
-    for (unsigned i = 0; i < count; i++) {
-        const Glyph *g = &data[i];
-        if (g->x > 256-11 || g->y > 192-14 || g->ink > 3) return false;
-        for (unsigned y = 0; y < 14; y++)
-            for (unsigned x = 0; x < 11; x++)
-                if (g->mask[y][x] > 15) return false;
-    }
-    return true;
-}
-
 bool pickupLoad(FILE *file, PickupItem item, unsigned textureOffset, unsigned palette)
 {
     Model *m = &models[item];
@@ -68,7 +52,7 @@ bool pickupLoad(FILE *file, PickupItem item, unsigned textureOffset, unsigned pa
         fread(&m->messageLength, 2, 1, file) != 1 ||
         !m->messageLength || m->messageLength >= m->glyphCount ||
         fread(fontPalette, sizeof fontPalette, 1, file) != 1 ||
-        !readGlyphs(file, m->glyphs, m->glyphCount))
+        !glyphsRead(file, m->glyphs, m->glyphCount))
         return false;
     m->loaded = true;
     m->textureAddress = textureOffset >> 3;
@@ -82,7 +66,7 @@ bool latchLoad(FILE *file)
     if (fread(&count, 2, 1, file) != 1 || !count || count > 24 ||
         fread(&length, 2, 1, file) != 1 || count != length ||
         fread(palette, sizeof palette, 1, file) != 1 ||
-        memcmp(palette, fontPalette, sizeof palette) || !readGlyphs(file, latchGlyphs, count))
+        memcmp(palette, fontPalette, sizeof palette) || !glyphsRead(file, latchGlyphs, count))
         return false;
     latchCount = count;
     return true;

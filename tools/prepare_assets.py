@@ -7,6 +7,7 @@ from pathlib import Path
 
 from disc import open_disc
 from notebook import notebook_data
+from pickup import prompt_data
 from vab import school_bank
 from room import school_room
 
@@ -26,13 +27,14 @@ def indexed_tim(data, mode):
     return data[20:20 + 2 * colors], data[img + 12:img + length], words * 2, height
 
 
-def background(data):
+def background(data, uv_height=240):
     palette, pixels, stride, height = indexed_tim(data, 1)
     if (stride, height) != (320, 240):
         raise ValueError("expected a 320 by 240 event background")
     # Sample the center of each native LCD pixel across the whole PS1 frame.
-    image = bytes(pixels[((2*y + 1)*5//8)*stride + (2*x + 1)*5//8]
-                  for y in range(192) for x in range(256))
+    columns = [(2*x + 1)*5//8 for x in range(256)]
+    rows = [((2*y + 1)*5//8*uv_height + uv_height//2)//240 for y in range(192)]
+    image = bytes(pixels[v*stride+u] for v in rows for u in columns)
     return palette + image
 
 
@@ -53,6 +55,21 @@ def piano_cursor(data):
     return sprite
 
 
+def tower_data(disc):
+    # Screen_BackgroundImgDrawBlackFadeIn maps V=239 to the edge at Y=240.
+    images = b"".join(background(disc.read(f"TIM/{name}.TIM"), uv_height=239)
+                      for name in ("CLOCK", "GOLD1", "SILVER1"))
+    offsets = []
+    messages = bytearray()
+    for number in (15, 16, 19, 20):
+        text = prompt_data(disc, number, first_floor=True, choices=False, map_bearings=True)
+        if not 0 < struct.unpack_from("<H", text)[0] <= 40:
+            raise ValueError("invalid clock tower message length")
+        offsets.append(20+len(images)+len(messages))
+        messages.extend(text)
+    return struct.pack("<4s4I", b"SHT1", *offsets) + images + messages
+
+
 def prepare(cue):
     with open_disc(cue) as disc:
         overlay = disc.read("VIN/MAP1_S01.BIN")
@@ -64,6 +81,7 @@ def prepare(cue):
                 + background(disc.read("TIM/PIANO2.TIM"))
                 + school_bank(disc.read("SND/MEP101.VAB"), disc.read("1ST/BASE.VAB")))
         notebook = notebook_data(disc, background)
+        tower = tower_data(disc)
         room = school_room(disc)
         corridor = school_room(disc, 32)
         east = school_room(disc, 31)
@@ -72,6 +90,7 @@ def prepare(cue):
         courtyard = school_room(disc, 23)
         infirmary = school_room(disc, 9)
     write_asset(OUTPUT.with_name("notebook.dat"), notebook)
+    write_asset(OUTPUT.with_name("tower.dat"), tower)
     write_asset(OUTPUT, data)
     write_asset(OUTPUT.with_name("room.dat"), room)
     write_asset(OUTPUT.with_name("corridor.dat"), corridor)

@@ -3,6 +3,16 @@ import re
 import struct
 
 
+def font_advance(c, ink_width):
+    # USA FONT_12X16_GLYPH_WIDTHS bearings relative to the last ink column.
+    bearing = 0 if c in "'ACHKNRTVWY[\\]_`afkuvwy" else 1
+    if c in "()Ijpz":
+        bearing = 2
+    if c == "=":
+        bearing = -1
+    return ink_width + bearing
+
+
 def notebook_data(disc, background):
     overlay = disc.read("VIN/MAP1_S00.BIN")
     base = 0x800c9578
@@ -31,11 +41,6 @@ def notebook_data(disc, background):
             for u in range(12):
                 if (row[u//2] >> (4*(u%2))) & 15:
                     ink_width = max(ink_width, u+1)
-        c = chr(39+i)
-        # USA FONT_12X16_GLYPH_WIDTHS bearings relative to the last ink column.
-        bearing = 0 if c in "'ACHKNRTVWY[\\]_`afkuvwy" else 1
-        if c in "()Ijpz": bearing = 2
-        if c == "=": bearing = -1
-        widths.append(ink_width + bearing)
+        widths.append(font_advance(chr(39+i), ink_width))
     return (b"SHN1" + text.ljust(128, b"\0") + widths + glyphs + tim[20:52]
             + background(disc.read("TIM/SAVELOAD.TIM")))

@@ -199,6 +199,7 @@ int main(void)
     bool inRoom = hasRoom;
     int previousImage = -1;
     bool enteringRoom = false;
+    unsigned towerFade = 0, towerFadeLength = 0;
     systemCounterSetup();
     uint32_t previousTime = systemCounterGetTicks(), debt = 0, pressed = 0;
     // MAP1_S01 keyboard updates once per NTSC-U VBlank in the PS1 reference.
@@ -209,6 +210,8 @@ int main(void)
         if (enteringRoom) {
             setBrightness(1, 0);
             enteringRoom = false;
+        } else if (towerFade) {
+            setBrightness(1, -(int)(16*--towerFade/towerFadeLength));
         }
         scanKeys();
         pressed |= keysDown();
@@ -241,6 +244,7 @@ int main(void)
                     if (next == SouthHall && roomCurrent() == FirstFloor && !latchUnlocked()) {
                         if (latchStart()) sound = DoorUnlock;
                     } else if (next != roomCurrent()) {
+                        towerFade = 0;
                         changeRoom(next);
                         enteringRoom = roomChanged = true;
                         previousTime = systemCounterGetTicks();
@@ -255,7 +259,14 @@ int main(void)
                         previousTime = systemCounterGetTicks();
                         debt = step;
                     } else if (pressed & KEY_A) {
-                        if (roomCurrent() == MusicRoom && !piano.solved && playerFacingPiano())
+                        TowerPoint tower = playerFacingTower();
+                        if (tower != NoTowerPoint) {
+                            towerFadeLength = towerFade = towerInspect(assetDir, tower);
+                            if (!towerFade) stop("Missing or invalid tower.dat.");
+                            roomChanged = true;
+                            previousTime = systemCounterGetTicks();
+                            debt = step;
+                        } else if (roomCurrent() == MusicRoom && !piano.solved && playerFacingPiano())
                             inRoom = false;
                         else if (roomCurrent() == Infirmary || phase == MedalFinished)
                             pickupStart();

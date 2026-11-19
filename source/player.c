@@ -361,6 +361,29 @@ bool playerFacingNotebook(void)
     return roomCurrent() == Infirmary && facingEastEdge(252723, 575897, 1024);
 }
 
+TowerPoint playerFacingTower(void)
+{
+    if (roomCurrent() != Courtyard) return NoTowerPoint;
+    // MAP1_S00 points 13–15. A half-metre ray intersects the oriented
+    // segment, from the same side as Event_CollideObbFacingCheck.
+    static const struct { int x, z, nx, nz, halfWidth; } points[] = {
+        {-53657, -279756, -2896, 2896, 2048},
+        {-49971, -277299, 0, 4096, 1536},
+        {-56115, -283033, -4096, 0, 1536}
+    };
+    int rx = sinLerp(yaw*8)/2, rz = cosLerp(yaw*8)/2;
+    for (unsigned i = 0; i < sizeof points/sizeof points[0]; i++) {
+        int dx = points[i].x-x, dz = points[i].z-z;
+        if (abs(dx) > 4096 || abs(dz) > 4096) continue;
+        int distance = -dx*points[i].nx - dz*points[i].nz;
+        int reach = -rx*points[i].nx - rz*points[i].nz;
+        if (reach > 0 && distance >= 0 && distance <= reach &&
+            (int64_t)abs(rx*dz-dx*rz)*4096 <= (int64_t)points[i].halfWidth*reach)
+            return TowerDoor+i;
+    }
+    return NoTowerPoint;
+}
+
 void playerSavePose(Checkpoint *point)
 {
     point->room = roomCurrent();
