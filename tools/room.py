@@ -37,9 +37,9 @@ def collision_edges(ipd, room):
         # The infirmary walls meet at shared splits. Keep their exposed faces.
         if room == 9 and other != 255:
             continue
-        # Keep the exterior perimeter and raised planters, trees and posts.
-        # The four entrance landing and ramp surfaces remain traversable.
-        if room == 23 and (floor in (0, 1, 30, 37, 38, 39, 40) or 50 <= floor < 60 or other != 255):
+        # Keep the tower perimeter, raised planters, trees and posts.
+        # The entrance and tower ramps remain traversable.
+        if room == 23 and (floor in (1, 30, 37, 38, 39, 40) or 50 <= floor < 60 or other != 255):
             continue
         if other != 255:
             raise ValueError("unexpected shared collision edge")
@@ -59,23 +59,21 @@ def collision_edges(ipd, room):
         return output
 
     floors = bytearray()
-    for plane in (37, 38, 39, 40):
+    for plane in (*range(37, 41), *range(50, 60)):
         corners = set()
         for i in range(count):
             a, b, left, right = struct.unpack_from("4B", collision, polygon+10*i+6)
             if plane in (left, right):
                 corners.update(struct.unpack_from("<3h", collision, vert+6*k)[::2] for k in (a, b))
-        zs = sorted({z for _, z in corners})
-        if len(zs) != 2 or len(corners) != 4:
-            raise ValueError("unexpected courtyard walkway bounds")
-        limits = [sorted(x-5120 for x, z in corners if z == end) for end in zs]
-        if any(len(pair) != 2 for pair in limits):
-            raise ValueError("unexpected courtyard walkway ends")
-        _, y, zref, _, sx, sz = struct.unpack_from("<3hH2h", collision, surface+12*plane)
-        if sx:
-            raise ValueError("unexpected courtyard walkway gradient")
-        floors.extend(struct.pack("<9h", *limits[0], *limits[1], zs[0]-5120, zs[1]-5120,
-                                  y, zref-5120, sz))
+        if len(corners) != 4:
+            raise ValueError("unexpected courtyard floor boundary")
+        center_x = sum(x for x, _ in corners)
+        center_z = sum(z for _, z in corners)
+        # Store the convex floor's corners in winding order for the ARM9 test.
+        for x, z in sorted(corners, key=lambda p: math.atan2(4*p[1]-center_z, 4*p[0]-center_x)):
+            floors.extend(struct.pack("<2h", x-5120, z-5120))
+        xref, y, zref, _, sx, sz = struct.unpack_from("<3hH2h", collision, surface+12*plane)
+        floors.extend(struct.pack("<5h", xref-5120, y, zref-5120, sx, sz))
     return struct.pack("<H", len(output)//12) + output + floors
 
 
@@ -264,7 +262,10 @@ def school_room(disc, room=39):
                     if rectangle is not None:
                         plane, bounds = rectangle
                         if name == b"NULL_NEA":
-                            decorations.append((plane, bounds, group, start))
+                            # The tower plaques share a plane with several
+                            # masonry triangles from SC1FSE1.
+                            plaque = room == 23 and j == 0 and k in (32, 33)
+                            decorations.append((plane, bounds, group, start, plaque))
                         else:
                             walls[plane].append(bounds)
 
@@ -281,10 +282,10 @@ def school_room(disc, room=39):
 
     # The PS1 ordering table layers wall decorations over their backing
     # faces. Separate confirmed coplanar pairs by two Q8 units (7.8 mm).
-    for plane, bounds, group, start in decorations:
+    for plane, bounds, group, start, plaque in decorations:
         left, right, bottom, top = bounds
-        if any(bounds != b and b[0] <= left and b[1] >= right and b[2] <= bottom and b[3] >= top
-               for b in walls[plane]):
+        if plaque or any(bounds != b and b[0] <= left and b[1] >= right and b[2] <= bottom and b[3] >= top
+                         for b in walls[plane]):
             axis, depth, side = plane
             for offset in range(start+2*axis, start+32, 8):
                 struct.pack_into("<h", group, offset, depth+side*2*vertex_scale)
@@ -305,7 +306,7 @@ def school_room(disc, room=39):
             add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-10240, y>>4, (z>>4)-30720), state,
                       item_page=page)
     if room != 39:
-        magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 31: b"SHE1", 32: b"SHC1", 23: b"SHY1"}[room]
+        magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 31: b"SHE1", 32: b"SHC1", 23: b"SHY2"}[room]
         extra = b""
         if room == 9:
             extra = medical_pickups(disc)

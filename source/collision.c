@@ -10,10 +10,51 @@ typedef struct {
 static Edge edges[128]; // Exterior boundaries and obstacles, plus door planes.
 static unsigned edgeCount;
 typedef struct {
-    int16_t minX0, maxX0, minX1, maxX1, minZ, maxZ, height, refZ, slope;
+    struct { int16_t x, z; } corner[4];
+    int16_t refX, height, refZ, slopeX, slopeZ;
 } Ramp;
-static Ramp courtyardRamps[4];
+_Static_assert(sizeof(Ramp) == 26, "courtyard floor layout");
+static Ramp courtyardRamps[14];
+static unsigned courtyardRampCount;
 enum { Radius = 1228 }; // Harry's 0.3-metre outer cylinder, Q12.
+
+static int crossEdge(const Ramp *r, unsigned a, int x, int z)
+{
+    unsigned b = (a+1)&3;
+    int ax = r->corner[a].x, az = r->corner[a].z;
+    return (r->corner[b].x-ax)*(z-az) - (r->corner[b].z-az)*(x-ax);
+}
+
+static bool loadCourtyardFloors(FILE *file, bool towerFloors)
+{
+    if (towerFloors) {
+        courtyardRampCount = sizeof courtyardRamps/sizeof courtyardRamps[0];
+        if (fread(courtyardRamps, sizeof courtyardRamps, 1, file) != 1) return false;
+    } else {
+        // SHY1 stores only the rectangular or trapezoidal entrance walkways.
+        struct { int16_t low0, high0, low1, high1, minZ, maxZ, y, z, slope; } old[4];
+        if (fread(old, sizeof old, 1, file) != 1) return false;
+        courtyardRampCount = sizeof old/sizeof old[0];
+        for (unsigned i = 0; i < courtyardRampCount; i++) {
+            courtyardRamps[i] = (Ramp){
+                .corner = {{old[i].low0, old[i].minZ}, {old[i].high0, old[i].minZ},
+                           {old[i].high1, old[i].maxZ}, {old[i].low1, old[i].maxZ}},
+                .height = old[i].y, .refZ = old[i].z, .slopeZ = old[i].slope
+            };
+        }
+    }
+    for (unsigned i = 0; i < courtyardRampCount; i++) {
+        const Ramp *r = &courtyardRamps[i];
+        if (abs(r->refX) > 5120 || abs(r->refZ) > 5120 || abs(r->height) > 256 ||
+            abs(r->slopeX) > 4096 || abs(r->slopeZ) > 4096) return false;
+        for (unsigned j = 0; j < 4; j++) {
+            unsigned k = (j+2)&3;
+            if (abs(r->corner[j].x) > 5120 || abs(r->corner[j].z) > 5120 ||
+                crossEdge(r, j, r->corner[k].x, r->corner[k].z) <= 0) return false;
+        }
+    }
+    return true;
+}
 
 bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles)
 {
@@ -51,15 +92,7 @@ bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles)
         e->az += originZ;
         e->bz += originZ;
     }
-    if (room == Courtyard) {
-        if (fread(courtyardRamps, sizeof courtyardRamps, 1, file) != 1) return false;
-        for (unsigned i = 0; i < sizeof courtyardRamps/sizeof courtyardRamps[0]; i++) {
-            const Ramp *r = &courtyardRamps[i];
-            if (r->minX0 >= r->maxX0 || r->minX1 >= r->maxX1 || r->minZ >= r->maxZ || abs(r->refZ) > 5120 ||
-                abs(r->height) > 256 || abs(r->slope) > 4096)
-                return false;
-        }
-    }
+    if (room == Courtyard && !loadCourtyardFloors(file, fullObstacles)) return false;
     // Actor collision stops at the closed leaves. The facing ray can still
     // cross the threshold, and a room transition spawns beyond the radius.
     for (unsigned i = 0; i < schoolDoorCount; i++) {
@@ -79,16 +112,14 @@ Floor collisionFloor(int x, int z)
     if (roomCurrent() == Courtyard) {
         int localX = (x-roomOriginX(Courtyard)) >> 4, localZ = (z-roomOriginZ(Courtyard)) >> 4;
         Floor floor = {0};
-        for (unsigned i = 0; i < sizeof courtyardRamps/sizeof courtyardRamps[0]; i++) {
+        for (unsigned i = 0; i < courtyardRampCount; i++) {
             const Ramp *r = &courtyardRamps[i];
-            if (localZ < r->minZ || localZ > r->maxZ) continue;
-            int dz = localZ-r->minZ, span = r->maxZ-r->minZ;
-            int minX = r->minX0 + (r->minX1-r->minX0)*dz/span;
-            int maxX = r->maxX0 + (r->maxX1-r->maxX0)*dz/span;
-            if (localX < minX || localX > maxX) continue;
-            int height = r->height + ((r->slope*(localZ-r->refZ)) >> 12);
+            if (crossEdge(r, 0, localX, localZ) < 0 || crossEdge(r, 1, localX, localZ) < 0 ||
+                crossEdge(r, 2, localX, localZ) < 0 || crossEdge(r, 3, localX, localZ) < 0) continue;
+            int height = r->height + ((r->slopeX*(localX-r->refX)) >> 12) +
+                         ((r->slopeZ*(localZ-r->refZ)) >> 12);
             if (height*16 < floor.height)
-                floor = (Floor){.height = height*16, .slopeZ = r->slope};
+                floor = (Floor){.height = height*16, .slopeX = r->slopeX, .slopeZ = r->slopeZ};
         }
         return floor;
     }

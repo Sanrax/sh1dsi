@@ -43,7 +43,8 @@ drink or first-aid kit and press A to inspect it. Choose Yes to take it or
 press B to leave it. The double doors on the other side of the southern
 hallway lead to the courtyard. Turn around and face those doors to return.
 Face the clock tower door or either medallion slot and press A to inspect it.
-Rerun the asset converter when updating an existing installation.
+Rerun the asset converter when updating an existing installation so the
+courtyard data includes the plaque and stair fixes.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

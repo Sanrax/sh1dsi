@@ -97,6 +97,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     if (fread(&header, sizeof header, 1, file) != 1) return false;
     bool firstFloorObstacles = room == FirstFloor && !memcmp(header.magic, "SHF3", 4);
     bool southHallObstacles = room == SouthHall && !memcmp(header.magic, "SHS2", 4);
+    bool towerFloors = room == Courtyard && !memcmp(header.magic, "SHY2", 4);
     bool latchText = firstFloorObstacles || (room == FirstFloor && !memcmp(header.magic, "SHF2", 4));
     bool medical = room == Infirmary && !memcmp(header.magic, "SHI3", 4);
     bool items = medical || (room == Infirmary && !memcmp(header.magic, "SHI2", 4));
@@ -106,6 +107,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     unsigned scenePages = room == SchoolCorridor ? 2 : 3;
     if (latchText) magic = firstFloorObstacles ? "SHF3" : "SHF2";
     if (southHallObstacles) magic = "SHS2";
+    if (towerFloors) magic = "SHY2";
     if (items) magic = medical ? "SHI3" : "SHI2";
     if ((corridor ? (memcmp(header.magic, magic, 4) || header.pages != scenePages + items || !playerReady() ||
                      sceneBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
@@ -151,7 +153,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     vramSetBankC(VRAM_C_TEXTURE_SLOT0);
     vramSetBankE(VRAM_E_TEX_PALETTE);
     if ((corridor || header.magic[3] >= '4') &&
-        !collisionLoad(file, room, firstFloorObstacles || southHallObstacles)) return false;
+        !collisionLoad(file, room, firstFloorObstacles || southHallObstacles || towerFloors)) return false;
     if (latchText && !latchLoad(file)) return false;
     if (room == MusicRoom && header.pages == 4 &&
         (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))

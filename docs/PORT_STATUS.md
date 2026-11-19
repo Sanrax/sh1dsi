@@ -171,9 +171,9 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 ## Courtyard
 
 - MAP1_S00 points 5 and 3 connect the southern hallway to room 23. The
-  room streams SCFFFE with 2,648 scenery quads, 83 collision edges, four
-  entrance ramp and landing planes, and three paletted texture pages
-  occupying 80 KiB. The conversion retains the tree and window cutouts.
+  room streams SCFFFE with 2,648 scenery quads, 88 collision edges, 14
+  ramp and landing planes, and three paletted texture pages occupying
+  80 KiB. The conversion retains the tree and window cutouts.
 - The original NTSC-U replay measured the entry at X/Z (−80691, −280576),
   yaw 0, and the return at (573440, 93389), yaw 2048, in Q12 coordinates.
   The production ROM matched both poses in melonDS 1.1 over DLDI and
@@ -197,18 +197,29 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - The PS1 lock message drew at 50.05 ms intervals. The three close-ups
   drew at 16.68 ms intervals when fully visible. The PS1 inspection replays
   returned to the courtyard with the medallion and latch intact.
-- A melonDS 1.1 DSi/DLDI replay walked from the infirmary to all three
-  interaction points, displayed and dismissed each view, and kept the
-  inventory, latch and player pose. All 830 sampled bright text pixels
-  matched the PS1 at 5-bit precision. In the top 152 rows, 99.5–99.7% of
-  close-up pixels were within one 5-bit step per channel.
-- The medallion-use events and tower interior are pending. The owner
-  reported flickering plaques and Harry sinking into the stairs.
+- DSi-mode replays in melonDS 1.1 over DLDI and `361ffa9` over virtual
+  console SD reached all three points from the infirmary, dismissed each
+  view and kept the inventory, latch and player pose. All 830 sampled
+  bright text pixels matched the PS1 at 5-bit precision. In the top 152
+  rows, 99.5–99.7% of close-up pixels were within one 5-bit step per channel.
+- The two plaques now sit 7.8 mm in front of their coplanar masonry. In a
+  16-angle melonDS DSi-mode sweep, the lowest counts of plaque-colored
+  pixels in the 112-pixel test regions rose from 1 to 87 for the moon and
+  from 0 to 112 for the sun.
+- The original tower planes raise Harry along the ramp to the 0.60 m
+  landing. The tower perimeter stops further forward movement. The old
+  sidecar kept Harry at ground level and allowed him through the tower.
+  The new sidecar ascended, stopped at the door and descended back to
+  ground in melonDS. A host check at 81 PS1 replay positions matched 73
+  heights within 4 mm. The largest difference was 3.1 cm.
+- The medallion-use events and tower interior are pending. The current
+  build starts directly at the piano and allows inspection of the tower
+  with both slots empty.
 
 ## Next
 
-1. Fix the tower plaques and stair collision against the PS1 scene.
-2. Trace the north exit and the school route to the gold medallion.
+1. Trace the north exit and the school route to the gold medallion.
+2. Port medallion placement and its clock tower state changes.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
