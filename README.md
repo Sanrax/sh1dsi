@@ -39,4 +39,5 @@ door on the western wall near the stairs and press A to unlock it. Dismiss the
 message with A or B, then press A to enter the southern hallway. The door
 stays unlocked for the session. Walk west along the southern hallway and face
 the single door on the south wall to enter the infirmary. You can walk to the
-desk and leave through the same door. Saving and medical pickups are pending.
+desk, see the notebook and medical supplies, and leave through the same door.
+Saving and collecting the supplies are pending.

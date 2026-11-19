@@ -76,23 +76,32 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   vertices. One of 300 intervals exceeded 34 ms. Entry RGB error was 17.7/255, and return error was 18.0/255.
 - The PS1 `infirmary` route checks flag 1079 after the latch, carries one
   medallion into room 9, and operates the save point at MAP1_S00 point 89.
-  It stops at the save interaction before writing a memory card.
+  The separate PS1 `save` replay writes and verifies the first slot on a
+  scratch memory card, including its checksum, location 4, flags and item
+  count. In this replay the PS1 stored (251381, 576233), yaw 1002.
 
-- The DLDI production build streamed room 9 (1,211 scenery quads, 30 batches,
-  three indexed textures, 45 collision edges). Harry landed at (233472, 587366),
+- The DLDI production build streamed room 9 (1,211 scenery quads and 45
+  collision edges). Harry landed at (233472, 587366),
   yaw 2048, and returned to room 13 at (591462, 77004), yaw 0. Both matched
   the PS1 trace. He could reach the eastern desk camera, walk into the counter
   twice to the same stopping X position and back away. A console SD replay
   kept the medallion through both doors. At entry the GPU retained 411
   polygons and 1,589 vertices. Whole-frame RGB error
-  was 23.2/255 at entry and 27.0/255 at return. Lighting, camera transitions,
-  the notebook and the two medical items still differ from PS1.
+  was 23.2/255 at entry and 27.0/255 at return. Lighting and camera transitions
+  still differ from PS1.
+- The notebook, drink and kit add 34 original BG_ITEM.PLM quads, four CLUTs
+  and an 8 KiB texture page. The production DLDI build reached the desk
+  with a whole-frame RGB error of 30.3/255 against the PS1 desk view.
+  A console SD diagnostic hid and restored the items at a fixed camera:
+  they changed 98 stationary pixels at the desk and 133 near the cabinet.
+  At the entrance none were in view. With items loaded, 300 idle intervals
+  measured 16.717 / 33.318 / 33.430 ms, with 3.992 ms mean submission time.
 
 ## Next
 
-1. Load the original notebook, first-aid kit and health drink models at their map positions.
-2. Implement the original save-point interaction and verify save/load across a fresh DSi boot.
-3. Match walking and turning sounds, then compare camera movement and lighting along the hallway.
+1. Implement the notebook interaction and original text at MAP1_S00 point 89.
+2. Write and reload the infirmary checkpoint across a fresh DSi boot, checking pose, inventory and flags.
+3. Implement the first-aid kit and health drink pickups, then compare the desk camera and lighting while walking.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
 shdecompilations. [Pinned upstream source](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce)

@@ -76,9 +76,15 @@ bool roomLoad(FILE *file, SchoolRoom room)
     if (room == Infirmary) magic = "SHI1";
     if (fread(&header, sizeof header, 1, file) != 1) return false;
     bool latchText = room == FirstFloor && !memcmp(header.magic, "SHF2", 4);
+    bool items = room == Infirmary && !memcmp(header.magic, "SHI2", 4);
+    enum { ItemPageBytes = 64*256/2, ItemPageOffset = 128*1024-ItemPageBytes };
+    if (items && header.textureBytes < ItemPageBytes) return false;
+    unsigned sceneBytes = header.textureBytes - (items ? ItemPageBytes : 0);
+    unsigned scenePages = room == SchoolCorridor ? 2 : 3;
     if (latchText) magic = "SHF2";
-    if ((corridor ? (memcmp(header.magic, magic, 4) || header.pages != (room == SchoolCorridor ? 2 : 3) || !playerReady() ||
-                     header.textureBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
+    if (items) magic = "SHI2";
+    if ((corridor ? (memcmp(header.magic, magic, 4) || header.pages != scenePages + items || !playerReady() ||
+                     sceneBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
          !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
            (!memcmp(header.magic, "SHR", 3) && header.magic[3] >= '2' && header.magic[3] <= '5' && header.pages == 4))) ||
         header.batches > 128 || !header.batches ||
@@ -88,16 +94,26 @@ bool roomLoad(FILE *file, SchoolRoom room)
         return false;
     for (unsigned i = 0; i < header.pages; i++) {
         const Page *p = &pages[i];
-        if ((p->width != 128 && p->width != 256) || (p->offset & 7) ||
-            p->offset > header.textureBytes || p->width*128u > header.textureBytes-p->offset ||
+        bool atlas = items && i == scenePages;
+        if (atlas && (p->width != 64 || p->offset != sceneBytes || p->palettes != 4)) return false;
+        unsigned limit = atlas ? header.textureBytes : sceneBytes;
+        if ((!atlas && p->width != 128 && p->width != 256) || (p->offset & 7) ||
+            p->offset > limit || p->width*128u > limit-p->offset ||
             p->firstPalette > header.paletteBytes/32 ||
             p->palettes > header.paletteBytes/32 - p->firstPalette)
             return false;
     }
     vramSetBankC(VRAM_C_LCD);
     vramSetBankE(VRAM_E_LCD);
-    if (!upload(file, VRAM_C, header.textureBytes) || !upload(file, VRAM_E, header.paletteBytes))
-        return false;
+    if (!upload(file, VRAM_C, sceneBytes)) return false;
+    if (items) {
+        // Keep the actor and pickup resident while loading the common items
+        // into the last 8 KiB of texture bank C.
+        if (skin.offset + 256*256/2 + 2048 > ItemPageOffset ||
+            !upload(file, (uint8_t *)VRAM_C + ItemPageOffset, ItemPageBytes)) return false;
+        pages[scenePages].offset = ItemPageOffset;
+    }
+    if (!upload(file, VRAM_E, header.paletteBytes)) return false;
     if (room == MusicRoom && header.pages == 4) {
         // Keep actor CLUTs above the largest streamed scenery palette.
         // The music room file also has item data directly after its skin.
@@ -112,7 +128,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     vramSetBankE(VRAM_E_TEX_PALETTE);
     if ((corridor || header.magic[3] >= '4') && !collisionLoad(file, room)) return false;
     if (latchText && !latchLoad(file)) return false;
-    if (header.pages == 4 &&
+    if (room == MusicRoom && header.pages == 4 &&
         (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))
         return false;
 
@@ -202,7 +218,8 @@ void roomDraw(const Medallion *medal)
                 glTranslatef32(-2048, -5488, 7640);
             }
             const Page *p = &pages[b->page];
-            unsigned width = p->width == 128 ? TEXTURE_SIZE_128 : TEXTURE_SIZE_256;
+            unsigned width = p->width == 64 ? TEXTURE_SIZE_64 :
+                             p->width == 128 ? TEXTURE_SIZE_128 : TEXTURE_SIZE_256;
             GFX_TEX_FORMAT = (p->offset >> 3) | (width << 20) | (TEXTURE_SIZE_256 << 23)
                              | (GL_RGB16 << 26) | ((b->flags & 2) ? GL_TEXTURE_COLOR0_TRANSPARENT : 0);
             GFX_PAL_FORMAT = (p->firstPalette + b->palette) * 2;

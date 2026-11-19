@@ -53,6 +53,52 @@ def collision_edges(ipd, room):
     return output
 
 
+def model_directory(data):
+    _, count, model_ptr = struct.unpack_from("<III", data, 4)
+    models = {}
+    for i in range(count):
+        name, meshes, base, _, _, ptr = struct.unpack_from("<8s4BI", data, model_ptr + 16*i)
+        models[name.rstrip(b"\0")] = data, meshes, base, ptr
+    return models
+
+
+def infirmary_items(disc):
+    # BG_ITEM.PLM uses four opaque CLUTs across two PS1 pages. The three
+    # models sample only the first 64 columns. Pack those rows into one page.
+    pixels = bytearray(64*256//2)
+    colors = bytearray()
+    for name, words, rows, dest, cluts in (
+            ("ITEM/TIM00.TIM", 64, 128, 0, (0, 1)),
+            ("TIM/BG_ETC.TIM", 32, 32, 128, (9, 10))):
+        tim = disc.read(name)
+        magic, flags, length, _, _, width, palettes = struct.unpack_from("<III4H", tim)
+        image = 8 + length
+        size, _, _, stride, height = struct.unpack_from("<I4H", tim, image)
+        if (magic, flags, width, stride, height) != (16, 8, 16, words, 256) or max(cluts) >= palettes:
+            raise ValueError("unexpected common item texture")
+        if size != 12+2*stride*height or image+size > len(tim):
+            raise ValueError("truncated common item texture")
+        for y in range(rows):
+            start = image+12+y*stride*2
+            pixels[(dest+y)*32:(dest+y+1)*32] = tim[start:start+32]
+        for row in cluts:
+            palette = tim[20+row*32:52+row*32]
+            if 0 in struct.unpack("<16H", palette):
+                raise ValueError("unexpected transparent common item color")
+            colors.extend(palette)
+
+    overlay = disc.read("VIN/MAP1_S00.BIN")
+    # g_CommonWorldObjectPoses[3..4] and Map_WorldObjectsInit's notebook.
+    poses = [(b"PAD_NEAR", (int(61.8531*4096), int(-0.805*4096), int(140.6099*4096)),
+              int(92.9*4096/360))]
+    for i, name in ((3, b"DRINK_NE"), (4, b"AIDKIT_N")):
+        x,y,z,rx,ry,rz = struct.unpack_from("<3i3h", overlay, 0x800dd71c-0x800c9578+20*i)
+        if rx or rz:
+            raise ValueError("unsupported common item rotation")
+        poses.append((name, (x,y,z), ry))
+    return pixels, colors, poses
+
+
 def school_room(disc, room=39):
     cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3)}[room]
     data = disc.read(f"BG/SC{cx:02X}{cz:02X}.IPD")
@@ -60,11 +106,8 @@ def school_room(disc, room=39):
         raise ValueError("unexpected school chunk coordinates")
     lm, = struct.unpack_from("<I", data, 4)
     mat_count = data[lm + 3]
-    mat_ptr, count, model_ptr = struct.unpack_from("<III", data, lm + 4)
-    models = {}
-    for i in range(count):
-        name, meshes, base, _, _, ptr = struct.unpack_from("<8s4BI", data, lm + model_ptr + 16*i)
-        models[name.rstrip(b"\0")] = meshes, base, lm + ptr
+    mat_ptr, = struct.unpack_from("<I", data, lm + 4)
+    models = model_directory(memoryview(data)[lm:])
 
     pages = bytearray()
     palettes = bytearray()
@@ -95,24 +138,33 @@ def school_room(disc, room=39):
     # Group opaque polygons by texture and CLUT without duplicating any texture.
     groups = defaultdict(bytearray)
     vertex_scale = 4 if room in (12, 31) else 8
-    def add_model(name, matrix, position, state=0):
-        meshes, base, ptr = models[name]
+    def add_model(name, matrix, position, state=0, *, item_page=None):
+        model_data, meshes, base, ptr = models[name]
         for j in range(meshes):
-            faces, nverts, _, _, prim, xy, z, _, _ = struct.unpack_from("<4B5I", data, ptr + 24*j)
+            faces, nverts, _, _, prim, xy, z, _, _ = struct.unpack_from("<4B5I", model_data, ptr + 24*j)
             vertices = []
             for v in range(nverts):
-                coord = (*struct.unpack_from("<hh", data, lm+xy+4*v),
-                         *struct.unpack_from("<h", data, lm+z+2*v))
+                coord = (*struct.unpack_from("<hh", model_data, xy+4*v),
+                         *struct.unpack_from("<h", model_data, z+2*v))
                 transformed = [position[a] + (sum(matrix[3*a+k]*coord[k] for k in range(3)) >> 12)
                                for a in range(3)]
                 x, y, zpos = transformed
                 # Room 31 is longer than the V16 range at two metres per unit.
                 vertices.append(((x-5120)*vertex_scale, -y*vertex_scale, -(zpos-5120)*vertex_scale))
             for k in range(faces):
-                face = data[lm+prim+20*k:lm+prim+20*(k+1)]
+                face = model_data[prim+20*k:prim+20*(k+1)]
                 mat = face[7] & 127
                 row = int.from_bytes(face[2:4], "little") >> 6
-                if mat >= mat_count or row >= page_info[mat][3]:
+                v_offset = 0
+                if item_page is not None:
+                    # BG_ETC rows 9/10 occupy CLUTs 2/3 in the atlas.
+                    if (mat, row) not in ((0, 0), (0, 1), (1, 9), (1, 10)):
+                        raise ValueError("unexpected common item material")
+                    if mat == 1:
+                        row -= 7
+                        v_offset = 128
+                    mat = item_page
+                if mat >= len(page_info) or row >= page_info[mat][3]:
                     raise ValueError("invalid material or CLUT")
                 flags = (face[7] >> 7) | (color_keys[mat][row] << 1)
                 group = groups[state, mat, row, flags]
@@ -121,7 +173,10 @@ def school_room(disc, room=39):
                     if not 0 <= idx < nverts:
                         raise ValueError("vertex outside LM mesh")
                     uv = (0, 4, 8, 10)[corner]
-                    group.extend(struct.pack("<3hBB", *vertices[idx], *face[uv:uv+2]))
+                    u, v = face[uv:uv+2]
+                    if item_page is not None and (u >= 64 or v >= (32 if v_offset else 128)):
+                        raise ValueError("common item UV outside atlas")
+                    group.extend(struct.pack("<3hBB", *vertices[idx], u, v+v_offset))
 
     infos, buffers = struct.unpack_from("<II", data, 20)
     for i in range(data[9]):
@@ -133,8 +188,22 @@ def school_room(disc, room=39):
             if data[info]:
                 raise ValueError("music room references an external PLM")
             add_model(bytes(data[info+4:info+12]).rstrip(b"\0"), pose[:9], pose[9:])
+    if room == 9:
+        page = len(page_info)
+        pixels, colors, poses = infirmary_items(disc)
+        page_info.append((len(pages), 64, len(palettes)//32, 4))
+        pages.extend(pixels)
+        palettes.extend(colors)
+        color_keys.append([False]*4)
+        plm = disc.read("BG/BG_ITEM.PLM")
+        models.update(model_directory(plm))
+        for name, (x,y,z), heading in poses:
+            angle = heading * math.tau/4096
+            c, s = round(math.cos(angle)*4096), round(math.sin(angle)*4096)
+            add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-10240, y>>4, (z>>4)-30720),
+                      item_page=page)
     if room != 39:
-        magic = {9: b"SHI1", 12: b"SHF2", 13: b"SHS1", 31: b"SHE1", 32: b"SHC1"}[room]
+        magic = {9: b"SHI2", 12: b"SHF2", 13: b"SHS1", 31: b"SHE1", 32: b"SHC1"}[room]
         extra = prompt_data(disc, latch=True) if room == 12 else b""
     else:
         magic = b"SHR5"
