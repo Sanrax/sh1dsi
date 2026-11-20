@@ -169,13 +169,13 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 
 ## Wall decorations
 
-- The converter offsets 30 confirmed coplanar decoration quads by 7.8 mm
-  toward the visible side. Texture coordinates, the backing walls and
-  runtime geometry counts stay the same.
-- A melonDS DSi-mode sweep sampled 13 angles at a first-floor poster.
-  In the old data, wall texels covered the entire 18 × 16 sample at three
-  angles. In the updated data, all 13 samples showed the poster with zero
-  wall-only texels in that region.
+- The first-floor converter now gives 14 decoration faces 62.5 mm of
+  wall clearance. Across 160 matched camera positions in melonDS DSi
+  mode, the earlier clearance lost 4,463 marked poster pixels at 60
+  positions. The new clearance lost four isolated edge pixels out of
+  98,261 when compared with the backing walls hidden. The ROM, collision,
+  textures and other sidecars were byte-identical after regeneration.
+  The production ROM loaded the first floor and reached the hall over DLDI.
 
 ## Infirmary camera
 
