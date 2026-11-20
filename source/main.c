@@ -232,7 +232,7 @@ int main(void)
                 MedalPhase phase = medal.phase;
                 roomChanged |= medallionTick(&medal, pressed & KEY_START);
                 int turn = 0, walk = 0;
-                bool wasActive = pickupActive() || latchActive();
+                bool wasActive = pickupActive();
                 if (!wasActive && (medal.phase == MedalHanging || medal.phase == MedalFinished)) {
                     turn = !!(held & KEY_RIGHT) - !!(held & KEY_LEFT);
                     walk = !!(held & KEY_UP) - !!(held & KEY_DOWN);
@@ -240,7 +240,6 @@ int main(void)
                 roomChanged |= playerTick(turn, walk, pickupAction());
                 PickupSound pickupSound = pickupTick(pressed);
                 if (pickupSound != PickupQuiet) sound = pickupSounds[pickupSound];
-                latchTick(pressed);
                 if (phase == MedalDrop && medal.phase == MedalImpact)
                     sound = 9;
                 if (!wasActive && phase == medal.phase && (phase == MedalHanging || phase == MedalFinished)) {
@@ -272,7 +271,7 @@ int main(void)
                             debt = step;
                         } else if (roomCurrent() == MusicRoom && !piano.solved && playerFacingPiano())
                             inRoom = false;
-                        else if (roomCurrent() == Infirmary || phase == MedalFinished)
+                        else if (roomCurrent() != MusicRoom || phase == MedalFinished)
                             pickupStart();
                     }
                 }

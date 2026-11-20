@@ -111,14 +111,25 @@ def model_corners(tmd, counts, material, first_row, row_offset):
     return data
 
 
-def silver_pickup(disc):
-    data = model_corners(disc.read("ITEM/UNQ62.TMD"), (80, 108, 156), (138, 14), 128, 128)
+def key_item_tile(disc, first_row, clut):
     tim = disc.read("ITEM/TIM01.TIM")
     image = 8 + struct.unpack_from("<I", tim, 8)[0]
     if struct.unpack_from("<I4H", tim, image) != (32780, 0, 0, 64, 256):
         raise ValueError("unexpected key item texture")
-    pixels = b"".join(tim[image+12+y*128:image+12+y*128+32] for y in range(128,192))
-    return data + prompt_data(disc, 30), pixels, tim[20+2*32:20+3*32]
+    pixels = b"".join(tim[image+12+y*128:image+12+y*128+32] for y in range(first_row, first_row+64))
+    return pixels, tim[20+clut*32:20+(clut+1)*32]
+
+
+def silver_pickup(disc):
+    data = model_corners(disc.read("ITEM/UNQ62.TMD"), (80, 108, 156), (138, 14), 128, 128)
+    return data + prompt_data(disc, 30), *key_item_tile(disc, 128, 2)
+
+
+def chemical_pickup(disc):
+    data = model_corners(disc.read("ITEM/UNQ60.TMD"), (96, 91, 188), (10, 14), 0, 0)
+    data.extend(prompt_data(disc, 18, map_bearings=True))
+    data.extend(prompt_data(disc, 19, choices=False, map_bearings=True))
+    return data, *key_item_tile(disc, 0, 0)
 
 
 def medical_pickups(disc):

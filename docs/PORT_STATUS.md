@@ -6,7 +6,7 @@ eastern hallway, descend the stairs, unlatch the first-floor door and enter
 the southern hallway. The courtyard connects the southern and northern halls.
 Harry can inspect the clock tower door and both medallion slots.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
-and equipment room.
+and equipment room. Harry can collect the Chemical from the equipment shelf.
 In the infirmary he can pick up both medical supplies and use the notebook.
 A cold boot can resume at the desk with the puzzle,
 door latch and pickups intact. The full game remains unplayable.
@@ -49,6 +49,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | PS1 upstairs north hall on the way to the lab | 392 buffer-change intervals | 372 at 33.37 ms and 20 at 50.05 ms. Mean 34.22 ms |
 | PS1 chemistry lab entry and turn | 101 buffer-change intervals | All 33.37 ms |
 | PS1 equipment room entry and return approach | 87 buffer-change intervals | 60 at 33.37 ms and 27 at 50.05 ms. Mean 38.54 ms |
+| PS1 Chemical pickup | 126 buffer-change intervals across two prompts | All 50.05 ms |
 | melonDS idle music room with Harry | 300 scene submissions | 16.715 / 33.317 / 33.432 ms min/mean/max, 2.893 ms mean ARM9 submission time |
 | melonDS rotating silver pickup with prompt | 300 scene intervals | 16.713 / 33.374 / 33.432 ms min/mean/max, 3.291 ms mean ARM9 submission time |
 | melonDS idle corridor after collecting the medallion | 300 scene intervals | 16.713 / 33.317 / 33.432 ms min/mean/max, 4.137 ms mean ARM9 submission time |
@@ -63,6 +64,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | melonDS upstairs north hall entry, walk and turn | 300 scene intervals | 16.719 / 33.374 / 33.443 ms min/mean/max, 3.869 ms mean ARM9 submission time |
 | melonDS chemistry lab from entry to the east aisle | 300 scene intervals | 16.713 / 33.374 / 33.447 ms min/mean/max, 3.702 ms mean ARM9 submission time |
 | melonDS equipment room from entry to the west aisle | 300 scene intervals | 16.719 / 33.374 / 33.445 ms min/mean/max, 4.413 ms mean ARM9 submission time |
+| melonDS rotating Chemical with prompt | 300 scene intervals | 16.713 / 33.318 / 33.432 ms min/mean/max, 4.748 ms mean ARM9 submission time |
 
 ## Scene and interaction checks
 
@@ -296,14 +298,29 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   the shelf in the SD replay and 18.5/255 on return. The lower screen stayed
   black.
 - The PS1 Chemical event declined with flag 68 clear and item 96 absent,
-  then accepted with the flag set and one item added. The prompt reached
-  full scale after 48–49 VBlanks. The native room supports traversal while
-  the pickup is pending.
+  then accepted with the flag set and one item added. The model reached
+  full scale after 48–49 VBlanks. Examining the empty shelf opened MAP1_S01
+  message 19 and kept the item count at one.
+- The native pickup uses the original point 13 facing segment, the 55-quad
+  shelf prop and 188-triangle rotating item. The prompt streams a 2 KiB
+  texture tile with one CLUT. In melonDS over DLDI and virtual console SD,
+  Harry declined, cancelled, accepted before solving the piano, and found
+  the shelf still empty after leaving and re-entering the room. All 182
+  bright green pixels in the item name and 184 bright pixels in the empty
+  shelf message matched the resampled PS1 captures. Lighting still differs.
+- A diagnostic shortcut reached the infirmary notebook after pickup on both
+  storage paths. The production ROM cold-loaded each written checkpoint
+  with the Chemical, silver medallion, latch and desk pose intact. The host
+  checkpoint recovery fixture also passed with the new flag.
+- The PS1 statue callback opened the hand after 610 VBlanks, or 136 when
+  Start was pressed during the pour. The Chemical stayed in inventory in
+  both runs. The gold medallion could then be declined or accepted. This
+  reference supplied the item selection directly to the event router.
 
 ## Next
 
-1. Port the Chemical pickup using MAP1_S01 event 5, flag 68 and item 96.
-2. Port the hand statue event that consumes the Chemical and releases the gold medallion.
+1. Port the hand statue and gold medallion events, preserving the original item use and skip behavior.
+2. Port the medallion placement events and unlock the clock tower.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

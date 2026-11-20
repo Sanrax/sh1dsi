@@ -35,8 +35,11 @@ corridor. Turn back toward the same door to return, or follow the corridor
 east and press A as you approach the double door. It leads to the adjoining
 second-floor hallway. Follow it past the stair landing to the far double
 doors to reach the upstairs north hall. Its two single doors lead to the
-chemistry lab and equipment room. Walk onto the stair landing to reach the
-first floor, and turn back up the stairs to return.
+chemistry lab and equipment room. In the equipment room, go around the
+near end of the central shelves and face the Chemical bottle on the west
+shelf. Press A to inspect it and choose Yes to take it. Walk onto the stair
+landing in the second-floor hallway to reach the first floor, and turn back
+up the stairs to return.
 On the first floor, face the double
 door on the western wall near the stairs and press A to unlock it. Dismiss the
 message with A or B, then press A to enter the southern hallway. The door
@@ -48,12 +51,12 @@ hallway lead to the courtyard. Turn around and face those doors to return.
 Cross the courtyard and use the opposite double doors to reach the north hall.
 Face the clock tower door or either medallion slot and press A to inspect it.
 Rerun the asset converter when updating an existing installation to get the
-wall poster, courtyard plaque and stair fixes.
+Chemical pickup, wall poster, courtyard plaque and stair fixes.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left
 or Right changes the confirmation choice. After saving, B returns to the room.
 On a fresh boot, A loads the highlighted checkpoint and B starts at the piano.
 The game keeps up to eleven slots in `/sh1dsi/` on the card containing the game
-data. The notebook remembers both medical supplies once collected. Keep the
-`note*.sav` files when updating the port.
+data. The notebook remembers the Chemical and both medical supplies once
+collected. Keep the `note*.sav` files when updating the port.

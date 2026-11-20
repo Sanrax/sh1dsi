@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Adapted from MAP1_S01 event 11, MAP1_S00 CommonItemTake, Event_ItemTake
+// Adapted from MAP1_S01 events 5 and 11, MAP1_S00 CommonItemTake, Event_ItemTake
 // and Gfx_PickupItemAnimate.
 // Copyright (C) 2026 shdecompilations
 #include <nds.h>
@@ -21,6 +21,7 @@ typedef struct {
 } Model;
 
 static Corner silverCorners[156*3], drinkCorners[124*3], kitCorners[76*3];
+static Corner chemicalCorners[188*3];
 static const struct {
     int x, z;
     unsigned flag;
@@ -30,18 +31,18 @@ static const struct {
     [SilverMedallion] = {-404684, 93388, SilverHeld, silverCorners, sizeof silverCorners/sizeof(Corner)},
     [HealthDrink] = {250961, 586956, DrinkHeld, drinkCorners, sizeof drinkCorners/sizeof(Corner)},
     [FirstAidKit] = {247971, 583680, KitHeld, kitCorners, sizeof kitCorners/sizeof(Corner)},
+    [Chemical] = {0, 0, ChemicalTaken, chemicalCorners, sizeof chemicalCorners/sizeof(Corner)},
 };
 static Model models[sizeof pickups/sizeof pickups[0]];
 static uint16_t fontPalette[16];
-static enum { Inactive, Stopping, Kneeling, Preparing, Inspecting, Rising } phase;
+static enum { Inactive, Stopping, Kneeling, Preparing, Inspecting, Rising, LatchNotice, EmptyShelfNotice } phase;
 static PickupItem activeItem;
 static unsigned ticks, selected, flash, shown;
 static unsigned collected;
 
-static Glyph latchGlyphs[24];
-static uint16_t latchCount;
+static Glyph latchGlyphs[24], emptyShelfGlyphs[24];
+static uint16_t latchCount, emptyShelfCount;
 static bool unlocked;
-static unsigned latchAge, latchShown;
 
 bool pickupLoad(FILE *file, PickupItem item, unsigned textureOffset, unsigned palette)
 {
@@ -60,42 +61,31 @@ bool pickupLoad(FILE *file, PickupItem item, unsigned textureOffset, unsigned pa
     return true;
 }
 
-bool latchLoad(FILE *file)
+static bool loadNotice(FILE *file, Glyph *glyphs, uint16_t *glyphCount)
 {
     uint16_t count, length, palette[16];
     if (fread(&count, 2, 1, file) != 1 || !count || count > 24 ||
         fread(&length, 2, 1, file) != 1 || count != length ||
         fread(palette, sizeof palette, 1, file) != 1 ||
-        memcmp(palette, fontPalette, sizeof palette) || !glyphsRead(file, latchGlyphs, count))
+        memcmp(palette, fontPalette, sizeof palette) || !glyphsRead(file, glyphs, count))
         return false;
-    latchCount = count;
+    *glyphCount = count;
     return true;
 }
 
+bool latchLoad(FILE *file) { return loadNotice(file, latchGlyphs, &latchCount); }
+
+bool pickupLoadEmptyShelf(FILE *file) { return loadNotice(file, emptyShelfGlyphs, &emptyShelfCount); }
+
 bool latchStart(void)
 {
-    if (unlocked || !latchCount || latchAge) return false;
-    latchAge = 1;
-    latchShown = 0;
+    if (unlocked || !latchCount || pickupActive()) return false;
+    phase = LatchNotice;
+    ticks = shown = 0;
     return true;
 }
 
 bool latchUnlocked(void) { return unlocked; }
-
-bool latchActive(void) { return latchAge != 0; }
-
-void latchTick(unsigned pressed)
-{
-    if (!latchAge) return;
-    // Event_DisplayMapMsgWithSfx waits 0.2 seconds before starting the text.
-    if (++latchAge <= 12) return;
-    if (latchShown < latchCount) {
-        latchShown = (pressed & (KEY_A | KEY_B)) ? latchCount : latchShown+1;
-    } else if (pressed & (KEY_A | KEY_B)) {
-        unlocked = true;
-        latchAge = latchShown = 0;
-    }
-}
 
 unsigned pickupFlags(void)
 {
@@ -113,9 +103,26 @@ bool pickupActive(void)
     return phase != Inactive;
 }
 
+static void preparePickup(PickupItem item)
+{
+    activeItem = item;
+    ticks = selected = flash = shown = 0;
+    phase = item == SilverMedallion ? Stopping : Preparing;
+}
+
 void pickupStart(void)
 {
     if (pickupActive()) return;
+    if (roomCurrent() == EquipmentRoom) {
+        if (!models[Chemical].loaded || !playerFacingChemical()) return;
+        if (collected & ChemicalTaken) {
+            phase = EmptyShelfNotice;
+            ticks = shown = 0;
+        } else {
+            preparePickup(Chemical);
+        }
+        return;
+    }
     PickupItem first, last;
     if (roomCurrent() == MusicRoom) {
         first = last = SilverMedallion;
@@ -129,9 +136,7 @@ void pickupStart(void)
     for (PickupItem item = first; item <= last; item++) {
         if (!models[item].loaded || pickupHidden(item) ||
             !playerFacingPoint(pickups[item].x, pickups[item].z)) continue;
-        activeItem = item;
-        ticks = selected = flash = shown = 0;
-        phase = item == SilverMedallion ? Stopping : Preparing;
+        preparePickup(item);
         break;
     }
 }
@@ -153,6 +158,21 @@ PickupSound pickupTick(unsigned pressed)
     const Model *m = &models[activeItem];
     const unsigned promptDelay = silver ? 16 : 21;
     switch (phase) {
+    case LatchNotice:
+    case EmptyShelfNotice: {
+        // Event_DisplayMapMsgWithSfx delays the first latch glyph by 0.2 s.
+        bool latch = phase == LatchNotice;
+        unsigned count = latch ? latchCount : emptyShelfCount;
+        bool advance = pressed & (KEY_A | KEY_B);
+        if (latch && ++ticks < 12) break;
+        if (shown < count) {
+            shown = advance ? count : shown+1;
+        } else if (advance) {
+            if (latch) unlocked = true;
+            phase = Inactive;
+        }
+        break;
+    }
     case Stopping:
         if (playerStopped()) phase = Kneeling;
         break;
@@ -203,6 +223,7 @@ PickupSound pickupTick(unsigned pressed)
 void pickupDrawItem(void)
 {
     bool silver = activeItem == SilverMedallion;
+    bool chemical = activeItem == Chemical;
     if (phase != Inspecting || ticks < (silver ? 4u : 3u)) return;
     const Model *m = &models[activeItem];
     // Keep the room's perspective distance for the pickup in its own view.
@@ -222,13 +243,13 @@ void pickupDrawItem(void)
     unsigned expanded = silver ? 18 : 21;
     unsigned angle = age > expanded ? ((age-expanded)%120)*32768u/120 : 0;
     glRotateYi(-(int)(angle & 32767));
-    glRotateXi(4096);
+    glRotateXi(chemical ? -4096 : 4096);
     int scale = 4096;
     if (age < expanded)
-        scale = silver ? (int)(age-2)*4096/15 : (int)age*4096/15;
+        scale = silver ? (int)(age-2)*4096/15 : (int)age*4096/(chemical ? 21 : 15);
     if (scale > 4096) scale = 4096;
     glScalef32(scale, scale, scale);
-    unsigned height = silver ? TEXTURE_SIZE_64 : TEXTURE_SIZE_256;
+    unsigned height = silver || chemical ? TEXTURE_SIZE_64 : TEXTURE_SIZE_256;
     GFX_TEX_FORMAT = m->textureAddress | (TEXTURE_SIZE_64 << 20) | (height << 23) | (GL_RGB16 << 26);
     GFX_PAL_FORMAT = m->paletteAddress;
     glPolyFmt(POLY_ALPHA(31) | POLY_CULL_FRONT | POLY_FORMAT_LIGHT0);
@@ -245,8 +266,9 @@ void pickupDrawItem(void)
 void pickupDrawPrompt(int bg)
 {
     static unsigned lastShown, lastHighlight;
-    unsigned visible = latchAge ? latchShown : phase == Inspecting ? shown : 0;
-    const Glyph *text = latchAge ? latchGlyphs : models[activeItem].glyphs;
+    unsigned visible = phase == LatchNotice || phase == EmptyShelfNotice || phase == Inspecting ? shown : 0;
+    const Glyph *text = phase == LatchNotice ? latchGlyphs :
+                        phase == EmptyShelfNotice ? emptyShelfGlyphs : models[activeItem].glyphs;
     if (!visible) {
         bgHide(bg);
         lastShown = 0;

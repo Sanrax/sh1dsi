@@ -4,7 +4,7 @@ import math
 import struct
 
 from harry import player_data
-from pickup import medical_pickups, prompt_data, silver_pickup
+from pickup import chemical_pickup, medical_pickups, prompt_data, silver_pickup
 
 
 def collision_edges(ipd, room):
@@ -369,12 +369,19 @@ def school_room(disc, room=39):
                       item_page=page)
     if room != 39:
         magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 16: b"SHU1", 23: b"SHY2", 31: b"SHE1",
-                 32: b"SHC1", 33: b"SHH1", 34: b"SHL1", 35: b"SHQ1"}[room]
+                 32: b"SHC1", 33: b"SHH1", 34: b"SHL1", 35: b"SHQ2"}[room]
         extra = b""
         if room == 9:
             extra = medical_pickups(disc)
         elif room == 12:
             extra = prompt_data(disc, 13, first_floor=True, choices=False)
+        elif room == 35:
+            # Map_WorldObjectsInit places ACID_HID at (-101.2, -1.3, 100.3).
+            add_model(b"ACID_HID", (4096,0,0,0,4096,0,0,0,4096), (4812,-333,5196), 5)
+            extra, pixels, colors = chemical_pickup(disc)
+            page_info.append((len(pages), 64, len(palettes)//32, 1))
+            pages.extend(pixels)
+            palettes.extend(colors)
     else:
         magic = b"SHR5"
         # Map_WorldObjectsInit and Map_WorldObjectsUpdate, EventFlag_71 set.

@@ -16,7 +16,7 @@ typedef struct {
     uint32_t quads;
 } Batch;
 
-enum { StaticBatch, HangingSilverBatch, FallenSilverBatch, DrinkBatch, KitBatch };
+enum { StaticBatch, HangingSilverBatch, FallenSilverBatch, DrinkBatch, KitBatch, ChemicalBatch };
 
 typedef struct {
     int16_t x, y, z;
@@ -118,15 +118,19 @@ bool roomLoad(FILE *file, SchoolRoom room)
     bool towerFloors = room == Courtyard && !memcmp(header.magic, "SHY2", 4);
     bool latchText = firstFloorObstacles || (room == FirstFloor && !memcmp(header.magic, "SHF2", 4));
     bool medical = room == Infirmary && !memcmp(header.magic, "SHI3", 4);
-    bool items = medical || (room == Infirmary && !memcmp(header.magic, "SHI2", 4));
-    enum { ItemPageBytes = 64*256/2, ItemPageOffset = 128*1024-ItemPageBytes };
-    if (items && header.textureBytes < ItemPageBytes) return false;
-    unsigned sceneBytes = header.textureBytes - (items ? ItemPageBytes : 0);
+    bool chemical = room == EquipmentRoom && !memcmp(header.magic, "SHQ2", 4);
+    bool infirmaryItems = medical || (room == Infirmary && !memcmp(header.magic, "SHI2", 4));
+    bool items = chemical || infirmaryItems;
+    unsigned itemBytes = chemical ? 64*64/2 : infirmaryItems ? 64*256/2 : 0;
+    unsigned itemOffset = 128*1024-itemBytes;
+    if (header.textureBytes < itemBytes) return false;
+    unsigned sceneBytes = header.textureBytes - itemBytes;
     unsigned scenePages = room == SchoolCorridor || room == UpperNorthHall || room == ChemistryLab ? 2 : 3;
     if (latchText) magic = firstFloorObstacles ? "SHF3" : "SHF2";
     if (southHallObstacles) magic = "SHS2";
     if (towerFloors) magic = "SHY2";
-    if (items) magic = medical ? "SHI3" : "SHI2";
+    if (infirmaryItems) magic = medical ? "SHI3" : "SHI2";
+    if (chemical) magic = "SHQ2";
     if ((corridor ? (memcmp(header.magic, magic, 4) || header.pages != scenePages + items || !playerReady() ||
                      sceneBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
          !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
@@ -139,10 +143,12 @@ bool roomLoad(FILE *file, SchoolRoom room)
     for (unsigned i = 0; i < header.pages; i++) {
         const Page *p = &pages[i];
         bool atlas = items && i == scenePages;
-        if (atlas && (p->width != 64 || p->offset != sceneBytes || p->palettes != 4)) return false;
+        if (atlas && (p->width != 64 || p->offset != sceneBytes || p->palettes != (chemical ? 1u : 4u)))
+            return false;
         unsigned limit = atlas ? header.textureBytes : sceneBytes;
+        unsigned pageBytes = atlas ? itemBytes : p->width*128u;
         if ((!atlas && p->width != 128 && p->width != 256) || (p->offset & 7) ||
-            p->offset > limit || p->width*128u > limit-p->offset ||
+            p->offset > limit || pageBytes > limit-p->offset ||
             p->firstPalette > header.paletteBytes/32 ||
             p->palettes > header.paletteBytes/32 - p->firstPalette)
             return false;
@@ -151,11 +157,10 @@ bool roomLoad(FILE *file, SchoolRoom room)
     vramSetBankE(VRAM_E_LCD);
     if (!upload(file, VRAM_C, sceneBytes)) return false;
     if (items) {
-        // Keep the actor and pickup resident while loading the common items
-        // into the last 8 KiB of texture bank C.
-        if (skin.offset + 256*256/2 + 2048 > ItemPageOffset ||
-            !upload(file, (uint8_t *)VRAM_C + ItemPageOffset, ItemPageBytes)) return false;
-        pages[scenePages].offset = ItemPageOffset;
+        // Keep Harry and his silver pickup resident in texture bank C.
+        if (skin.offset + 256*256/2 + 2048 > itemOffset ||
+            !upload(file, (uint8_t *)VRAM_C + itemOffset, itemBytes)) return false;
+        pages[scenePages].offset = itemOffset;
     }
     if (!upload(file, VRAM_E, header.paletteBytes)) return false;
     if (room == MusicRoom && header.pages == 4) {
@@ -181,8 +186,11 @@ bool roomLoad(FILE *file, SchoolRoom room)
         (header.textureBytes < 2048 || header.paletteBytes < 32 ||
          !pickupLoad(file, SilverMedallion, header.textureBytes-2048, header.paletteBytes/32-1)))
         return false;
-    if (medical && (!pickupLoad(file, HealthDrink, ItemPageOffset, pages[scenePages].firstPalette+1) ||
-                    !pickupLoad(file, FirstAidKit, ItemPageOffset, pages[scenePages].firstPalette)))
+    if (medical && (!pickupLoad(file, HealthDrink, itemOffset, pages[scenePages].firstPalette+1) ||
+                    !pickupLoad(file, FirstAidKit, itemOffset, pages[scenePages].firstPalette)))
+        return false;
+    if (chemical && (!pickupLoad(file, Chemical, itemOffset, pages[scenePages].firstPalette) ||
+                     !pickupLoadEmptyShelf(file)))
         return false;
 
     // One tightly packed stream in RAM. The file length bounds every batch read.
@@ -197,11 +205,12 @@ bool roomLoad(FILE *file, SchoolRoom room)
     vertices = malloc(bytes);
     if (!vertices) return false;
     unsigned pos = 0, total = bytes / sizeof(Vertex);
-    unsigned maxState = medical ? KitBatch : corridor ? StaticBatch : FallenSilverBatch;
+    unsigned maxState = chemical ? ChemicalBatch : medical ? KitBatch : corridor ? StaticBatch : FallenSilverBatch;
     for (unsigned i = 0; i < header.batches; i++) {
         Batch *b = &batches[i];
         if (fread(b, sizeof *b, 1, file) != 1 || b->page >= header.pages ||
             b->state > maxState || b->flags > (room == Courtyard ? 7 : 3) || b->palette >= pages[b->page].palettes ||
+            (chemical && b->page == scenePages) ||
             b->quads > (total-pos)/4 ||
             fread(vertices+pos, sizeof(Vertex)*4, b->quads, file) != b->quads)
             return false;
@@ -261,6 +270,7 @@ void roomDraw(const Medallion *medal)
         [FallenSilverBatch] = solved && !pickupHidden(SilverMedallion),
         [DrinkBatch] = !pickupHidden(HealthDrink),
         [KitBatch] = !pickupHidden(FirstAidKit),
+        [ChemicalBatch] = !pickupHidden(Chemical),
     };
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];

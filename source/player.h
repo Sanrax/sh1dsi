@@ -15,6 +15,7 @@ bool playerFacingPoint(int worldX, int worldZ);
 void playerWarpForMedal(void);
 bool playerFacingPiano(void);
 bool playerFacingNotebook(void);
+bool playerFacingChemical(void);
 TowerPoint playerFacingTower(void);
 void playerSavePose(Checkpoint *point);
 void playerRestorePose(const Checkpoint *point);
