@@ -360,6 +360,25 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   error was 20.6/255 on entry, 17.1/255 after descending the ramp and
   13.9/255 after returning to the hall.
 
+### Native depth fog
+
+- The USA 1.1 PS1 replay confirmed that the courtyard uses fog off.
+  Four opening-street samples used RGB (108, 100, 116) and reached full
+  fog near 13.5 m. A diagnostic W-buffer table with 0.5 m spacing reproduced
+  the street's depth ramp with 0.39 percentage points of mean density error
+  and 2.32 at worst from 1 to 13.5 m. This measurement covers the depth
+  ramp. Object tint and lighting still need separate comparisons.
+  [Original fog calculations](https://github.com/shdecompilations/silent-hill-decomp/blob/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce/src/bodyprog/gfx/bodyprog_80055028.c)
+- The synthetic panel probe matched calculated RGB within 1/255 in
+  melonDS 1.1 DSi mode, over both DLDI and virtual console SD. At a fixed
+  courtyard entry camera, the Z and W cases and forced scenery fog each
+  averaged 2.86 ms of ARM9 submission and 33.30–33.43 ms between
+  submissions over 127 intervals per case. Each used 900 polygons and
+  3,605 vertices. W-depth changed 43 of 49,152 pixels with fog off. The
+  production renderer still uses Z-depth. Compare depth ordering at
+  matched cameras when a fog-enabled scene reaches the renderer.
+  [DS fog table and blending](https://mgba-emu.github.io/gbatek/#ds-3d-toon-edge-fog-alpha-blending-anti-aliasing)
+
 ## North hallway
 
 - MAP1_S00 points 4 and 6 connect the courtyard to first-floor room 16.
