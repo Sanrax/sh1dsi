@@ -89,8 +89,21 @@ int roomOriginZ(SchoolRoom room)
     return (room == EastCorridor || room == FirstFloor ? 60 : 20)*4096;
 }
 
-static Batch batches[128];
-static unsigned batchWords[128];
+enum { MaxBatches = 128, MaxRoomVertices = 11000, ChunkQuads = 32 };
+typedef struct {
+    int16_t bounds[6]; // Minimum XYZ, then maximum XYZ.
+    uint16_t words;
+} GeometryChunk;
+
+typedef struct {
+    int64_t offset;
+    int32_t normal[3];
+    uint8_t corner[3];
+} ClipPlane;
+
+static Batch batches[MaxBatches];
+static GeometryChunk chunks[MaxRoomVertices/(4*ChunkQuads) + MaxBatches];
+static unsigned batchWords[MaxBatches];
 static uint32_t *geometry;
 
 static bool upload(FILE *file, void *vram, unsigned size)
@@ -130,15 +143,20 @@ static unsigned packPosition(uint32_t **out, const Vertex *v, const Vertex *prev
     return command;
 }
 
-static uint32_t *loadGeometry(FILE *file, uint32_t *out, unsigned quads)
+static uint32_t *loadGeometry(FILE *file, uint32_t *out, unsigned quads, GeometryChunk **chunk)
 {
-    enum { ChunkQuads = 32 };
-    Vertex vertices[4*ChunkQuads], last;
-    // Each batch begins with a full position so it can be drawn by itself.
-    const Vertex *previous = NULL;
+    Vertex vertices[4*ChunkQuads];
     while (quads) {
         unsigned count = quads < ChunkQuads ? quads : ChunkQuads;
         if (fread(vertices, sizeof(Vertex)*4, count, file) != count) return NULL;
+        GeometryChunk *part = (*chunk)++;
+        part->bounds[0] = part->bounds[3] = vertices[0].x;
+        part->bounds[1] = part->bounds[4] = vertices[0].y;
+        part->bounds[2] = part->bounds[5] = vertices[0].z;
+
+        const uint32_t *start = out;
+        // Restart positions at chunk boundaries so either span can be skipped.
+        const Vertex *previous = NULL;
         for (unsigned i = 0; i < count*4; i += 2) {
             uint32_t *commands = out++;
             const Vertex *first = &vertices[i], *second = first+1;
@@ -150,8 +168,16 @@ static uint32_t *loadGeometry(FILE *file, uint32_t *out, unsigned quads)
                                           FIFO_TEX_COORD, secondPosition);
             previous = second;
         }
-        last = *previous;
-        previous = &last;
+        part->words = out-start;
+        for (unsigned i = 1; i < count*4; i++) {
+            const Vertex *v = &vertices[i];
+            if (v->x < part->bounds[0]) part->bounds[0] = v->x;
+            if (v->x > part->bounds[3]) part->bounds[3] = v->x;
+            if (v->y < part->bounds[1]) part->bounds[1] = v->y;
+            if (v->y > part->bounds[4]) part->bounds[4] = v->y;
+            if (v->z < part->bounds[2]) part->bounds[2] = v->z;
+            if (v->z > part->bounds[5]) part->bounds[5] = v->z;
+        }
         quads -= count;
     }
     return out;
@@ -199,7 +225,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
                      sceneBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
          !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
            (!memcmp(header.magic, "SHR", 3) && header.magic[3] >= '2' && header.magic[3] <= '5' && header.pages == 4))) ||
-        header.batches > 128 || !header.batches ||
+        header.batches > MaxBatches || !header.batches ||
         header.textureBytes > 128*1024 || (header.textureBytes & 7) ||
         header.paletteBytes > 64*1024 || (header.paletteBytes & 31) ||
         fread(pages, sizeof(Page), header.pages, file) != header.pages)
@@ -269,7 +295,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     long start = ftell(file);
     if (start < 0 || fseek(file, 0, SEEK_END)) return false;
     long bytes = ftell(file) - start - (long)(header.batches * sizeof(Batch));
-    unsigned maxVerts = room == Courtyard ? 11000 : room == MusicRoom || room == SchoolCorridor ? 6144 : 8192;
+    unsigned maxVerts = room == Courtyard ? MaxRoomVertices : room == MusicRoom || room == SchoolCorridor ? 6144 : 8192;
     if (bytes <= 0 || bytes > maxVerts*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)) ||
         fseek(file, start, SEEK_SET))
         return false;
@@ -282,6 +308,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     unsigned maxState = pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
                         corridor ? StaticBatch : FallenSilverBatch;
     uint32_t *end = geometry;
+    GeometryChunk *chunk = chunks;
     for (unsigned i = 0; i < header.batches; i++) {
         Batch *b = &batches[i];
         if (fread(b, sizeof *b, 1, file) != 1 || b->page >= header.pages ||
@@ -289,7 +316,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
             ((chemical || pour) && b->page >= scenePages) ||
             b->quads > (total-pos)/4)
             return false;
-        uint32_t *next = loadGeometry(file, end, b->quads);
+        uint32_t *next = loadGeometry(file, end, b->quads, &chunk);
         if (!next) return false;
         batchWords[i] = next-end;
         end = next;
@@ -304,6 +331,62 @@ bool roomLoad(FILE *file, SchoolRoom room)
     handPresent = hand || pour;
     handPuzzle = pour;
     return true;
+}
+
+static void roomFrustum(ClipPlane planes[6], int scale)
+{
+    int clip[16];
+    glGetFixed(GL_GET_MATRIX_CLIP, clip);
+    for (unsigned axis = 0; axis < 3; axis++) {
+        ClipPlane *low = &planes[2*axis], *high = low+1;
+        for (unsigned i = 0; i < 3; i++) {
+            low->normal[i] = scale*(clip[4*i+3]+clip[4*i+axis]);
+            high->normal[i] = scale*(clip[4*i+3]-clip[4*i+axis]);
+            low->corner[i] = i + (low->normal[i] < 0 ? 0 : 3);
+            high->corner[i] = i + (high->normal[i] < 0 ? 0 : 3);
+        }
+        low->offset = ((int64_t)clip[15]+clip[12+axis])*4096;
+        high->offset = ((int64_t)clip[15]-clip[12+axis])*4096;
+    }
+}
+
+static ARM_CODE inline bool chunkVisible(const GeometryChunk *chunk, const ClipPlane planes[6])
+{
+    const int16_t *bounds = chunk->bounds;
+    for (unsigned i = 0; i < 6; i++) {
+        const ClipPlane *p = &planes[i];
+        int64_t distance = p->offset
+                         + (int64_t)p->normal[0]*bounds[p->corner[0]]
+                         + (int64_t)p->normal[1]*bounds[p->corner[1]]
+                         + (int64_t)p->normal[2]*bounds[p->corner[2]];
+        // Leave room for the geometry engine's fixed-point rounding.
+        if (distance < -8*4096) return false;
+    }
+    return true;
+}
+
+static inline void submitGeometry(const uint32_t *commands, unsigned words)
+{
+    // Commands are flushed at load. Finish the DMA before the next GPU write.
+    while (dmaBusy(0)) {}
+    dmaSetParams(0, commands, (void *)&GFX_FIFO, DMA_FIFO | words);
+    while (dmaBusy(0)) {}
+}
+
+static ARM_CODE void submitVisible(const uint32_t *commands, const GeometryChunk *chunk,
+                                   unsigned count, const ClipPlane planes[6])
+{
+    unsigned run = 0;
+    for (unsigned i = 0; i < count; i++) {
+        if (chunkVisible(&chunk[i], planes)) {
+            run += chunk[i].words;
+        } else {
+            if (run) submitGeometry(commands, run);
+            commands += run + chunk[i].words;
+            run = 0;
+        }
+    }
+    if (run) submitGeometry(commands, run);
 }
 
 void roomDraw(const Medallion *medal)
@@ -345,12 +428,17 @@ void roomDraw(const Medallion *medal)
     glClearDepth(0x7fff);
     glColor(RGB15(31,31,31));
     const uint32_t *commands = geometry;
+    const GeometryChunk *chunk = chunks;
+    bool wide = current == EastCorridor || current == FirstFloor || current == NorthHall;
+    ClipPlane planes[6];
+    // Only the room geometry gets the additional scale, applied below.
+    roomFrustum(planes, wide ? 2 : 1);
     if (playerReady()) {
         GFX_TEX_FORMAT = (skin.offset >> 3) | (TEXTURE_SIZE_256 << 20)
                          | (TEXTURE_SIZE_256 << 23) | (GL_RGB16 << 26);
         playerDraw(skin.firstPalette);
     }
-    if (current == EastCorridor || current == FirstFloor || current == NorthHall) glScalef32(8192, 8192, 8192);
+    if (wide) glScalef32(8192, 8192, 8192);
     bool visible[] = {
         [StaticBatch] = true,
         [HangingSilverBatch] = !solved,
@@ -365,6 +453,7 @@ void roomDraw(const Medallion *medal)
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];
         unsigned count = batchWords[i];
+        unsigned chunkCount = (b->quads+ChunkQuads-1)/ChunkQuads;
         if (count && visible[b->state]) {
             bool moving = b->state == HangingSilverBatch && medal->phase >= MedalSwing;
             if (moving) {
@@ -384,15 +473,15 @@ void roomDraw(const Medallion *medal)
             // PS1 visible faces wind clockwise in these screen coordinates.
             glPolyFmt(POLY_ALPHA((b->flags & 1) ? 16 : 31) | POLY_CULL_FRONT);
             glBegin(GL_QUADS);
-            // The buffer was flushed once at load time. Wait before the
-            // CPU issues another geometry command or changes matrices.
-            while (dmaBusy(0)) {}
-            dmaSetParams(0, commands, (void *)&GFX_FIFO, DMA_FIFO | count);
-            while (dmaBusy(0)) {}
+            if (b->state == StaticBatch)
+                submitVisible(commands, chunk, chunkCount, planes);
+            else
+                submitGeometry(commands, count);
             glEnd();
             if (moving) glPopMatrix(1);
         }
         commands += count;
+        chunk += chunkCount;
     }
     statueDrawSmoke();
     pickupDrawItem();

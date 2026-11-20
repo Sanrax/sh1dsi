@@ -116,6 +116,30 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - The production build also passed the music-room corridor round trip over
   DLDI and the courtyard round trip over virtual console SD.
 
+### Room-frustum culling
+
+- Static room geometry is grouped into spans of up to 32 quads. The renderer
+  skips a span only when its bounds lie past a clip plane, with a guard for
+  fixed-point rounding. It sends visible spans in their existing order and
+  submits animated and event geometry with their existing transforms.
+- The host check decoded all 67,096 positions and UVs exactly. In 18 matched
+  views across 11 rooms in melonDS DSi mode, every pixel and both GPU RAM
+  counts matched. Peak use was 1,143 polygons and 4,581 vertices, with no
+  overflow flag. [DS geometry RAM limits](https://mgba-emu.github.io/gbatek/#ds-3d-status)
+- Across 1,134 measured intervals, mean submission fell from 2.46 to 2.02 ms.
+  It fell from 2.45 to 1.48 ms at the upstairs stairwell and from 3.00 to
+  1.83 ms at the courtyard tower. The dense southern entrance rose from
+  2.72 to 2.87 ms. Mean intervals were 33.32 and 33.36 ms, with four over
+  34 ms in each run, all on the first interval of a test view. The longest
+  was 42.36 ms before and 47.57 ms after. The remaining intervals topped
+  out at 33.43 ms in both runs.
+- The bounds table adds 2,982 bytes of main RAM. Restarting coordinates at
+  span boundaries adds 200 bytes to the courtyard command buffer. Hardware
+  timing remains pending.
+- Production replays passed the music-room corridor round trip and the
+  full falling-medallion sequence over DLDI, plus the southern hall to
+  courtyard round trip over virtual console SD.
+
 ## Animated character submission
 
 - The actor draw uses ARM instructions for the fixed-point math and packs
