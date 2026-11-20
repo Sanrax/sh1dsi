@@ -231,9 +231,29 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   build starts directly at the piano and allows inspection of the tower
   with both slots empty.
 
+## Chase camera clearance
+
+- The original chase roads reserve one metre at each edge. The port now
+  applies that inset to its chase-camera targets and uses the centre line
+  if the road is under two metres wide. Door and fixed views retain their
+  own positions.
+- At the southern hall test pose, the old DSi camera settled 22 cm behind
+  the wall. The updated camera settled 78 cm inside and the PS1 camera was
+  1.43 m inside. The eye still approaches from a different angle. Whole-frame
+  RGB error was 21.0/255 before the fix and 22.6/255 with the wall clearance.
+- The final ROM kept the camera inside at four headings beside that wall
+  on virtual console SD. The north round trip passed again over DLDI.
+
+## Gold medallion route reference
+
+- The PS1 replay used upstairs east corridor point 52 to enter room 33 at
+  Q12 X/Z (−62668, 784384), yaw 3072. It crossed to point 45 and entered
+  chemistry lab room 34 at (−261324, 398130), yaw 0. The lab event requires
+  the Chemical item before it releases the gold medallion.
+
 ## Next
 
-1. Trace the chemistry lab entrance and the event that releases the gold medallion.
+1. Connect upstairs rooms 31, 33 and 34 through the verified doors.
 2. Port medallion placement and its clock tower state changes.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 

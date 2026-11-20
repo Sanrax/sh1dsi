@@ -54,6 +54,15 @@ static int limitToRoad(int value, int low, int high)
     return value < low ? low : value > high ? high : value;
 }
 
+static int limitChaseAxis(int value, int low, int high)
+{
+    // vcAdjustXzInLimAreaUsingMIN_IN_ROAD_DIST reserves a metre at each
+    // side of the authored road. Narrow roads use their centre line.
+    const int clearance = 4096;
+    if (high-low < 2*clearance) return (low+high)/2;
+    return limitToRoad(value, low+clearance, high-clearance);
+}
+
 // MAP1_S00 camera_paths: two fixed positions and a higher priority road by
 // the cabinet. Horizontal bounds and camera coordinates use the PS1 Q4 units.
 typedef struct {
@@ -100,24 +109,24 @@ static void advanceRoadCamera(void)
     int angle = (yaw + 2048 - 136)*8;
     int sx = x + 2*sinLerp(angle), sz = z + 2*cosLerp(angle);
     if (roomCurrent() == SchoolCorridor) {
-        sx = limitToRoad(sx, -121088, -42496);
-        sz = limitToRoad(sz, 75264, 88320);
+        sx = limitChaseAxis(sx, -121088, -42496);
+        sz = limitChaseAxis(sz, 75264, 88320);
     } else if (roomCurrent() == SouthHall) {
-        sx = limitToRoad(sx, 534016, 612608);
-        sz = limitToRoad(sz, 75264, 86272);
+        sx = limitChaseAxis(sx, 534016, 612608);
+        sz = limitChaseAxis(sz, 75264, 86272);
     } else if (roomCurrent() == NorthHall) {
-        sx = limitToRoad(sx, 507392, 585984);
-        sz = limitToRoad(sz, 779008, 790784);
+        sx = limitChaseAxis(sx, 507392, 585984);
+        sz = limitChaseAxis(sz, 779008, 790784);
     } else if (roomCurrent() == Courtyard) {
         // MAP1_S00 courtyard chase road bounds.
-        sx = limitToRoad(sx, -111616, -50176);
-        sz = limitToRoad(sz, -280576, -217088);
+        sx = limitChaseAxis(sx, -111616, -50176);
+        sz = limitChaseAxis(sz, -280576, -217088);
     } else if (roomCurrent() == FirstFloor) {
-        sx = limitToRoad(sx, 437760, 449536);
-        sz = limitToRoad(sz, 174080, 299264);
+        sx = limitChaseAxis(sx, 437760, 449536);
+        sz = limitChaseAxis(sz, 174080, 299264);
     } else {
-        sx = limitToRoad(sx, -208384, -197376);
-        sz = limitToRoad(sz, 175104, 299008);
+        sx = limitChaseAxis(sx, -208384, -197376);
+        sz = limitChaseAxis(sz, 175104, 299008);
     }
     roadEyeX += (sx-roadEyeX)/10;
     roadEyeZ += (sz-roadEyeZ)/10;
