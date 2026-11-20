@@ -232,13 +232,14 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 
 ## Wall decorations
 
-- The first-floor converter now gives 14 decoration faces 62.5 mm of
-  wall clearance. Across 160 matched camera positions in melonDS DSi
-  mode, the earlier clearance lost 4,463 marked poster pixels at 60
-  positions. The new clearance lost four isolated edge pixels out of
-  98,261 when compared with the backing walls hidden. The ROM, collision,
+- All 28 first-floor poster faces now receive 62.5 mm of clearance. The
+  converter checks sloped wall panels and posters authored 3.9 mm off the
+  wall. In 126 matched melonDS DSi views, removing the backing panels
+  exposed 22,952 marked pixels with the previous data and nine isolated
+  edge pixels out of 462,895 with the new data. The ROM, collision,
   textures and other sidecars were byte-identical after regeneration.
-  The production ROM loaded the first floor and reached the hall over DLDI.
+- Production replays over DLDI and virtual console SD entered from the
+  southern hall, climbed the stairs and returned at the expected landing pose.
 
 ## Infirmary camera
 

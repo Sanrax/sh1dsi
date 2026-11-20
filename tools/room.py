@@ -323,12 +323,13 @@ def school_room(disc, room=39):
                         if face:
                             music_decorations.append((*face, group, start))
                         continue
-                    if music and name in (b"NULL1", b"W5_FAR"):
-                        rectangle = vertical_bounds(points, 0)
+                    # Stairwell wall panels can be trapezoids along the slope.
+                    if room == 12 or (music and name in (b"NULL1", b"W5_FAR")):
+                        surface = vertical_bounds(points, 0)
                     else:
-                        rectangle = vertical_rectangle(points)
-                    if rectangle is not None:
-                        plane, bounds = rectangle
+                        surface = vertical_rectangle(points)
+                    if surface is not None:
+                        plane, bounds = surface
                         if name == b"NULL_NEA":
                             # The tower plaques share a plane with several
                             # masonry triangles from SC1FSE1.
@@ -351,13 +352,16 @@ def school_room(disc, room=39):
     # The PS1 ordering table layers wall decorations over their backing
     # faces. First-floor posters need a wider gap at shallow camera angles.
     gap = (16 if room == 12 else 2) * vertex_scale
-    for plane, bounds, group, start, plaque in decorations:
+    for (axis, depth, side), bounds, group, start, plaque in decorations:
         left, right, bottom, top = bounds
-        if plaque or any(bounds != b and b[0] <= left and b[1] >= right and b[2] <= bottom and b[3] >= top
-                         for b in walls[plane]):
-            axis, depth, side = plane
-            for offset in range(start+2*axis, start+32, 8):
-                struct.pack_into("<h", group, offset, depth+side*gap)
+        # Some first-floor posters already sit one Q8 unit in front of the wall.
+        depths = (depth, depth-side*vertex_scale) if room == 12 else (depth,)
+        for wall in depths:
+            if plaque or any(bounds != b and b[0] <= left and b[1] >= right and b[2] <= bottom and b[3] >= top
+                             for b in walls[axis, wall, side]):
+                for offset in range(start+2*axis, start+32, 8):
+                    struct.pack_into("<h", group, offset, wall+side*gap)
+                break
 
     # The music-room walls can still win depth tests with a two-Q8-unit
     # gap at oblique views. Clamp the posters to a larger clearance,
