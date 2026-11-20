@@ -124,16 +124,15 @@ static void playTone(int id)
                     tone->rate, tone->volume, tone->pan, false, 0);
 }
 
-static void changeRoom(SchoolRoom next)
+static void changeRoom(RoomExit exit)
 {
-    SchoolRoom from = roomCurrent();
+    SchoolRoom from = roomCurrent(), next = exit.room;
     bool east = next == EastCorridor || from == EastCorridor;
-    bool stairs = east && (from == FirstFloor || next == FirstFloor);
     bool hall = east || from == Courtyard || next == Courtyard ||
                 (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
     FILE *file = openRoom(next);
     if (!file) stop("Missing room data.\nRun the asset converter.");
-    if (!stairs) playTone(hall ? HallOpen : DoorOpen);
+    if (!exit.stairs) playTone(hall ? HallOpen : DoorOpen);
     uint32_t start = systemCounterGetTicks();
     // Let the last geometry submission retire before remapping texture VRAM.
     setBrightness(1, -16);
@@ -145,12 +144,12 @@ static void changeRoom(SchoolRoom next)
         setBrightness(1, 0);
         stop("Invalid school room data.");
     }
-    playerEnterRoom(from);
+    playerEnterRoom(from, exit.stairs);
     // GameBoot_InGameStartup step 11 keeps the load screen for at least
     // one second, including time already spent on disc or card reads.
     while ((uint32_t)(systemCounterGetTicks()-start) < systemCounterUsecsToTicks(1000000))
         swiWaitForVBlank();
-    if (!stairs) playTone(hall ? HallClose : DoorClose);
+    if (!exit.stairs) playTone(hall ? HallClose : DoorClose);
 }
 
 int main(void)
@@ -254,12 +253,13 @@ int main(void)
                 if (phase == MedalDrop && medal.phase == MedalImpact)
                     sound = 9;
                 if (!wasActive && phase == medal.phase && (phase == MedalHanging || phase == MedalFinished)) {
-                    SchoolRoom next = playerDestination(pressed & KEY_A);
+                    RoomExit exit = playerDestination(pressed & KEY_A);
+                    SchoolRoom next = exit.room;
                     if (next == SouthHall && roomCurrent() == FirstFloor && !latchUnlocked()) {
                         if (latchStart()) sound = DoorUnlock;
                     } else if (next != roomCurrent()) {
                         inspectionFade = 0;
-                        changeRoom(next);
+                        changeRoom(exit);
                         enteringRoom = roomChanged = true;
                         previousTime = systemCounterGetTicks();
                         debt = step;

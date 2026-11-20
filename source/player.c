@@ -386,19 +386,30 @@ void playerWarpForPour(void)
     warp(-242483, 405094, 0);
 }
 
-void playerEnterRoom(SchoolRoom from)
+struct StairExit {
+    SchoolRoom from, to;
+    int triggerX, triggerZ, halfWidth, halfDepth;
+    int arrivalX, arrivalZ, arrivalYaw;
+    int eyeX, eyeZ;
+};
+
+// The two TouchAabb stair exits use their destination map point as the
+// arrival pose, with a separate camera anchor.
+static const StairExit stairExits[] = {
+    {EastCorridor, FirstFloor, -184320, 174899, 6144, 6144, 454656, 188006, 3072, 441876, 179657},
+    {FirstFloor, EastCorridor, 462848, 188006, 6144, 6144, -192512, 174899, 3072, -204178, 184306}
+};
+
+void playerEnterRoom(SchoolRoom from, const StairExit *stairs)
 {
     doorView = NULL;
-    bool downstairs = roomCurrent() == FirstFloor;
-    if ((downstairs && from == EastCorridor) || (from == FirstFloor && roomCurrent() == EastCorridor)) {
-        // A LoadOverlay warp uses the map point directly, without the
-        // 0.4-metre offset applied to ordinary doors.
-        warp(downstairs ? 454656 : -192512, downstairs ? 188006 : 174899, 3072);
+    if (stairs) {
+        warp(stairs->arrivalX, stairs->arrivalZ, stairs->arrivalYaw);
         entryX = x;
         entryZ = z;
         followingRoad = doorRail = false;
-        roadEyeX = downstairs ? 441876 : -204178;
-        roadEyeZ = downstairs ? 179657 : 184306;
+        roadEyeX = stairs->eyeX;
+        roadEyeZ = stairs->eyeZ;
         return;
     }
     for (unsigned i = 0; i < schoolDoorCount; i++) {
@@ -444,16 +455,16 @@ void playerEnterRoom(SchoolRoom from)
     }
 }
 
-SchoolRoom playerDestination(bool action)
+RoomExit playerDestination(bool action)
 {
     SchoolRoom room = roomCurrent();
-    // Event_Collide: MAP1_S01 point 80 / MAP1_S00 point 79 use a
-    // TouchAabb with both half-extents set to 6 quarter-metres.
-    if (room == EastCorridor && abs(x + 184320) <= 6144 && abs(z - 174899) <= 6144)
-        return FirstFloor;
-    if (room == FirstFloor && abs(x - 462848) <= 6144 && abs(z - 188006) <= 6144)
-        return EastCorridor;
-    if (!action || roomVersion < 5) return room;
+    for (unsigned i = 0; i < sizeof stairExits/sizeof stairExits[0]; i++) {
+        const StairExit *exit = &stairExits[i];
+        if (exit->from == room && abs(x - exit->triggerX) <= exit->halfWidth &&
+            abs(z - exit->triggerZ) <= exit->halfDepth)
+            return (RoomExit){exit->to, exit};
+    }
+    if (!action || roomVersion < 5) return (RoomExit){room, NULL};
     int rayX = sinLerp(yaw*8)/2, rayZ = cosLerp(yaw*8)/2;
     for (unsigned i = 0; i < schoolDoorCount; i++) {
         const Door *d = &schoolDoors[i];
@@ -463,9 +474,9 @@ SchoolRoom playerDestination(bool action)
         int reach = -rayX*d->nx - rayZ*d->nz;
         if (reach > 0 && along >= 0 && along <= reach &&
             abs(rayX*dz - dx*rayZ) <= d->halfWidth*reach)
-            return d->other;
+            return (RoomExit){d->other, NULL};
     }
-    return room;
+    return (RoomExit){room, NULL};
 }
 
 static bool facingEdge(int edgeX, int edgeZ, int halfWidth, int nx, int nz)

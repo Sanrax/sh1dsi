@@ -22,8 +22,13 @@ bool playerFacingHand(void);
 TowerPoint playerFacingTower(void);
 void playerSavePose(Checkpoint *point);
 void playerRestorePose(const Checkpoint *point);
-SchoolRoom playerDestination(bool action);
-void playerEnterRoom(SchoolRoom from);
+typedef struct StairExit StairExit;
+typedef struct {
+    SchoolRoom room;
+    const StairExit *stairs;
+} RoomExit;
+RoomExit playerDestination(bool action);
+void playerEnterRoom(SchoolRoom from, const StairExit *stairs);
 int playerSetCamera(void);
 void playerDraw(unsigned firstPalette);
 

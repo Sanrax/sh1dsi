@@ -313,6 +313,21 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   recording verified three distinct PCM onsets and silence when pressing
   Up on the already selected first option.
 
+## Stair transitions
+
+- A stair link now carries its trigger, arrival pose and camera anchor
+  through the room load. Stair links skip door sounds.
+- In melonDS DSi mode, both DLDI and virtual console SD resumed an infirmary
+  checkpoint, crossed the southern hallway and walked the existing stairs
+  in both directions. Both PS1 and native replays reached Q12 X/Z
+  (454656, 188006) downstairs and (−192512, 174899) upstairs with yaw 3072.
+  The native replays retained the items and latch and kept the lower LCD black.
+- The basement stair and boiler room each need 80 KiB of scenery textures,
+  which fits before the resident player texture. One boiler-room texture
+  page has multiple transparency indices, all in palette rows that static
+  instances leave unused. Check whether runtime props use those rows before
+  extending the converter and connecting the basement.
+
 ## Downstairs collision
 
 - Four matched PS1 and melonDS approaches reproduced walk-through at the
