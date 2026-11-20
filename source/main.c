@@ -167,11 +167,6 @@ int main(void)
     glInit();
     FILE *roomFile = openRoom(MusicRoom);
     bool hasRoom = roomFile != NULL;
-    if (roomFile) {
-        bool ok = roomLoad(roomFile, MusicRoom);
-        fclose(roomFile);
-        if (!ok) stop("Invalid music room data");
-    }
     bgHide(0);
     vramSetBankA(VRAM_A_MAIN_BG);
     vramSetBankB(VRAM_B_MAIN_SPRITE);
@@ -191,7 +186,15 @@ int main(void)
     Medallion medal = {0};
     Checkpoint point = {0};
     NotebookResult boot = hasRoom ? notebookMenu(assetDir, true, &point) : NotebookClosed;
-    if (boot == NotebookMissingArt) stop("Missing notebook.dat");
+    if (boot == NotebookMissingArt) {
+        fclose(roomFile);
+        stop("Missing notebook.dat");
+    }
+    if (roomFile) {
+        bool ok = boot == NotebookLoaded ? roomLoadShared(roomFile) : roomLoad(roomFile, MusicRoom);
+        fclose(roomFile);
+        if (!ok) stop("Invalid music room data");
+    }
     if (boot == NotebookLoaded) {
         FILE *savedRoom = openRoom(Infirmary);
         if (!savedRoom) stop("Missing infirmary.dat");

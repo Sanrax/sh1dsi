@@ -21,6 +21,7 @@ bool roomCanDissolveHand(void);
 int roomOriginX(SchoolRoom room);
 int roomOriginZ(SchoolRoom room);
 bool roomLoad(FILE *file, SchoolRoom room);
+bool roomLoadShared(FILE *file);
 void roomDraw(const Medallion *medal);
 
 #endif

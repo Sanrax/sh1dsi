@@ -196,7 +196,7 @@ static long roomFileSize(FILE *file, long position)
     return fseek(file, position, SEEK_SET) ? -1 : size;
 }
 
-bool roomLoad(FILE *file, SchoolRoom room)
+static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
 {
     bool corridor = room != MusicRoom;
     const char *magic = "SHC1";
@@ -259,9 +259,12 @@ bool roomLoad(FILE *file, SchoolRoom room)
             p->palettes > header.paletteBytes/32 - p->firstPalette)
             return false;
     }
+    // On Continue, the saved room will provide its own scenery textures.
+    unsigned textureStart = !scenery && header.pages == 4 ? pages[3].offset : 0;
+    if (textureStart && fseek(file, textureStart, SEEK_CUR)) return false;
     vramSetBankC(VRAM_C_LCD);
     vramSetBankE(VRAM_E_LCD);
-    if (!upload(file, VRAM_C, sceneBytes)) return false;
+    if (!upload(file, (uint8_t *)VRAM_C + textureStart, sceneBytes-textureStart)) return false;
     if (itemPages) {
         // Keep Harry and his silver pickup resident in texture bank C.
         if (skin.offset + 256*256/2 + 2048 > itemOffset ||
@@ -314,6 +317,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     unsigned maxVerts = room == Courtyard ? MaxRoomVertices : room == MusicRoom || room == SchoolCorridor ? 6144 : 8192;
     if (bytes <= 0 || bytes > maxVerts*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)))
         return false;
+    if (!scenery) return true;
     unsigned pos = 0, total = bytes / sizeof(Vertex);
     // Two full vertices need six parameters and one packed command word.
     size_t geometryBytes = total/2 * 7 * sizeof(*geometry);
@@ -346,6 +350,16 @@ bool roomLoad(FILE *file, SchoolRoom room)
     handPresent = hand || pour;
     handPuzzle = pour;
     return true;
+}
+
+bool roomLoad(FILE *file, SchoolRoom room)
+{
+    return loadRoom(file, room, true);
+}
+
+bool roomLoadShared(FILE *file)
+{
+    return loadRoom(file, MusicRoom, false);
 }
 
 static void roomFrustum(ClipPlane planes[6], int scale)

@@ -275,6 +275,27 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   desk pose and flags. Ten menu captures per path matched after masking
   the elapsed-time field on the final cold load.
 
+### Startup scene loading
+
+- The load list draws before the game reads the first room. Continue reads
+  the shared player data from the existing music-room file. It skips the
+  80 KiB scenery texture prefix and geometry packing. New Game loads the
+  full room.
+- Over three cold launches per case in melonDS DSi mode, the load list
+  drew at 37.83 ms on virtual console SD and 96.35 ms on DLDI, down from
+  71.26 and 146.50 ms. Continue to first scene submission took 35.10 ms
+  on SD in both builds and rose from 51.81 to 85.24 ms on DLDI. Adding the
+  two intervals, with player wait excluded, gives 72.93 ms on SD and
+  181.59 ms on DLDI, down from 106.36 and 198.31 ms.
+- With a saved slot present, choosing New Game took 35.09 ms on SD and
+  68.52 ms on DLDI after selection. Empty-card launches reached the first
+  scene at 54.96 ms on SD and 138.57 ms on DLDI. All eight fixed menu and
+  scene captures matched pixel for pixel across the two paths.
+- Production builds resumed through the southern hall on both media, walked
+  the courtyard round trip over virtual console SD, and passed the music-room
+  corridor round trip over DLDI. The missing-room fallback and two truncated
+  room cases matched the previous screens on an empty card.
+
 ## Infirmary pickups
 
 - MAP1_S00 points 97 and 98 use the original standing pickup flow, with
