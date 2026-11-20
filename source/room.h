@@ -17,6 +17,7 @@ extern const unsigned schoolDoorCount;
 
 SchoolRoom roomCurrent(void);
 bool roomHasHand(void);
+bool roomCanDissolveHand(void);
 int roomOriginX(SchoolRoom room);
 int roomOriginZ(SchoolRoom room);
 bool roomLoad(FILE *file, SchoolRoom room);

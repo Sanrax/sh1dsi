@@ -132,6 +132,13 @@ def chemical_pickup(disc):
     return data, *key_item_tile(disc, 0, 0)
 
 
+def gold_pickup(disc):
+    data = model_corners(disc.read("ITEM/UNQ61.TMD"), (80, 108, 156), (74, 14), 64, 64)
+    data.extend(prompt_data(disc, 17, map_bearings=True))
+    data.extend(prompt_data(disc, 20, choices=False, map_bearings=True))
+    return data, *key_item_tile(disc, 64, 1)
+
+
 def medical_pickups(disc):
     # TIM00 rows 0–127 and its first two CLUTs are shared with the props.
     data = bytearray()

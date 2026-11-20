@@ -177,7 +177,7 @@ unsigned handInspect(const char *dir)
 {
     Art *art = malloc(sizeof *art);
     bool ok = art && readHand(dir, art);
-    if (ok) inspect(art, false, 33, 42);
+    if (ok) inspect(art, false, 57, 43);
     free(art);
     return ok ? 33 : 0;
 }

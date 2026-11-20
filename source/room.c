@@ -4,6 +4,7 @@
 #include "player.h"
 #include "collision.h"
 #include "pickup.h"
+#include "statue.h"
 
 typedef struct {
     uint32_t offset;
@@ -16,7 +17,8 @@ typedef struct {
     uint32_t quads;
 } Batch;
 
-enum { StaticBatch, HangingSilverBatch, FallenSilverBatch, DrinkBatch, KitBatch, ChemicalBatch };
+enum { StaticBatch, HangingSilverBatch, FallenSilverBatch, DrinkBatch, KitBatch, ChemicalBatch,
+       IntactHandBatch, OpenHandBatch, GoldAtHandBatch };
 
 typedef struct {
     int16_t x, y, z;
@@ -30,7 +32,7 @@ static struct {
 } header;
 static Page pages[4], skin;
 static SchoolRoom current = MusicRoom;
-static bool handPresent;
+static bool handPresent, handPuzzle;
 
 // MAP1_S00 and MAP1_S01 door points. Normals point into the room.
 const Door schoolDoors[] = {
@@ -57,6 +59,7 @@ const unsigned schoolDoorCount = sizeof schoolDoors/sizeof schoolDoors[0];
 
 SchoolRoom roomCurrent(void) { return current; }
 bool roomHasHand(void) { return current == ChemistryLab && handPresent; }
+bool roomCanDissolveHand(void) { return current == ChemistryLab && handPuzzle; }
 int roomOriginX(SchoolRoom room)
 {
     switch (room) {
@@ -122,9 +125,12 @@ bool roomLoad(FILE *file, SchoolRoom room)
     bool medical = room == Infirmary && !memcmp(header.magic, "SHI3", 4);
     bool chemical = room == EquipmentRoom && !memcmp(header.magic, "SHQ2", 4);
     bool hand = room == ChemistryLab && !memcmp(header.magic, "SHL2", 4);
+    bool pour = room == ChemistryLab && !memcmp(header.magic, "SHL3", 4);
     bool infirmaryItems = medical || (room == Infirmary && !memcmp(header.magic, "SHI2", 4));
-    bool items = chemical || infirmaryItems;
-    unsigned itemBytes = chemical ? 64*64/2 : infirmaryItems ? 64*256/2 : 0;
+    enum { KeyTileBytes = 64*64/2, SmokeTileBytes = 32*128 };
+    unsigned itemPages = pour ? 2 : chemical || infirmaryItems ? 1 : 0;
+    unsigned itemBytes = pour ? KeyTileBytes+SmokeTileBytes : chemical ? KeyTileBytes :
+                         infirmaryItems ? 64*256/2 : 0;
     unsigned itemOffset = 128*1024-itemBytes;
     if (header.textureBytes < itemBytes) return false;
     unsigned sceneBytes = header.textureBytes - itemBytes;
@@ -135,7 +141,8 @@ bool roomLoad(FILE *file, SchoolRoom room)
     if (infirmaryItems) magic = medical ? "SHI3" : "SHI2";
     if (chemical) magic = "SHQ2";
     if (hand) magic = "SHL2";
-    if ((corridor ? (memcmp(header.magic, magic, 4) || header.pages != scenePages + items || !playerReady() ||
+    if (pour) magic = "SHL3";
+    if ((corridor ? (memcmp(header.magic, magic, 4) || header.pages != scenePages + itemPages || !playerReady() ||
                      sceneBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
          !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
            (!memcmp(header.magic, "SHR", 3) && header.magic[3] >= '2' && header.magic[3] <= '5' && header.pages == 4))) ||
@@ -146,11 +153,14 @@ bool roomLoad(FILE *file, SchoolRoom room)
         return false;
     for (unsigned i = 0; i < header.pages; i++) {
         const Page *p = &pages[i];
-        bool atlas = items && i == scenePages;
-        if (atlas && (p->width != 64 || p->offset != sceneBytes || p->palettes != (chemical ? 1u : 4u)))
+        bool atlas = itemPages && i >= scenePages;
+        bool smoke = pour && i == scenePages+1;
+        if (atlas && (p->width != (smoke ? 32 : 64) ||
+            p->offset != sceneBytes+(smoke ? KeyTileBytes : 0) ||
+            p->palettes != (smoke ? 2u : infirmaryItems ? 4u : 1u)))
             return false;
         unsigned limit = atlas ? header.textureBytes : sceneBytes;
-        unsigned pageBytes = atlas ? itemBytes : p->width*128u;
+        unsigned pageBytes = smoke ? SmokeTileBytes : atlas && !infirmaryItems ? KeyTileBytes : p->width*128u;
         if ((!atlas && p->width != 128 && p->width != 256) || (p->offset & 7) ||
             p->offset > limit || pageBytes > limit-p->offset ||
             p->firstPalette > header.paletteBytes/32 ||
@@ -160,11 +170,11 @@ bool roomLoad(FILE *file, SchoolRoom room)
     vramSetBankC(VRAM_C_LCD);
     vramSetBankE(VRAM_E_LCD);
     if (!upload(file, VRAM_C, sceneBytes)) return false;
-    if (items) {
+    if (itemPages) {
         // Keep Harry and his silver pickup resident in texture bank C.
         if (skin.offset + 256*256/2 + 2048 > itemOffset ||
             !upload(file, (uint8_t *)VRAM_C + itemOffset, itemBytes)) return false;
-        pages[scenePages].offset = itemOffset;
+        for (unsigned i = scenePages; i < header.pages; i++) pages[i].offset += itemOffset-sceneBytes;
     }
     if (!upload(file, VRAM_E, header.paletteBytes)) return false;
     if (room == MusicRoom && header.pages == 4) {
@@ -196,6 +206,11 @@ bool roomLoad(FILE *file, SchoolRoom room)
     if (chemical && (!pickupLoad(file, Chemical, itemOffset, pages[scenePages].firstPalette) ||
                      !pickupLoadEmptyShelf(file)))
         return false;
+    if (pour && (!playerLoadPour(file) ||
+                 !statueLoad(file, pages[scenePages+1].offset, pages[scenePages+1].firstPalette) ||
+                 !pickupLoad(file, GoldMedallion, itemOffset, pages[scenePages].firstPalette) ||
+                 !pickupLoadEmptyHand(file)))
+        return false;
 
     // One tightly packed stream in RAM. The file length bounds every batch read.
     long start = ftell(file);
@@ -209,12 +224,13 @@ bool roomLoad(FILE *file, SchoolRoom room)
     vertices = malloc(bytes);
     if (!vertices) return false;
     unsigned pos = 0, total = bytes / sizeof(Vertex);
-    unsigned maxState = chemical ? ChemicalBatch : medical ? KitBatch : corridor ? StaticBatch : FallenSilverBatch;
+    unsigned maxState = pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
+                        corridor ? StaticBatch : FallenSilverBatch;
     for (unsigned i = 0; i < header.batches; i++) {
         Batch *b = &batches[i];
         if (fread(b, sizeof *b, 1, file) != 1 || b->page >= header.pages ||
             b->state > maxState || b->flags > (room == Courtyard ? 7 : 3) || b->palette >= pages[b->page].palettes ||
-            (chemical && b->page == scenePages) ||
+            ((chemical || pour) && b->page >= scenePages) ||
             b->quads > (total-pos)/4 ||
             fread(vertices+pos, sizeof(Vertex)*4, b->quads, file) != b->quads)
             return false;
@@ -222,7 +238,8 @@ bool roomLoad(FILE *file, SchoolRoom room)
     }
     if (pos != total) return false;
     current = room;
-    handPresent = hand;
+    handPresent = hand || pour;
+    handPuzzle = pour;
     return true;
 }
 
@@ -233,14 +250,15 @@ void roomDraw(const Medallion *medal)
     // MAP1_S01 medallion cameras. Local origin (-100, 0, 20), 2 metres/unit.
     // Screen_CutsceneCameraStateUpdate masks the 320x240 picture at y=±96.
     // Shrink the frustum with the viewport to keep the original pixel scale.
-    int border = gameplay ? 6 : 19;
+    int border = statueActive() ? (int)statueBorder() : gameplay ? 6 : 19;
     glViewport(0, border, 255, 191-border);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    const int distance = gameplay ? 224 : medal->phase == MedalHanging ? 353 : medal->projection;
+    const int distance = statueCamera() ? 376 : gameplay ? 224 :
+                         medal->phase == MedalHanging ? 353 : medal->projection;
     const int near = 1024; // 0.25 scene units, Q12.
     int horizontal = 160 * near / distance;
-    int vertical = (gameplay ? 112 : 96) * near / distance;
+    int vertical = (120-(5*border+2)/4)*near/distance;
     glFrustumf32(-horizontal, horizontal, -vertical, vertical, near, inttof32(16));
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
@@ -277,6 +295,9 @@ void roomDraw(const Medallion *medal)
         [DrinkBatch] = !pickupHidden(HealthDrink),
         [KitBatch] = !pickupHidden(FirstAidKit),
         [ChemicalBatch] = !pickupHidden(Chemical),
+        [IntactHandBatch] = !statueOpened(),
+        [OpenHandBatch] = statueOpened(),
+        [GoldAtHandBatch] = statueOpened() && !pickupHidden(GoldMedallion),
     };
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];
@@ -309,6 +330,7 @@ void roomDraw(const Medallion *medal)
         }
         v += count;
     }
+    statueDrawSmoke();
     pickupDrawItem();
     glFlush(0);
 }

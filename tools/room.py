@@ -3,8 +3,9 @@ from collections import defaultdict
 import math
 import struct
 
-from harry import player_data
-from pickup import chemical_pickup, medical_pickups, prompt_data, silver_pickup
+from harry import player_data, pour_frames
+from pickup import chemical_pickup, gold_pickup, medical_pickups, prompt_data, silver_pickup
+from vab import statue_sound
 
 
 def collision_edges(ipd, room):
@@ -174,6 +175,25 @@ def vertical_rectangle(points):
         side = 1 if (winding > 0) == (axis == 0) else -1
         return (axis, points[0][axis], side), (*horizontal, *vertical)
     return None
+
+
+def smoke_atlas(disc):
+    # The PS1 smoke uses BLD.TIM's CLUT 4 and the three 32-pixel tiles
+    # at U=224, V=160/192/224. Translate additive intensity to DS alpha.
+    tim = disc.read("TIM/BLD.TIM")
+    if struct.unpack_from("<III4H", tim) != (16, 8, 524, 0, 0, 16, 16):
+        raise ValueError("unexpected smoke TIM palette")
+    image = 532
+    if struct.unpack_from("<I4H", tim, image) != (32780, 0, 0, 64, 256):
+        raise ValueError("unexpected smoke TIM image")
+    clut = struct.unpack_from("<16H", tim, 20+4*32)
+    alpha = [((color & 31)*5+5)//11 << 5 for color in clut]
+    pixels = bytearray()
+    for y in range(160,256):
+        offset = image+12+y*128+112
+        for byte in tim[offset:offset+16]:
+            pixels.extend((alpha[byte & 15], alpha[byte >> 4]))
+    return pixels + bytes(32*32), struct.pack("<H", 0x7fff) + bytes(62)
 
 
 def school_room(disc, room=39):
@@ -369,15 +389,25 @@ def school_room(disc, room=39):
                       item_page=page)
     if room != 39:
         magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 16: b"SHU1", 23: b"SHY2", 31: b"SHE1",
-                 32: b"SHC1", 33: b"SHH1", 34: b"SHL2", 35: b"SHQ2"}[room]
+                 32: b"SHC1", 33: b"SHH1", 34: b"SHL3", 35: b"SHQ2"}[room]
         extra = b""
         if room == 9:
             extra = medical_pickups(disc)
         elif room == 12:
             extra = prompt_data(disc, 13, first_floor=True, choices=False)
         elif room == 34:
-            # The intact hand sits at (-59.2, -1.0, 99.5) in MAP1_S01.
-            add_model(b"HAND_HID", (4096,0,0,0,4096,0,0,0,4096), (5324,-256,4992))
+            # These world objects share the original MAP1_S01 hand position.
+            for state, name in enumerate((b"HAND_HID", b"HAND2_HI", b"PANELG_H"), 6):
+                add_model(name, (4096,0,0,0,4096,0,0,0,4096), (5324,-256,4992), state)
+            pickup, pixels, colors = gold_pickup(disc)
+            page_info.append((len(pages), 64, len(palettes)//32, 1))
+            pages.extend(pixels)
+            palettes.extend(colors)
+            smoke, colors = smoke_atlas(disc)
+            page_info.append((len(pages), 32, len(palettes)//32, 2))
+            pages.extend(smoke)
+            palettes.extend(colors)
+            extra = pour_frames(disc) + statue_sound(disc.read("SND/MEP101.VAB")) + pickup
         elif room == 35:
             # Map_WorldObjectsInit places ACID_HID at (-101.2, -1.3, 100.3).
             add_model(b"ACID_HID", (4096,0,0,0,4096,0,0,0,4096), (4812,-333,5196), 5)

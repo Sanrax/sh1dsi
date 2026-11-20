@@ -6,7 +6,8 @@ eastern hallway, descend the stairs, unlatch the first-floor door and enter
 the southern hallway. The courtyard connects the southern and northern halls.
 Harry can inspect the clock tower door and both medallion slots.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
-and equipment room. Harry can collect the Chemical and inspect the hand statue.
+and equipment room. Harry can collect the Chemical, open the hand statue
+and take the gold medallion.
 In the infirmary he can pick up both medical supplies and use the notebook.
 A cold boot can resume at the desk with the puzzle,
 door latch and pickups intact. The full game remains unplayable.
@@ -28,8 +29,8 @@ door latch and pickups intact. The full game remains unplayable.
 
 ## Frame pacing
 
-PS1 references use Beetle PSX software rendering, USA 1.1, SCPH-7001 BIOS,
-digital pad and the 59.94 Hz clock. The street replay starts a new game.
+PS1 references use Beetle PSX software rendering, USA 1.1, a digital pad
+and the 59.94 Hz clock. The street replay starts a new game.
 School replays seed a private Continue slot and then use controller input.
 See the replay instructions on `diagnostics/dsi`. Native simulation uses
 16.683 ms steps. Hardware timing is pending.
@@ -50,6 +51,8 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | PS1 chemistry lab entry and turn | 101 buffer-change intervals | All 33.37 ms |
 | PS1 equipment room entry and return approach | 87 buffer-change intervals | 60 at 33.37 ms and 27 at 50.05 ms. Mean 38.54 ms |
 | PS1 Chemical pickup | 126 buffer-change intervals across two prompts | All 50.05 ms |
+| PS1 hand statue pour and dissolve | 235 buffer-change intervals | 102 at 33.37 ms and 133 at 50.05 ms |
+| PS1 gold pickup | 127 buffer-change intervals across two prompts | 4 at 33.37 ms and 123 at 50.05 ms |
 | melonDS idle music room with Harry | 300 scene submissions | 16.715 / 33.317 / 33.432 ms min/mean/max, 2.893 ms mean ARM9 submission time |
 | melonDS rotating silver pickup with prompt | 300 scene intervals | 16.713 / 33.374 / 33.432 ms min/mean/max, 3.291 ms mean ARM9 submission time |
 | melonDS idle corridor after collecting the medallion | 300 scene intervals | 16.713 / 33.317 / 33.432 ms min/mean/max, 4.137 ms mean ARM9 submission time |
@@ -65,6 +68,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | melonDS chemistry lab from entry to the east aisle | 300 scene intervals | 16.713 / 33.374 / 33.447 ms min/mean/max, 3.702 ms mean ARM9 submission time |
 | melonDS equipment room from entry to the west aisle | 300 scene intervals | 16.719 / 33.374 / 33.445 ms min/mean/max, 4.413 ms mean ARM9 submission time |
 | melonDS rotating Chemical with prompt | 300 scene intervals | 16.713 / 33.318 / 33.432 ms min/mean/max, 4.748 ms mean ARM9 submission time |
+| melonDS statue close camera | 271 scene intervals | 16.711 / 33.368 / 34.249 ms min/mean/max, 4.014 ms mean ARM9 submission time |
 
 ## Scene and interaction checks
 
@@ -315,15 +319,45 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   storage paths. The production ROM cold-loaded each written checkpoint
   with the Chemical, silver medallion, latch and desk pose intact. The host
   checkpoint recovery fixture also passed with the new flag.
-- The PS1 statue callback opened the hand after 610 VBlanks, or 136 when
-  Start was pressed during the pour. The Chemical stayed in inventory in
-  both runs. The gold medallion could then be declined or accepted. This
-  reference supplied the item selection directly to the event router.
+- The PS1 statue callbacks preserve the Chemical after use and offer the
+  gold medallion once the hand opens. The reference supplies the item
+  selection directly to the event router. Initial lab traces used the
+  core's embedded OpenBIOS because the expected US firmware path was
+  absent. The statue replay was repeated with the owner's SCPH-7001 via
+  a local firmware alias. The inspection and pour images were identical.
+  [Beetle PSX firmware selection](https://github.com/libretro/beetle-psx-libretro/blob/master/libretro.c)
+
+## Hand statue and gold medallion
+
+- Select uses the Chemical when Harry faces the hand. This is a direct
+  item-use control until the original inventory is ported. The event uses
+  the original pour clip and fixed camera, the original smoke tiles with
+  DS alpha blending, the ambient hiss loop and the two original hand models.
+- The production DLDI replay walked from the piano, collected the Chemical,
+  played the full pour, declined and accepted the gold medallion and
+  returned to the empty hand after reloading the lab. The pour warped
+  Harry to the PS1 Q12 position (−242483, 405094), yaw 0. All 286 bright
+  green pixels in the gold medallion name matched the resampled PS1 capture.
+- The native full sequence reached the end at 610 simulation ticks. The
+  PS1 runs reached it at 609–610 VBlanks. Mean whole-frame RGB errors were
+  20.0/255 during the pour, 20.4/255 during dissolution and 18.0/255 at the
+  open hand. Lighting and smoke blending differ. A probe peaked at 400
+  polygons and 1,541 vertices. An isolated melonDS audio recording captured
+  the hiss during the smoke with silence after the sound stopped.
+- Over virtual console SD, a lab fixture loaded a legacy checkpoint,
+  completed the full event, and saved the open hand and both items in the
+  notebook. The production ROM cold-loaded the new SHC2 slot. Start also
+  finished the event and stopped the sound during the active hiss. The host
+  fixture kept the older SHC1 slot readable across all 36 partial writes.
+
+The original medallion placement replays filled each slot and retained both
+items. The boiler remained off. The clock tower door requires the separate
+boiler switch event.
 
 ## Next
 
-1. Port the hand statue and gold medallion events, preserving the original item use and skip behavior.
-2. Port the medallion placement events and unlock the clock tower.
+1. Port both medallion placement events and the filled clock views.
+2. Connect the boiler room and verify the switch that unlocks the clock tower.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

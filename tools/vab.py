@@ -4,7 +4,7 @@ import struct
 import sys
 
 
-def decode_vag(data):
+def decode_vag(data, *, looping=False):
     coefficients = ((0, 0), (60, 0), (115, -52), (98, -55), (122, -60))
     pcm = array("h")
     prev = older = 0
@@ -21,41 +21,66 @@ def decode_vag(data):
                 older, prev = prev, max(-32768, min(32767, sample))
                 pcm.append(prev)
         if flags & 1:
-            if flags & 2:
-                raise ValueError("looping sample in a one-shot sound bank")
+            if bool(flags & 2) != looping:
+                raise ValueError("unexpected SPU sample end marker")
             if sys.byteorder == "big":
                 pcm.byteswap()
             return pcm.tobytes()
     raise ValueError("unterminated VAG sample")
 
 
-def convert_tones(vab, notes, samples):
+def tone_row(vab, program, note):
+    count = vab[32 + program * 16]
+    rows = 0x820 + 512 * sum(bool(vab[32 + i * 16]) for i in range(program))
+    matches = [rows + 32*i for i in range(count)
+               if vab[rows + 32*i + 6] <= note <= vab[rows + 32*i + 7]]
+    if len(matches) != 1:
+        raise ValueError("expected one VAB tone per note")
+    return matches[0]
+
+
+def sample_data(vab, vag):
     programs = struct.unpack_from("<H", vab, 18)[0]
     offsets = 0x820 + programs * 512
     sizes = struct.unpack_from("<256H", vab, offsets)
+    start = offsets + 512 + sum(sizes[:vag]) * 8
+    return vab[start:start + sizes[vag]*8]
+
+
+def tone_rate(vab, tone, note):
+    center, fine = vab[tone + 4:tone + 6]
+    pitch = int(4096 * 2 ** ((note - center + fine / 128) / 12))
+    return round(44100 * pitch / 4096)
+
+
+def convert_tones(vab, notes, samples):
     unique = {}
     tones = bytearray()
     for program, note, level in notes:
-        count = vab[32 + program * 16]
-        rows = 0x820 + 512 * sum(bool(vab[32 + i * 16]) for i in range(program))
-        matches = [rows + 32*i for i in range(count)
-                   if vab[rows + 32*i + 6] <= note <= vab[rows + 32*i + 7]]
-        if len(matches) != 1:
-            raise ValueError("expected one VAB tone per note")
-        tone = matches[0]
+        tone = tone_row(vab, program, note)
         vag = struct.unpack_from("<H", vab, tone + 22)[0]
         if vag not in unique:
-            start = offsets + 512 + sum(sizes[:vag]) * 8
-            pcm = decode_vag(vab[start:start + sizes[vag]*8])
+            pcm = decode_vag(sample_data(vab, vag))
             unique[vag] = len(samples), len(pcm)
             samples.extend(pcm)
-        center, fine = vab[tone + 4:tone + 6]
-        pitch = int(4096 * 2 ** ((note - center + fine / 128) / 12))
-        rate = round(44100 * pitch / 4096)
+        rate = tone_rate(vab, tone, note)
         volume = vab[tone + 2] * vab[33 + program * 16] // 127
         volume = volume * level // 127
         tones.extend(struct.pack("<IIHBB", *unique[vag], rate, volume, vab[tone + 3]))
     return tones
+
+
+def statue_sound(vab):
+    # Sfx 1433 uses MAP1_S01's ambient program 0, note 50, at half volume.
+    tone = tone_row(vab, 0, 50)
+    vad = sample_data(vab, struct.unpack_from("<H", vab, tone+22)[0])
+    starts = [i//16*28 for i in range(0, len(vad), 16) if vad[i+1] & 4]
+    pcm = decode_vag(vad, looping=True)
+    if len(starts) != 1 or not 0 < 2*starts[0] < len(pcm):
+        raise ValueError("unexpected hand statue loop")
+    volume = vab[tone+2] * vab[33] * 64 // (127*127)
+    return struct.pack("<IHHBB2x", len(pcm), starts[0], tone_rate(vab, tone, 50),
+                       volume, vab[tone+3]) + pcm
 
 
 def school_bank(map_vab, base_vab):

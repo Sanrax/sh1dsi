@@ -3,6 +3,15 @@ from collections import defaultdict
 import struct
 
 
+def pour_frames(disc):
+    # Player state 83 uses MAP1_S01 clip 51 at 15 frames per second.
+    source = disc.read("ANIM/HB_M1S01.ANM")
+    frames = source[(900-676)*156:(949-676)*156]
+    if len(frames) != 49*156:
+        raise ValueError("incomplete Harry pour animation")
+    return frames
+
+
 def player_data(disc):
     model = disc.read("CHARA/HERO.ILM")
     _, models, headers, order = struct.unpack_from("<4I", model, 4)

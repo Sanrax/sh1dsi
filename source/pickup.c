@@ -6,6 +6,7 @@
 #include <string.h>
 #include "pickup.h"
 #include "glyph.h"
+#include "statue.h"
 
 typedef struct {
     int16_t x, y, z;
@@ -21,7 +22,7 @@ typedef struct {
 } Model;
 
 static Corner silverCorners[156*3], drinkCorners[124*3], kitCorners[76*3];
-static Corner chemicalCorners[188*3];
+static Corner chemicalCorners[188*3], goldCorners[156*3];
 static const struct {
     int x, z;
     unsigned flag;
@@ -32,16 +33,18 @@ static const struct {
     [HealthDrink] = {250961, 586956, DrinkHeld, drinkCorners, sizeof drinkCorners/sizeof(Corner)},
     [FirstAidKit] = {247971, 583680, KitHeld, kitCorners, sizeof kitCorners/sizeof(Corner)},
     [Chemical] = {0, 0, ChemicalTaken, chemicalCorners, sizeof chemicalCorners/sizeof(Corner)},
+    [GoldMedallion] = {0, 0, GoldHeld, goldCorners, sizeof goldCorners/sizeof(Corner)},
 };
 static Model models[sizeof pickups/sizeof pickups[0]];
 static uint16_t fontPalette[16];
-static enum { Inactive, Stopping, Kneeling, Preparing, Inspecting, Rising, LatchNotice, EmptyShelfNotice } phase;
+static enum { Inactive, Stopping, Kneeling, Preparing, Inspecting, Rising, LatchNotice,
+              EmptyShelfNotice, EmptyHandNotice } phase;
 static PickupItem activeItem;
 static unsigned ticks, selected, flash, shown;
 static unsigned collected;
 
-static Glyph latchGlyphs[24], emptyShelfGlyphs[24];
-static uint16_t latchCount, emptyShelfCount;
+static Glyph latchGlyphs[24], emptyShelfGlyphs[24], emptyHandGlyphs[48];
+static uint16_t latchCount, emptyShelfCount, emptyHandCount;
 static bool unlocked;
 
 bool pickupLoad(FILE *file, PickupItem item, unsigned textureOffset, unsigned palette)
@@ -61,10 +64,10 @@ bool pickupLoad(FILE *file, PickupItem item, unsigned textureOffset, unsigned pa
     return true;
 }
 
-static bool loadNotice(FILE *file, Glyph *glyphs, uint16_t *glyphCount)
+static bool loadNotice(FILE *file, Glyph *glyphs, unsigned capacity, uint16_t *glyphCount)
 {
     uint16_t count, length, palette[16];
-    if (fread(&count, 2, 1, file) != 1 || !count || count > 24 ||
+    if (fread(&count, 2, 1, file) != 1 || !count || count > capacity ||
         fread(&length, 2, 1, file) != 1 || count != length ||
         fread(palette, sizeof palette, 1, file) != 1 ||
         memcmp(palette, fontPalette, sizeof palette) || !glyphsRead(file, glyphs, count))
@@ -73,9 +76,11 @@ static bool loadNotice(FILE *file, Glyph *glyphs, uint16_t *glyphCount)
     return true;
 }
 
-bool latchLoad(FILE *file) { return loadNotice(file, latchGlyphs, &latchCount); }
+bool latchLoad(FILE *file) { return loadNotice(file, latchGlyphs, 24, &latchCount); }
 
-bool pickupLoadEmptyShelf(FILE *file) { return loadNotice(file, emptyShelfGlyphs, &emptyShelfCount); }
+bool pickupLoadEmptyShelf(FILE *file) { return loadNotice(file, emptyShelfGlyphs, 24, &emptyShelfCount); }
+
+bool pickupLoadEmptyHand(FILE *file) { return loadNotice(file, emptyHandGlyphs, 48, &emptyHandCount); }
 
 bool latchStart(void)
 {
@@ -123,6 +128,16 @@ void pickupStart(void)
         }
         return;
     }
+    if (roomCurrent() == ChemistryLab) {
+        if (!roomCanDissolveHand() || !statueOpened() || !playerFacingHand()) return;
+        if (collected & GoldHeld) {
+            phase = EmptyHandNotice;
+            ticks = shown = 0;
+        } else {
+            preparePickup(GoldMedallion);
+        }
+        return;
+    }
     PickupItem first, last;
     if (roomCurrent() == MusicRoom) {
         first = last = SilverMedallion;
@@ -159,10 +174,11 @@ PickupSound pickupTick(unsigned pressed)
     const unsigned promptDelay = silver ? 16 : 21;
     switch (phase) {
     case LatchNotice:
-    case EmptyShelfNotice: {
+    case EmptyShelfNotice:
+    case EmptyHandNotice: {
         // Event_DisplayMapMsgWithSfx delays the first latch glyph by 0.2 s.
         bool latch = phase == LatchNotice;
-        unsigned count = latch ? latchCount : emptyShelfCount;
+        unsigned count = latch ? latchCount : phase == EmptyHandNotice ? emptyHandCount : emptyShelfCount;
         bool advance = pressed & (KEY_A | KEY_B);
         if (latch && ++ticks < 12) break;
         if (shown < count) {
@@ -182,13 +198,15 @@ PickupSound pickupTick(unsigned pressed)
             phase = Inspecting;
         }
         break;
-    case Preparing:
+    case Preparing: {
         // The PS1 loads the item model with player control frozen.
-        if (++ticks >= (activeItem == HealthDrink ? 23u : 27u)) {
+        unsigned delay = activeItem == HealthDrink ? 23 : activeItem == GoldMedallion ? 32 : 27;
+        if (++ticks >= delay) {
             ticks = 0;
             phase = Inspecting;
         }
         break;
+    }
     case Inspecting:
         ticks++;
         if (ticks < promptDelay) break;
@@ -249,7 +267,7 @@ void pickupDrawItem(void)
         scale = silver ? (int)(age-2)*4096/15 : (int)age*4096/(chemical ? 21 : 15);
     if (scale > 4096) scale = 4096;
     glScalef32(scale, scale, scale);
-    unsigned height = silver || chemical ? TEXTURE_SIZE_64 : TEXTURE_SIZE_256;
+    unsigned height = silver || chemical || activeItem == GoldMedallion ? TEXTURE_SIZE_64 : TEXTURE_SIZE_256;
     GFX_TEX_FORMAT = m->textureAddress | (TEXTURE_SIZE_64 << 20) | (height << 23) | (GL_RGB16 << 26);
     GFX_PAL_FORMAT = m->paletteAddress;
     glPolyFmt(POLY_ALPHA(31) | POLY_CULL_FRONT | POLY_FORMAT_LIGHT0);
@@ -266,9 +284,10 @@ void pickupDrawItem(void)
 void pickupDrawPrompt(int bg)
 {
     static unsigned lastShown, lastHighlight;
-    unsigned visible = phase == LatchNotice || phase == EmptyShelfNotice || phase == Inspecting ? shown : 0;
+    unsigned visible = phase >= LatchNotice || phase == Inspecting ? shown : 0;
     const Glyph *text = phase == LatchNotice ? latchGlyphs :
-                        phase == EmptyShelfNotice ? emptyShelfGlyphs : models[activeItem].glyphs;
+                        phase == EmptyShelfNotice ? emptyShelfGlyphs :
+                        phase == EmptyHandNotice ? emptyHandGlyphs : models[activeItem].glyphs;
     if (!visible) {
         bgHide(bg);
         lastShown = 0;

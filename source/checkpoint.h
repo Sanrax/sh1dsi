@@ -5,12 +5,13 @@
 
 enum { SaveSlots = 11, PianoSolved = 1, SilverHeld = 2, LatchOpen = 4, NotebookRead = 8 };
 enum { DrinkHeld = 16, KitHeld = 32, ChemicalTaken = 64 };
-enum { PickupFlags = SilverHeld | DrinkHeld | KitHeld | ChemicalTaken };
+enum { HandOpened = 128, GoldHeld = 256 };
+enum { PickupFlags = SilverHeld | DrinkHeld | KitHeld | ChemicalTaken | GoldHeld };
 typedef struct {
     int32_t x, z;
     uint32_t ticks, saves;
-    uint16_t yaw;
-    uint8_t room, flags;
+    uint16_t yaw, flags;
+    uint8_t room;
 } Checkpoint;
 
 typedef enum { SlotEmpty, SlotReady, SlotDamaged, SlotUnavailable } SlotState;

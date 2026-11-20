@@ -7,12 +7,14 @@
 
 bool playerLoad(FILE *file, unsigned version);
 bool playerReady(void);
-typedef enum { PlayerMove, PlayerKneel, PlayerRise } PlayerAction;
+typedef enum { PlayerMove, PlayerKneel, PlayerRise, PlayerPour } PlayerAction;
 bool playerTick(int turn, int walk, PlayerAction action);
 bool playerStopped(void);
 bool playerActionDone(PlayerAction action);
 bool playerFacingPoint(int worldX, int worldZ);
 void playerWarpForMedal(void);
+void playerWarpForPour(void);
+bool playerLoadPour(FILE *file);
 bool playerFacingPiano(void);
 bool playerFacingNotebook(void);
 bool playerFacingChemical(void);

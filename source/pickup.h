@@ -2,11 +2,12 @@
 #define SH1_PICKUP_H
 #include "player.h"
 
-typedef enum { SilverMedallion, HealthDrink, FirstAidKit, Chemical } PickupItem;
+typedef enum { SilverMedallion, HealthDrink, FirstAidKit, Chemical, GoldMedallion } PickupItem;
 typedef enum { PickupQuiet, PickupMove, PickupCancel, PickupConfirm } PickupSound;
 
 bool latchLoad(FILE *file);
 bool pickupLoadEmptyShelf(FILE *file);
+bool pickupLoadEmptyHand(FILE *file);
 bool latchStart(void);
 unsigned pickupFlags(void);
 void pickupRestore(unsigned flags);

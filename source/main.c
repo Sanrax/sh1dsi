@@ -7,6 +7,7 @@
 #include "player.h"
 #include "pickup.h"
 #include "notebook.h"
+#include "statue.h"
 
 typedef struct {
     uint16_t palette[256];
@@ -199,6 +200,7 @@ int main(void)
         piano.solved = (point.flags & PianoSolved) != 0;
         medal.phase = piano.solved ? MedalFinished : MedalHanging;
         pickupRestore(point.flags);
+        statueRestore(point.flags);
     }
     bool inRoom = hasRoom;
     int previousImage = -1;
@@ -232,12 +234,16 @@ int main(void)
                 MedalPhase phase = medal.phase;
                 roomChanged |= medallionTick(&medal, pressed & KEY_START);
                 int turn = 0, walk = 0;
-                bool wasActive = pickupActive();
+                bool wasActive = pickupActive() || statueActive();
                 if (!wasActive && (medal.phase == MedalHanging || medal.phase == MedalFinished)) {
                     turn = !!(held & KEY_RIGHT) - !!(held & KEY_LEFT);
                     walk = !!(held & KEY_UP) - !!(held & KEY_DOWN);
                 }
-                roomChanged |= playerTick(turn, walk, pickupAction());
+                if (statueTick(pressed)) {
+                    inspectionFadeLength = inspectionFade = StatueRevealVBlanks;
+                    roomChanged = true;
+                }
+                roomChanged |= playerTick(turn, walk, statueCamera() ? PlayerPour : pickupAction());
                 PickupSound pickupSound = pickupTick(pressed);
                 if (pickupSound != PickupQuiet) sound = pickupSounds[pickupSound];
                 if (phase == MedalDrop && medal.phase == MedalImpact)
@@ -252,10 +258,14 @@ int main(void)
                         enteringRoom = roomChanged = true;
                         previousTime = systemCounterGetTicks();
                         debt = step;
+                    } else if ((pressed & KEY_SELECT) && statueStart()) {
+                        inspectionFade = 0;
+                        setBrightness(1, 0);
+                        roomChanged = true;
                     } else if ((pressed & KEY_A) && playerFacingNotebook()) {
                         playerSavePose(&point);
                         point.flags = (point.flags & NotebookRead) | (piano.solved ? PianoSolved : 0) |
-                                      pickupFlags() | (latchUnlocked() ? LatchOpen : 0);
+                                      pickupFlags() | statueFlags() | (latchUnlocked() ? LatchOpen : 0);
                         if (notebookMenu(assetDir, false, &point) == NotebookMissingArt)
                             stop("Missing notebook.dat");
                         roomChanged = true;
@@ -263,7 +273,7 @@ int main(void)
                         debt = step;
                     } else if (pressed & KEY_A) {
                         TowerPoint tower = playerFacingTower();
-                        bool hand = playerFacingHand();
+                        bool hand = playerFacingHand() && !(roomCanDissolveHand() && statueOpened());
                         if (tower != NoTowerPoint || hand) {
                             inspectionFadeLength = inspectionFade = hand ? handInspect(assetDir) : towerInspect(assetDir, tower);
                             if (!inspectionFade) stop(hand ? "Missing or invalid hand.dat." : "Missing or invalid tower.dat.");

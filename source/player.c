@@ -5,6 +5,7 @@
 #include "player.h"
 #include "collision.h"
 #include "room.h"
+#include "statue.h"
 
 typedef struct {
     int8_t parent, rotation, translation, offset[3];
@@ -30,12 +31,12 @@ _Static_assert(sizeof(Bone) == 6 && sizeof(Vertex) == 8 &&
                sizeof(Corner) == 4 && sizeof(Batch) == 4, "player file layout");
 
 static Bone bones[18];
-enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward, Kneel, Rise };
-static const unsigned firstFrame[] = {0, 40, 53, 66, 89, 113, 128};
-static const unsigned frameCount[] = {40, 13, 13, 23, 24, 15, 12};
-static const unsigned frameRate[] = {10, 15, 15, 22, 23, 15, 15};
-static const unsigned blendRate[] = {5, 50, 50, 50, 20, 10, 10};
-static int8_t frames[140][156];
+enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward, Kneel, Rise, Pour };
+static const unsigned firstFrame[] = {0, 40, 53, 66, 89, 113, 128, 140};
+static const unsigned frameCount[] = {40, 13, 13, 23, 24, 15, 12, 49};
+static const unsigned frameRate[] = {10, 15, 15, 22, 23, 15, 15, 15};
+static const unsigned blendRate[] = {5, 50, 50, 50, 20, 10, 10, 10};
+static int8_t frames[189][156];
 static Vertex vertices[384];
 static Corner corners[1500];
 static Batch batches[30];
@@ -262,6 +263,11 @@ bool playerStopped(void)
     return speed == 0;
 }
 
+bool playerLoadPour(FILE *file)
+{
+    return fread(frames+firstFrame[Pour], sizeof frames[0], frameCount[Pour], file) == frameCount[Pour];
+}
+
 bool playerActionDone(PlayerAction action)
 {
     return clip == (action == PlayerKneel ? Kneel : Rise) &&
@@ -278,7 +284,7 @@ bool playerTick(int turn, int walk, PlayerAction action)
     tickFraction %= 1000000;
     unsigned next = action == PlayerMove ?
         locomotion(roomVersion >= 3 ? turn : 0, roomVersion >= 4 ? walk : 0, dt) :
-        action == PlayerKneel ? Kneel : Rise;
+        action == PlayerKneel ? Kneel : action == PlayerRise ? Rise : Pour;
     advanceRoadCamera();
     if (next != clip) {
         blendFrom = firstFrame[clip] + (frameQ12 >> 12);
@@ -312,6 +318,11 @@ static void warp(int worldX, int worldZ, int heading)
 void playerWarpForMedal(void)
 {
     warp(-100*4096, 82329, 3840);
+}
+
+void playerWarpForPour(void)
+{
+    warp(-242483, 405094, 0);
 }
 
 void playerEnterRoom(SchoolRoom from)
@@ -506,6 +517,10 @@ int playerSetCamera(void)
     bool lab = room == ChemistryLab;
     int ground = collisionFloor(x, z).height;
     int origin = roomOriginX(room), originZ = roomOriginZ(room);
+    if (lab && statueCamera()) {
+        static const CameraPose pour = {-244162, -1679, 399278, -240025, -9379, 413163};
+        return setCameraPose(&pour, origin, originZ);
+    }
     if (doorView && !followingRoad) return setCameraPose(doorView, origin, originZ);
     if (equipment && x < EquipmentAisleSplit) {
         // The two fixed-angle roads overlap near the middle of the west aisle.
