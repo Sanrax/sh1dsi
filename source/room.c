@@ -25,6 +25,12 @@ typedef struct {
     uint8_t u, v;
 } Vertex;
 
+typedef struct {
+    uint32_t commands, parameters[2][3];
+} GeometryPair;
+
+_Static_assert(sizeof(Vertex) == 8 && sizeof(GeometryPair) == 7*sizeof(uint32_t), "room geometry layout");
+
 static struct {
     char magic[4];
     uint16_t pages, batches;
@@ -88,7 +94,7 @@ int roomOriginZ(SchoolRoom room)
 }
 
 static Batch batches[128];
-static Vertex *vertices;
+static GeometryPair *geometry;
 
 static bool upload(FILE *file, void *vram, unsigned size)
 {
@@ -100,6 +106,31 @@ static bool upload(FILE *file, void *vram, unsigned size)
             return false;
         memcpy((uint8_t *)vram + pos, buf, n);
         pos += n;
+    }
+    return true;
+}
+
+static bool loadGeometry(FILE *file, GeometryPair *out, unsigned quads)
+{
+    // Each FIFO word encodes the texture coordinate and position commands
+    // for two vertices. Keep the sidecar layout independent of the FIFO.
+    enum { ChunkQuads = 32 };
+    Vertex vertices[4*ChunkQuads];
+    while (quads) {
+        unsigned count = quads < ChunkQuads ? quads : ChunkQuads;
+        if (fread(vertices, sizeof(Vertex)*4, count, file) != count) return false;
+        for (unsigned i = 0; i < count*4; i += 2) {
+            out->commands = FIFO_COMMAND_PACK(FIFO_TEX_COORD, FIFO_VERTEX16,
+                                              FIFO_TEX_COORD, FIFO_VERTEX16);
+            for (unsigned j = 0; j < 2; j++) {
+                const Vertex *v = &vertices[i+j];
+                out->parameters[j][0] = ((uint32_t)v->v << 20) | ((uint32_t)v->u << 4);
+                out->parameters[j][1] = ((uint32_t)(uint16_t)v->y << 16) | (uint16_t)v->x;
+                out->parameters[j][2] = (uint32_t)(int32_t)v->z;
+            }
+            out++;
+        }
+        quads -= count;
     }
     return true;
 }
@@ -212,7 +243,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
                  !pickupLoadEmptyHand(file)))
         return false;
 
-    // One tightly packed stream in RAM. The file length bounds every batch read.
+    // Derive the command buffer size from the validated on-card vertex count.
     long start = ftell(file);
     if (start < 0 || fseek(file, 0, SEEK_END)) return false;
     long bytes = ftell(file) - start - (long)(header.batches * sizeof(Batch));
@@ -220,10 +251,11 @@ bool roomLoad(FILE *file, SchoolRoom room)
     if (bytes <= 0 || bytes > maxVerts*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)) ||
         fseek(file, start, SEEK_SET))
         return false;
-    free(vertices);
-    vertices = malloc(bytes);
-    if (!vertices) return false;
     unsigned pos = 0, total = bytes / sizeof(Vertex);
+    size_t geometryBytes = total/2 * sizeof(*geometry);
+    free(geometry);
+    geometry = malloc(geometryBytes);
+    if (!geometry) return false;
     unsigned maxState = pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
                         corridor ? StaticBatch : FallenSilverBatch;
     for (unsigned i = 0; i < header.batches; i++) {
@@ -232,11 +264,12 @@ bool roomLoad(FILE *file, SchoolRoom room)
             b->state > maxState || b->flags > (room == Courtyard ? 7 : 3) || b->palette >= pages[b->page].palettes ||
             ((chemical || pour) && b->page >= scenePages) ||
             b->quads > (total-pos)/4 ||
-            fread(vertices+pos, sizeof(Vertex)*4, b->quads, file) != b->quads)
+            !loadGeometry(file, geometry+pos/2, b->quads))
             return false;
         pos += 4*b->quads;
     }
     if (pos != total) return false;
+    DC_FlushRange(geometry, geometryBytes);
     current = room;
     handPresent = hand || pour;
     handPuzzle = pour;
@@ -281,7 +314,7 @@ void roomDraw(const Medallion *medal)
     glClearPolyID(63);
     glClearDepth(0x7fff);
     glColor(RGB15(31,31,31));
-    const Vertex *v = vertices;
+    const GeometryPair *pairs = geometry;
     if (playerReady()) {
         GFX_TEX_FORMAT = (skin.offset >> 3) | (TEXTURE_SIZE_256 << 20)
                          | (TEXTURE_SIZE_256 << 23) | (GL_RGB16 << 26);
@@ -301,8 +334,8 @@ void roomDraw(const Medallion *medal)
     };
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];
-        unsigned count = 4*b->quads;
-        if (visible[b->state]) {
+        unsigned count = 2*b->quads;
+        if (count && visible[b->state]) {
             bool moving = b->state == HangingSilverBatch && medal->phase >= MedalSwing;
             if (moving) {
                 // SHR1 stores the hanging model with its Q8 pivot baked in.
@@ -321,14 +354,15 @@ void roomDraw(const Medallion *medal)
             // PS1 visible faces wind clockwise in these screen coordinates.
             glPolyFmt(POLY_ALPHA((b->flags & 1) ? 16 : 31) | POLY_CULL_FRONT);
             glBegin(GL_QUADS);
-            for (unsigned j = 0; j < count; j++) {
-                glTexCoord2t16(v[j].u << 4, v[j].v << 4);
-                glVertex3v16(v[j].x, v[j].y, v[j].z);
-            }
+            // The buffer was flushed once at load time. Wait before the
+            // CPU issues another geometry command or changes matrices.
+            while (dmaBusy(0)) {}
+            dmaSetParams(0, pairs, (void *)&GFX_FIFO, DMA_FIFO | (count*sizeof(*pairs)/4));
+            while (dmaBusy(0)) {}
             glEnd();
             if (moving) glPopMatrix(1);
         }
-        v += count;
+        pairs += count;
     }
     statueDrawSmoke();
     pickupDrawItem();

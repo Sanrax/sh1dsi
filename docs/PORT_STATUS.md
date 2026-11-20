@@ -70,6 +70,36 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | melonDS rotating Chemical with prompt | 300 scene intervals | 16.713 / 33.318 / 33.432 ms min/mean/max, 4.748 ms mean ARM9 submission time |
 | melonDS statue close camera | 271 scene intervals | 16.711 / 33.368 / 34.249 ms min/mean/max, 4.014 ms mean ARM9 submission time |
 
+## Room geometry submission
+
+- The loader packs the room vertices into geometry FIFO commands and
+  flushes the data cache once. DMA submits each visible batch in its
+  original order. The existing local sidecars work with this build.
+- In melonDS DSi mode, each case sampled 128 scene intervals. Mean
+  intervals stayed at 33.43 ms in the music room and courtyard and
+  33.30 ms at the infirmary desk.
+
+| Scene | Previous mean submission | Packed mean submission |
+| --- | --- | --- |
+| Music room | 2.94 ms | 2.02 ms |
+| Moving medallion | 2.94 ms | 2.00 ms |
+| Courtyard entrance | 6.98 ms | 3.74 ms |
+| Courtyard below the ramp | 7.00 ms | 3.66 ms |
+| Infirmary desk | 3.99 ms | 2.43 ms |
+
+- All 49,152 pixels matched in each of six comparisons covering the music
+  room, moving medallion, two courtyard views and both infirmary item
+  states. Collecting the infirmary items changed 541 pixels in both builds
+  at the fixed diagnostic view.
+- The courtyard geometry buffer grew from 82.75 to 144.81 KiB, and its
+  emulator room-load sample rose from 45.80 to 47.98 ms. The music-room
+  buffer grew from 24.69 to 43.20 KiB. Real hardware timing is pending.
+- The production ROM streamed the music room and its corridor in both
+  directions over DLDI. The virtual console SD replay crossed from the
+  infirmary through the southern hall to the courtyard, turned and
+  returned through the southern door. Both retained their expected
+  spawn poses, inventory state and black lower screen.
+
 ## Scene and interaction checks
 
 - The top screen uses the native 256×192 viewport. Harry has 19 meshes and
