@@ -257,6 +257,24 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   Both modes reported 16 MB; physical storage remains untested.
   [Upstream SD controller fix](https://github.com/melonDS-emu/melonDS/pull/2438)
 
+### Boot and notebook timing
+
+- The notebook renderer writes two RGB555 pixels per aligned word. Across
+  three cold launches with a saved slot in melonDS DSi mode, median time
+  from the app timer starting to the first load-list draw fell from 75.95
+  to 70.63 ms on virtual console SD and from 151.18 to 145.86 ms on DLDI.
+  The first notebook draw saved 5.32 ms on both paths. With an empty card,
+  first scene submission took 71.69 ms on virtual console SD and 138.59 ms
+  on DLDI in both builds.
+- The timed save runs created and verified a generation in 6.78–7.18 ms
+  and overwrote and verified it in 2.05–3.02 ms. Selecting Continue to
+  first scene submission measured 35.25 ms on virtual console SD and
+  51.97 ms on DLDI. Physical storage timings remain pending.
+- Production replays on both paths cancelled creation, created and
+  overwrote a slot, checked both record generations and cold-loaded the
+  desk pose and flags. Ten menu captures per path matched after masking
+  the elapsed-time field on the final cold load.
+
 ## Infirmary pickups
 
 - MAP1_S00 points 97 and 98 use the original standing pickup flow, with

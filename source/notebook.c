@@ -95,10 +95,15 @@ static void showIntro(const Art *a, uint16_t *screen)
     }
 }
 
-static void page(const Art *a, uint16_t *screen)
+static ARM_CODE void page(const Art *a, uint16_t *screen)
 {
-    for (unsigned i = 0; i < sizeof a->image; i++)
-        screen[i] = a->colors[a->image[i]] | BIT(15);
+    // The bitmap base is word-aligned. Set the opaque bit on both pixels.
+    volatile uint32_t *out = (volatile uint32_t *)screen;
+    for (unsigned i = 0; i < sizeof a->image; i += 2) {
+        uint32_t left = a->colors[a->image[i]];
+        uint32_t right = a->colors[a->image[i+1]];
+        *out++ = left | (right << 16) | 0x80008000u;
+    }
 }
 
 typedef enum { Browse, Confirm, WriteError, Saved } MenuState;
