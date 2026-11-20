@@ -358,8 +358,9 @@ def school_room(disc, room=39):
             for offset in range(start+2*axis, start+32, 8):
                 struct.pack_into("<h", group, offset, depth+side*2*vertex_scale)
 
-    # Preserve a two-Q8-unit gap for the music-room posters, including
-    # vertices shared by several triangles of the same decoration.
+    # The music-room walls can still win depth tests with a two-Q8-unit
+    # gap at oblique views. Clamp the posters to a larger clearance,
+    # keeping shared corners together across their triangles.
     for (axis, depth, side), bounds, group, start in music_decorations:
         left, right, bottom, top = bounds
         for delta in range(-2*vertex_scale, 2*vertex_scale+1, vertex_scale):
@@ -367,7 +368,7 @@ def school_room(disc, room=39):
             if not any(b[0] <= left and b[1] >= right and b[2] <= bottom and b[3] >= top
                        for b in walls[axis, wall, side]):
                 continue
-            minimum = side*wall + 2*vertex_scale
+            minimum = side*wall + 12*vertex_scale
             for offset in range(start+2*axis, start+32, 8):
                 coord, = struct.unpack_from("<h", group, offset)
                 struct.pack_into("<h", group, offset, side*max(side*coord, minimum))

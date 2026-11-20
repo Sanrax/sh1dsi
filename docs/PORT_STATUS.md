@@ -283,14 +283,17 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 
 ## Music-room posters
 
-- Conversion gives the music-room decoration vertices 7.8 mm of wall
-  clearance. The fix covers 25 additional faces, including tilted quads
-  and triangles. It preserves their textures and UVs.
-- At 13 matched camera positions on each wall in melonDS DSi mode, the
-  west poster previously disappeared from the sampled region three times.
-  Both sampled posters stayed visible at all 13 positions with the fix.
-  The production ROM booted into the music room and passed the corridor
-  exit and return over DLDI with the regenerated room data.
+- Conversion gives 35 decoration faces 46.9 mm of wall clearance. It
+  moves their vertices along the wall normal and preserves the textures,
+  UVs, batch counts and file size.
+- Across 144 matched camera positions in melonDS DSi mode, the previous
+  7.8 mm clearance let the walls cover 8,025 marked poster pixels. The
+  new clearance matched all 133,538 visible poster pixels in the
+  comparison with the backing walls hidden. The ROM and all other data
+  files were byte-identical on regeneration.
+- The production ROM booted with the regenerated data and passed the
+  music-room corridor round trip over DLDI in melonDS 1.1 and virtual
+  console SD in `361ffa9`. The lower screen stayed black.
 
 ## Equipment room
 

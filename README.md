@@ -23,6 +23,9 @@ Run `make sdcard` after conversion. Copy the contents of `dist/` to the
 card root. The directory includes the ROM and fifteen local data files. Keep
 the generated game data on your own devices.
 
+For the music-room poster fix, replace `/sh1dsi/room.dat` on the card with
+the regenerated `dist/sh1dsi/room.dat`.
+
 The build starts with Harry standing at Midwich's piano. Up and Down walk forward and backward.
 Left and Right turn him. Face the keys and press A to inspect the piano, then A again
 to examine the keyboard. Move the cursor with the D-pad and
