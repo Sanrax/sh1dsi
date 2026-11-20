@@ -116,6 +116,23 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - The production build also passed the music-room corridor round trip over
   DLDI and the courtyard round trip over virtual console SD.
 
+## Animated character submission
+
+- The actor draw uses ARM instructions for the fixed-point math and packs
+  each transformed position once for the indexed corners. The packed
+  position buffer adds 768 bytes. [GCC ARM function attributes](https://gcc.gnu.org/onlinedocs/gcc-11.5.0/gcc/ARM-Function-Attributes.html)
+- Over 64 draws of each of ten poses in melonDS DSi mode, mean actor draw
+  time fell from 1.233 to 1.073 ms. Bone interpolation fell from 0.112 to
+  0.096 ms and vertex transforms from 0.350 to 0.196 ms. Geometry submission
+  rose from 0.771 to 0.780 ms. Scene intervals averaged about 33.4 ms.
+- The ten held poses matched every bone matrix, transformed vertex and
+  top-screen pixel. The host check matched all 332 positions in each of
+  8,316 frame and blend samples across the eight clips.
+- The production DLDI run solved the piano and took the silver medallion
+  through the kneeling inspection. A separate DLDI run passed the corridor
+  round trip. The virtual console SD run walked and turned in the courtyard
+  and returned to the southern hall.
+
 ## Scene and interaction checks
 
 - The top screen uses the native 256×192 viewport. Harry has 19 meshes and

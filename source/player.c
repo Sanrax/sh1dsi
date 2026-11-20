@@ -672,16 +672,25 @@ static void skeleton(Matrix world[18])
     }
 }
 
-void playerDraw(unsigned firstPalette)
+typedef struct {
+    uint32_t xy;
+    int32_t z;
+} PackedPosition;
+
+ARM_CODE void playerDraw(unsigned firstPalette)
 {
     Matrix world[18];
-    static int16_t positions[384][3];
+    static PackedPosition positions[384];
     skeleton(world);
     for (unsigned i = 0; i < vertexCount; i++) {
         const Vertex *v = &vertices[i];
         const Matrix *m = &world[v->bone];
-        for (unsigned j = 0; j < 3; j++)
-            positions[i][j] = (m->t[j] + dot(m->r[j], v->xyz)) * (j ? -8 : 8);
+        // Pack once per transformed vertex, before the indexed corners reuse it.
+        uint16_t px = (m->t[0] + dot(m->r[0], v->xyz)) * 8;
+        uint16_t py = (m->t[1] + dot(m->r[1], v->xyz)) * -8;
+        int16_t pz = (m->t[2] + dot(m->r[2], v->xyz)) * -8;
+        positions[i].xy = px | ((uint32_t)py << 16);
+        positions[i].z = pz;
     }
 
     glPushMatrix();
@@ -696,9 +705,10 @@ void playerDraw(unsigned firstPalette)
         GFX_PAL_FORMAT = 2*(firstPalette + b->palette);
         glBegin(b->sides == 3 ? GL_TRIANGLES : GL_QUADS);
         for (unsigned j = 0; j < b->count; j++, c++) {
-            const int16_t *v = positions[c->vertex];
+            const PackedPosition *v = &positions[c->vertex];
             glTexCoord2t16(c->u << 4, c->v << 4);
-            glVertex3v16(v[0], v[1], v[2]);
+            GFX_VERTEX16 = v->xy;
+            GFX_VERTEX16 = v->z;
         }
         glEnd();
     }
