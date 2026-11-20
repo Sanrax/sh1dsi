@@ -50,6 +50,7 @@ static FILE *openRoom(SchoolRoom room)
     case NorthHall: name = "north"; break;
     case UpperNorthHall: name = "uppernorth"; break;
     case ChemistryLab: name = "laboratory"; break;
+    case EquipmentRoom: name = "equipment"; break;
     case Infirmary: name = "infirmary"; break;
     case Courtyard: name = "courtyard"; break;
     default: return NULL;

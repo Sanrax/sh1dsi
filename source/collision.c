@@ -76,6 +76,7 @@ bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles)
     case NorthHall: edgeCount = 24; break;
     case UpperNorthHall: edgeCount = 32; break;
     case ChemistryLab: edgeCount = 30; break;
+    case EquipmentRoom: edgeCount = 32; break;
     case EastCorridor: edgeCount = 43; break;
     case SchoolCorridor: edgeCount = 20; break;
     case MusicRoom: edgeCount = 51; break;

@@ -90,6 +90,7 @@ def prepare(cue):
         north = school_room(disc, 16)
         upper_north = school_room(disc, 33)
         laboratory = school_room(disc, 34)
+        equipment = school_room(disc, 35)
         courtyard = school_room(disc, 23)
         infirmary = school_room(disc, 9)
     write_asset(OUTPUT.with_name("notebook.dat"), notebook)
@@ -103,6 +104,7 @@ def prepare(cue):
     write_asset(OUTPUT.with_name("north.dat"), north)
     write_asset(OUTPUT.with_name("uppernorth.dat"), upper_north)
     write_asset(OUTPUT.with_name("laboratory.dat"), laboratory)
+    write_asset(OUTPUT.with_name("equipment.dat"), equipment)
     write_asset(OUTPUT.with_name("courtyard.dat"), courtyard)
     write_asset(OUTPUT.with_name("infirmary.dat"), infirmary)
 

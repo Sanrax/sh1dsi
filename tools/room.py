@@ -14,7 +14,8 @@ def collision_edges(ipd, room):
                 31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0),
                 13: (30720, 0, 80, 12, 80, 0), 9: (10240, 30720, 45, 11, 49, 0),
                 23: (-10240, -20480, 204, 61, 236, 0), 16: (30720, 40960, 33, 6, 34, 0),
-                33: (-10240, 40960, 40, 8, 40, 0), 34: (-20480, 20480, 38, 5, 38, 15)}[room]
+                33: (-10240, 40960, 40, 8, 40, 0), 34: (-20480, 20480, 38, 5, 38, 15),
+                35: (-30720, 20480, 40, 7, 40, 0)}[room]
     if (x, z, vertices, surfaces, count, cylinders) != expected:
         raise ValueError("unexpected school collision header")
     output = bytearray()
@@ -42,6 +43,9 @@ def collision_edges(ipd, room):
         if room == 33 and 24 <= i < 32:
             continue
         if room == 34 and 22 <= i < 30:
+            continue
+        # The equipment room starts with eight edges outside the inner shell.
+        if room == 35 and i < 8:
             continue
         # The infirmary walls meet at shared splits. Keep their exposed faces.
         if room == 9 and other != 255:
@@ -174,7 +178,7 @@ def vertical_rectangle(points):
 
 def school_room(disc, room=39):
     cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3),
-              23: (255, 254), 16: (3, 4), 33: (255, 4), 34: (254, 2)}[room]
+              23: (255, 254), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2)}[room]
     data = disc.read(f"BG/SC{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -365,7 +369,7 @@ def school_room(disc, room=39):
                       item_page=page)
     if room != 39:
         magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 16: b"SHU1", 23: b"SHY2", 31: b"SHE1",
-                 32: b"SHC1", 33: b"SHH1", 34: b"SHL1"}[room]
+                 32: b"SHC1", 33: b"SHH1", 34: b"SHL1", 35: b"SHQ1"}[room]
         extra = b""
         if room == 9:
             extra = medical_pickups(disc)

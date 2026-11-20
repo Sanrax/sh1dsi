@@ -49,20 +49,26 @@ static bool ready, halfFrame;
 static int roadEyeX, roadEyeZ, entryX, entryZ;
 static bool followingRoad, doorRail;
 typedef struct {
-    SchoolRoom room, from;
     int x, y, z, watchX, watchY, watchZ;
+} CameraPose;
+typedef struct {
+    SchoolRoom room, from;
+    CameraPose camera;
 } DoorView;
-// Measured through-door poses for the courtyard and upstairs hallways.
+// Measured views at the courtyard and upstairs doors.
 static const DoorView doorViews[] = {
-    {Courtyard, SouthHall, -80691, -10451, -280786, -80899, -6046, -258222},
-    {Courtyard, NorthHall, -80691, -10451, -216468, -80449, -5852, -238997},
-    {NorthHall, Courtyard, 546816, -8003, 772695, 546561, -3404, 795226},
-    {UpperNorthHall, EastCorridor, -62457, -7987, 784384, -84986, -3388, 784129},
-    {UpperNorthHall, ChemistryLab, -118374, -7987, 789511, -118145, -3388, 766982},
-    {EastCorridor, UpperNorthHall, -209115, -7987, 292864, -186584, -3388, 293117}
+    {Courtyard, SouthHall, {-80691, -10451, -280786, -80899, -6046, -258222}},
+    {Courtyard, NorthHall, {-80691, -10451, -216468, -80449, -5852, -238997}},
+    {NorthHall, Courtyard, {546816, -8003, 772695, 546561, -3404, 795226}},
+    {UpperNorthHall, EastCorridor, {-62457, -7987, 784384, -84986, -3388, 784129}},
+    {UpperNorthHall, ChemistryLab, {-118374, -7987, 789511, -118145, -3388, 766982}},
+    {EastCorridor, UpperNorthHall, {-209115, -7987, 292864, -186584, -3388, 293117}},
+    {EquipmentRoom, UpperNorthHall, {-402816, -8601, 413736, -403915, -2816, 401473}},
+    {UpperNorthHall, EquipmentRoom, {-131481, -7987, 789512, -131252, -3388, 766982}}
 };
-static const DoorView *doorView;
+static const CameraPose *doorView;
 static bool eastLabRoad;
+enum { EquipmentAisleSplit = -407552 };
 
 static int limitToRoad(int value, int low, int high)
 {
@@ -125,7 +131,8 @@ static void advanceRoadCamera(void)
     // Leave the entry view as Harry walks out along the road. The small
     // chase road places the ideal eye two metres away, twelve degrees to
     // one side of the heading opposite Harry (vcMakeIdealCamPosUseVC_ROAD_DATA).
-    if (abs(x-entryX) > 8192 || abs(z-entryZ) > 8192) followingRoad = true;
+    if (abs(x-entryX) > 8192 || abs(z-entryZ) > 8192 ||
+        (roomCurrent() == EquipmentRoom && x < EquipmentAisleSplit)) followingRoad = true;
     if (!followingRoad) return;
     int angle = (yaw + 2048 - 136)*8;
     int sx = x + 2*sinLerp(angle), sz = z + 2*cosLerp(angle);
@@ -141,6 +148,9 @@ static void advanceRoadCamera(void)
     } else if (roomCurrent() == UpperNorthHall) {
         sx = limitChaseAxis(sx, -139520, -60928);
         sz = limitChaseAxis(sz, 777728, 788736);
+    } else if (roomCurrent() == EquipmentRoom) {
+        sx = limitChaseAxis(sx, -404736, -400896);
+        sz = limitChaseAxis(sz, 399360, 420096);
     } else if (roomCurrent() == Courtyard) {
         // MAP1_S00 courtyard chase road bounds.
         sx = limitChaseAxis(sx, -111616, -50176);
@@ -330,9 +340,9 @@ void playerEnterRoom(SchoolRoom from)
             for (unsigned j = 0; j < sizeof doorViews/sizeof doorViews[0]; j++) {
                 const DoorView *view = &doorViews[j];
                 if (view->room != d->room || view->from != from) continue;
-                doorView = view;
-                roadEyeX = view->x;
-                roadEyeZ = view->z;
+                doorView = &view->camera;
+                roadEyeX = doorView->x;
+                roadEyeZ = doorView->z;
                 doorRail = true;
                 return;
             }
@@ -460,6 +470,15 @@ bool playerFacingPoint(int worldX, int worldZ)
     return along > 0 && abs(dx*sz-dz*sx) <= (int)(((int64_t)along*2365) >> 12);
 }
 
+static int setCameraPose(const CameraPose *view, int origin, int originZ)
+{
+    int height = -view->y/2;
+    gluLookAtf32((view->x-origin)/2, height, (originZ-view->z)/2,
+                 (view->watchX-origin)/2, -view->watchY/2,
+                 (originZ-view->watchZ)/2, 0,4096,0);
+    return height;
+}
+
 int playerSetCamera(void)
 {
     // vcMakeNormalWatchTgtPos / vcSetWatchTgtXzPos, small chase road.
@@ -467,18 +486,21 @@ int playerSetCamera(void)
     // the distance to Harry is below four metres.
     SchoolRoom room = roomCurrent();
     bool corridor = room == SchoolCorridor || room == SouthHall || room == NorthHall || room == UpperNorthHall;
+    bool equipment = room == EquipmentRoom;
     bool stairwell = room == EastCorridor || room == FirstFloor;
     bool infirmary = room == Infirmary;
     bool courtyard = room == Courtyard;
     bool lab = room == ChemistryLab;
     int ground = collisionFloor(x, z).height;
     int origin = roomOriginX(room), originZ = roomOriginZ(room);
-    if (doorView && !followingRoad) {
-        int height = -doorView->y/2;
-        gluLookAtf32((doorView->x-origin)/2, height, (originZ-doorView->z)/2,
-                     (doorView->watchX-origin)/2, -doorView->watchY/2,
-                     (originZ-doorView->watchZ)/2, 0,4096,0);
-        return height;
+    if (doorView && !followingRoad) return setCameraPose(doorView, origin, originZ);
+    if (equipment && x < EquipmentAisleSplit) {
+        // The two fixed-angle roads overlap near the middle of the west aisle.
+        static const CameraPose westAisle[] = {
+            {-409856, -11059, 415744, -415184, -6691, 400864},
+            {-409856, -9622, 403712, -413552, -870, 417040}
+        };
+        return setCameraPose(&westAisle[z >= 409600], origin, originZ);
     }
     if (room == MusicRoom && x >= -419840 && x <= -416768 && z >= 94976 && z <= 98304) {
         // Fixed-angle road looking back through the music-room doorway.
@@ -498,7 +520,7 @@ int playerSetCamera(void)
         eyeZ = eastLabRoad ? 402176 : 419328;
         eyeHeight = 4608;
         targetHeight = 1408;
-    } else if (corridor || stairwell || courtyard) {
+    } else if (corridor || stairwell || courtyard || equipment) {
         eyeX = roadEyeX;
         eyeZ = roadEyeZ;
         bool rail = doorRail && !followingRoad;
@@ -515,7 +537,7 @@ int playerSetCamera(void)
         targetX += dx * extra / length;
         targetZ += dz * extra / length;
     }
-    if ((corridor || stairwell || infirmary || courtyard || lab) && length && !(doorRail && !followingRoad)) {
+    if ((corridor || stairwell || infirmary || courtyard || lab || equipment) && length && !(doorRail && !followingRoad)) {
         // vcAdjCamOfsAngByCharaInScreen keeps Harry's feet inside the
         // vertical half-angle atan(224/224)/2. Work in slopes to avoid
         // converting the ray to Euler angles and back.

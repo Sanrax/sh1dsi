@@ -45,6 +45,8 @@ const Door schoolDoors[] = {
     {UpperNorthHall, EastCorridor, -61030, 784384, -1, 0, 3584},
     {UpperNorthHall, ChemistryLab, -118374, 790937, 0, -1, 2304},
     {ChemistryLab, UpperNorthHall, -261324, 396492, 0, 1, 2304},
+    {UpperNorthHall, EquipmentRoom, -131481, 790937, 0, -1, 2304},
+    {EquipmentRoom, UpperNorthHall, -403865, 396492, 0, 1, 2304},
     {SouthHall, Courtyard, 573440, 95027, 0, -1, 4864},
     {Courtyard, SouthHall, -80691, -282214, 0, 1, 4864},
     {Courtyard, NorthHall, -80691, -215040, 0, -1, 4864},
@@ -56,7 +58,8 @@ SchoolRoom roomCurrent(void) { return current; }
 int roomOriginX(SchoolRoom room)
 {
     switch (room) {
-    case MusicRoom: return -100*4096;
+    case MusicRoom:
+    case EquipmentRoom: return -100*4096;
     case Courtyard:
     case UpperNorthHall:
     case SchoolCorridor: return -20*4096;
@@ -74,7 +77,7 @@ int roomOriginZ(SchoolRoom room)
 {
     if (room == Infirmary) return 140*4096;
     if (room == NorthHall || room == UpperNorthHall) return 180*4096;
-    if (room == ChemistryLab) return 100*4096;
+    if (room == ChemistryLab || room == EquipmentRoom) return 100*4096;
     if (room == Courtyard) return -60*4096;
     return (room == EastCorridor || room == FirstFloor ? 60 : 20)*4096;
 }
@@ -106,6 +109,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     if (room == NorthHall) magic = "SHU1";
     if (room == UpperNorthHall) magic = "SHH1";
     if (room == ChemistryLab) magic = "SHL1";
+    if (room == EquipmentRoom) magic = "SHQ1";
     if (room == Infirmary) magic = "SHI1";
     if (room == Courtyard) magic = "SHY1";
     if (fread(&header, sizeof header, 1, file) != 1) return false;

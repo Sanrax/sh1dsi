@@ -5,7 +5,8 @@ or skip the falling silver medallion, decline or accept it, walk through the
 eastern hallway, descend the stairs, unlatch the first-floor door and enter
 the southern hallway. The courtyard connects the southern and northern halls.
 Harry can inspect the clock tower door and both medallion slots.
-Upstairs, the east corridor connects through the north hall to the chemistry lab.
+Upstairs, the east corridor connects through the north hall to the chemistry lab
+and equipment room.
 In the infirmary he can pick up both medical supplies and use the notebook.
 A cold boot can resume at the desk with the puzzle,
 door latch and pickups intact. The full game remains unplayable.
@@ -13,8 +14,8 @@ door latch and pickups intact. The full game remains unplayable.
 ## Build and media
 
 - BlocksDS 1.24.0 and Wonderful GCC 16.2.0 produce a TWL-exclusive ROM
-  (unit code 3). The converter reproduces all thirteen local data files byte for
-  byte.
+  (unit code 3). A forced rebuild and repeat conversion reproduced the ROM
+  and all fourteen local data files byte for byte.
 - USA 1.1 CUE, one MODE2/2352 track, 616,494,480 bytes, SHA-1
   `34278d31d9b9b12b3b5db5e45bcbe548991ecbc7`. Non-XA file entries agreed
   with upstream silentassets. All converted data stays on the owner's machine.
@@ -47,6 +48,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | PS1 northern hallway entry and walk to the return door | 206 buffer-change intervals | 1 at 16.68 ms, 203 at 33.37 ms and 2 at 50.05 ms. Mean 33.45 ms |
 | PS1 upstairs north hall on the way to the lab | 392 buffer-change intervals | 372 at 33.37 ms and 20 at 50.05 ms. Mean 34.22 ms |
 | PS1 chemistry lab entry and turn | 101 buffer-change intervals | All 33.37 ms |
+| PS1 equipment room entry and return approach | 87 buffer-change intervals | 60 at 33.37 ms and 27 at 50.05 ms. Mean 38.54 ms |
 | melonDS idle music room with Harry | 300 scene submissions | 16.715 / 33.317 / 33.432 ms min/mean/max, 2.893 ms mean ARM9 submission time |
 | melonDS rotating silver pickup with prompt | 300 scene intervals | 16.713 / 33.374 / 33.432 ms min/mean/max, 3.291 ms mean ARM9 submission time |
 | melonDS idle corridor after collecting the medallion | 300 scene intervals | 16.713 / 33.317 / 33.432 ms min/mean/max, 4.137 ms mean ARM9 submission time |
@@ -60,6 +62,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | melonDS northern hallway entry, walk and turn | 300 scene intervals | 16.711 / 33.374 / 33.443 ms min/mean/max, 3.756 ms mean ARM9 submission time |
 | melonDS upstairs north hall entry, walk and turn | 300 scene intervals | 16.719 / 33.374 / 33.443 ms min/mean/max, 3.869 ms mean ARM9 submission time |
 | melonDS chemistry lab from entry to the east aisle | 300 scene intervals | 16.713 / 33.374 / 33.447 ms min/mean/max, 3.702 ms mean ARM9 submission time |
+| melonDS equipment room from entry to the west aisle | 300 scene intervals | 16.719 / 33.374 / 33.445 ms min/mean/max, 4.413 ms mean ARM9 submission time |
 
 ## Scene and interaction checks
 
@@ -280,10 +283,27 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   The production ROM booted into the music room and passed the corridor
   exit and return over DLDI with the regenerated room data.
 
+## Equipment room
+
+- MAP1_S01 points 46 and 50 connect the upstairs hall to room 35. SCFD02
+  supplies 1,424 quads, 32 collision edges and three paletted texture pages
+  occupying 80 KiB. The west aisle uses two measured PS1 views with an
+  approximate switch point. The original replay had fog disabled.
+- The production ROM reached the Chemical shelf and returned to the hall
+  in melonDS DSi mode on both DLDI and virtual console SD. Both door poses
+  matched PS1 at Q12 X/Z (−403865, 398130), yaw 0, and (−131481, 789299),
+  yaw 2048. Whole-frame mean RGB error was 19.0/255 on entry, 16.2/255 at
+  the shelf in the SD replay and 18.5/255 on return. The lower screen stayed
+  black.
+- The PS1 Chemical event declined with flag 68 clear and item 96 absent,
+  then accepted with the flag set and one item added. The prompt reached
+  full scale after 48–49 VBlanks. The native room supports traversal while
+  the pickup is pending.
+
 ## Next
 
-1. Connect the lab equipment room through MAP1_S01 points 46 and 50.
-2. Port the Chemical pickup and the hand statue event that releases the gold medallion.
+1. Port the Chemical pickup using MAP1_S01 event 5, flag 68 and item 96.
+2. Port the hand statue event that consumes the Chemical and releases the gold medallion.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
