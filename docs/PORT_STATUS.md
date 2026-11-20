@@ -100,6 +100,22 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   returned through the southern door. Both retained their expected
   spawn poses, inventory state and black lower screen.
 
+### Compact vertex commands
+
+- Each batch starts with a full vertex and uses two-coordinate commands
+  where an axis matches the preceding vertex. The host check decoded
+  all 67,096 vertices and UVs in the eleven room streams exactly.
+  [BlocksDS vertex commands](https://blocksds.skylyrac.net/libnds/videoGL_8h.html)
+- Six matched melonDS frames were pixel-identical, including the moving
+  medallion and both infirmary item states. Decoding the DMA buffers
+  from those runs also matched every vertex, UV and batch boundary.
+- The courtyard allocation fell from 144.82 to 108.80 KiB and the music
+  room from 43.21 to 32.76 KiB. Mean courtyard submission below the ramp
+  fell from 3.62 to 3.35 ms over 128 intervals. Scene intervals averaged
+  33.30–33.43 ms. The courtyard's sampled load rose from 48.70 to 52.12 ms.
+- The production build also passed the music-room corridor round trip over
+  DLDI and the courtyard round trip over virtual console SD.
+
 ## Scene and interaction checks
 
 - The top screen uses the native 256×192 viewport. Harry has 19 meshes and
