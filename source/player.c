@@ -85,6 +85,49 @@ static int limitChaseAxis(int value, int low, int high)
     return limitToRoad(value, low+clearance, high-clearance);
 }
 
+enum { MaxChaseClearance = 4*4096 };
+
+// vcFlipFromCamExclusionArea uses a radius of 1.3 m behind Harry and
+// up to 4 m in front. Interpolate against the cosine to stay in Q12.
+static bool insideChaseClearance(int dx, int dz, int facingX, int facingZ)
+{
+    static const int cosine[] = {4096, 3784, 2896, 1567, 0, -1567, -2896, -3784, -4096};
+    static const int radius[] = {16384, 16384, 15155, 13107, 11059, 9420, 7782, 6144, 5324};
+    if (abs(dx) >= MaxChaseClearance || abs(dz) >= MaxChaseClearance) return false;
+    int distance = sqrt32(dx*dx + dz*dz);
+    if (!distance) return true;
+    int dot = limitToRoad((dx*facingX + dz*facingZ)/distance, -4096, 4096);
+    unsigned span = 1;
+    while (dot < cosine[span]) span++;
+    int clearance = radius[span] + (radius[span-1]-radius[span])*(dot-cosine[span]) /
+                    (cosine[span-1]-cosine[span]);
+    return distance < clearance;
+}
+
+static int firstFloorChaseZ(int aimX, int aimZ, int low, int high)
+{
+    int dx = aimX-x, dz = aimZ-z;
+    int facingX = sinLerp(yaw*8), facingZ = cosLerp(yaw*8);
+    // If moving to the other side would pass too close, stay on the
+    // current side of Harry and seek clearance along the corridor.
+    bool south = dz < 0;
+    if (south != (roadEyeZ < z) && insideChaseClearance(dx, 0, facingX, facingZ)) {
+        south = roadEyeZ < z;
+        dz = 0;
+    }
+    if (!insideChaseClearance(dx, dz, facingX, facingZ)) return aimZ;
+
+    int minDistance = abs(dz), maxDistance = MaxChaseClearance;
+    while (maxDistance-minDistance > 64) {
+        int trial = (minDistance+maxDistance)/2;
+        if (insideChaseClearance(dx, south ? -trial : trial, facingX, facingZ))
+            minDistance = trial;
+        else
+            maxDistance = trial;
+    }
+    return limitChaseAxis(z + (south ? -maxDistance : maxDistance), low, high);
+}
+
 // MAP1_S00 camera_paths: two fixed positions and a higher priority road by
 // the cabinet. Horizontal bounds and camera coordinates use the PS1 Q4 units.
 typedef struct {
@@ -158,7 +201,7 @@ static void advanceRoadCamera(void)
         sz = limitChaseAxis(sz, -280576, -217088);
     } else if (roomCurrent() == FirstFloor) {
         sx = limitChaseAxis(sx, 437760, 449536);
-        sz = limitChaseAxis(sz, 174080, 299264);
+        sz = firstFloorChaseZ(sx, limitChaseAxis(sz, 174080, 299264), 174080, 299264);
     } else {
         sx = limitChaseAxis(sx, -208384, -197376);
         sz = limitChaseAxis(sz, 175104, 299008);

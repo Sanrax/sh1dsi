@@ -257,6 +257,17 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   RGB error was 21.0/255 before the fix and 22.6/255 with the wall clearance.
 - The final ROM kept the camera inside at four headings beside that wall
   on virtual console SD. The north round trip passed again over DLDI.
+- The first-floor chase now uses the PS1's heading-dependent clearance to
+  keep the camera away from Harry while it stays within the authored road.
+  At Q12 X/Z (444000, 250000), facing east, its horizontal distance rose
+  from 0.67 m to 2.49 m. The same PS1 pose measured 2.38 m. The native
+  look target went from 3.62 m below the floor to 0.69 m above it, matching
+  the PS1 target height. Mean whole-frame RGB error fell from 28.1 to
+  26.6/255. Camera motion during turns still differs.
+- The production DLDI replay walked into the first-floor hall, turned and
+  crossed the stairs in both directions with the original warp poses.
+  A shorter virtual console SD replay also passed both stair transitions.
+  The southern hall still has a close approach to check in a separate pass.
 
 ## Chemistry lab route
 
