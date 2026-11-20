@@ -5,6 +5,7 @@ or skip the falling silver medallion, decline or accept it, walk through the
 eastern hallway, descend the stairs, unlatch the first-floor door and enter
 the southern hallway. The courtyard connects the southern and northern halls.
 Harry can inspect the clock tower door and both medallion slots.
+Upstairs, the east corridor connects through the north hall to the chemistry lab.
 In the infirmary he can pick up both medical supplies and use the notebook.
 A cold boot can resume at the desk with the puzzle,
 door latch and pickups intact. The full game remains unplayable.
@@ -12,7 +13,7 @@ door latch and pickups intact. The full game remains unplayable.
 ## Build and media
 
 - BlocksDS 1.24.0 and Wonderful GCC 16.2.0 produce a TWL-exclusive ROM
-  (unit code 3). The converter reproduces all eleven local data files byte for
+  (unit code 3). The converter reproduces all thirteen local data files byte for
   byte.
 - USA 1.1 CUE, one MODE2/2352 track, 616,494,480 bytes, SHA-1
   `34278d31d9b9b12b3b5db5e45bcbe548991ecbc7`. Non-XA file entries agreed
@@ -44,6 +45,8 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | PS1 health drink and first-aid kit events | 130 drink and 126 kit buffer-change intervals | Drink had 9 at 33.37 ms and 121 at 50.05 ms. Kit intervals were all 50.05 ms |
 | PS1 courtyard entry, walk and return approach | 183 buffer-change intervals | 45 at 33.37 ms, 117 at 50.05 ms and 21 at 66.73 ms. Mean 47.86 ms |
 | PS1 northern hallway entry and walk to the return door | 206 buffer-change intervals | 1 at 16.68 ms, 203 at 33.37 ms and 2 at 50.05 ms. Mean 33.45 ms |
+| PS1 upstairs north hall on the way to the lab | 392 buffer-change intervals | 372 at 33.37 ms and 20 at 50.05 ms. Mean 34.22 ms |
+| PS1 chemistry lab entry and turn | 101 buffer-change intervals | All 33.37 ms |
 | melonDS idle music room with Harry | 300 scene submissions | 16.715 / 33.317 / 33.432 ms min/mean/max, 2.893 ms mean ARM9 submission time |
 | melonDS rotating silver pickup with prompt | 300 scene intervals | 16.713 / 33.374 / 33.432 ms min/mean/max, 3.291 ms mean ARM9 submission time |
 | melonDS idle corridor after collecting the medallion | 300 scene intervals | 16.713 / 33.317 / 33.432 ms min/mean/max, 4.137 ms mean ARM9 submission time |
@@ -55,6 +58,8 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | melonDS infirmary health drink | 300 scene submissions during the pickup event | 16.713 / 33.374 / 33.432 ms min/mean/max, 4.263 ms mean ARM9 submission time |
 | melonDS courtyard entry, straight walk and turn | 300 scene intervals | 16.711 / 33.318 / 33.457 ms min/mean/max, 6.911 ms mean ARM9 submission time |
 | melonDS northern hallway entry, walk and turn | 300 scene intervals | 16.711 / 33.374 / 33.443 ms min/mean/max, 3.756 ms mean ARM9 submission time |
+| melonDS upstairs north hall entry, walk and turn | 300 scene intervals | 16.719 / 33.374 / 33.443 ms min/mean/max, 3.869 ms mean ARM9 submission time |
+| melonDS chemistry lab from entry to the east aisle | 300 scene intervals | 16.713 / 33.374 / 33.447 ms min/mean/max, 3.702 ms mean ARM9 submission time |
 
 ## Scene and interaction checks
 
@@ -244,17 +249,30 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - The final ROM kept the camera inside at four headings beside that wall
   on virtual console SD. The north round trip passed again over DLDI.
 
-## Gold medallion route reference
+## Chemistry lab route
 
 - The PS1 replay used upstairs east corridor point 52 to enter room 33 at
   Q12 X/Z (−62668, 784384), yaw 3072. It crossed to point 45 and entered
-  chemistry lab room 34 at (−261324, 398130), yaw 0. The lab event requires
-  the Chemical item before it releases the gold medallion.
+  chemistry lab room 34 at (−261324, 398130), yaw 0. The return through
+  points 49 and 42 spawned at (−118374, 789299), yaw 2048, then
+  (−208896, 292864), yaw 1024.
+- The production ROM walked this route from the piano and matched all four
+  PS1 door poses in melonDS DSi mode with DLDI and virtual console SD.
+  Mean entry and return RGB errors were 19.1, 12.8, 19.8 and 15.3 out of
+  255. The PS1 replay had fog off in both rooms. Lighting still differs.
+- SCFF04 streams 1,166 quads and 32 collision edges. SCFE02 streams 1,083
+  quads, 30 edges and the 15 original obstacle cylinders. Each room uses
+  64 KiB of textures. The lab uses its two original camera positions, and
+  the melonDS replay verified the switch when crossing to the east aisle.
+- At the west bench, melonDS stopped 7 mm from the PS1 stop. A host check
+  backed away within the narrow aisle and reached the same contact again.
+- The lab event requires the Chemical item before it releases the gold
+  medallion. The current lab build supports traversal and collision.
 
 ## Next
 
-1. Connect upstairs rooms 31, 33 and 34 through the verified doors.
-2. Port medallion placement and its clock tower state changes.
+1. Connect the lab equipment room through MAP1_S01 points 46 and 50.
+2. Port the Chemical pickup and the hand statue event that releases the gold medallion.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

@@ -13,7 +13,8 @@ def collision_edges(ipd, room):
     expected = {39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
                 31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0),
                 13: (30720, 0, 80, 12, 80, 0), 9: (10240, 30720, 45, 11, 49, 0),
-                23: (-10240, -20480, 204, 61, 236, 0), 16: (30720, 40960, 33, 6, 34, 0)}[room]
+                23: (-10240, -20480, 204, 61, 236, 0), 16: (30720, 40960, 33, 6, 34, 0),
+                33: (-10240, 40960, 40, 8, 40, 0), 34: (-20480, 20480, 38, 5, 38, 15)}[room]
     if (x, z, vertices, surfaces, count, cylinders) != expected:
         raise ValueError("unexpected school collision header")
     output = bytearray()
@@ -37,6 +38,11 @@ def collision_edges(ipd, room):
         # SC0304's inner shell follows the usable hallway around its alcove.
         if room == 16 and (floor == 1 or (floor == 0 and not 5 <= i <= 12)):
             continue
+        # Use the inner shell and the furniture silhouettes on both floors.
+        if room == 33 and 24 <= i < 32:
+            continue
+        if room == 34 and 22 <= i < 30:
+            continue
         # The infirmary walls meet at shared splits. Keep their exposed faces.
         if room == 9 and other != 255:
             continue
@@ -58,6 +64,13 @@ def collision_edges(ipd, room):
         scale = 16 if room == 39 else 1
         output.extend(struct.pack("<6h", (ax-5120)*scale, (az-5120)*scale,
                                   (bx-5120)*scale, (bz-5120)*scale, tx, tz))
+    if room == 34:
+        cylinder_offset, = struct.unpack_from("<I", collision, 0x18)
+        for i in range(cylinders):
+            flags, px, py, pz, radius = struct.unpack_from("<H4h", collision, cylinder_offset+10*i)
+            if flags != 1 or py != -147 or not 0 < radius < 256:
+                raise ValueError("unexpected lab obstacle cylinder")
+            output.extend(struct.pack("<3h", px-5120, pz-5120, radius))
     if room != 23:
         return output
 
@@ -144,7 +157,7 @@ def vertical_rectangle(points):
 
 def school_room(disc, room=39):
     cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3),
-              23: (255, 254), 16: (3, 4)}[room]
+              23: (255, 254), 16: (3, 4), 33: (255, 4), 34: (254, 2)}[room]
     data = disc.read(f"BG/SC{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -309,7 +322,8 @@ def school_room(disc, room=39):
             add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-10240, y>>4, (z>>4)-30720), state,
                       item_page=page)
     if room != 39:
-        magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 16: b"SHU1", 23: b"SHY2", 31: b"SHE1", 32: b"SHC1"}[room]
+        magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 16: b"SHU1", 23: b"SHY2", 31: b"SHE1",
+                 32: b"SHC1", 33: b"SHH1", 34: b"SHL1"}[room]
         extra = b""
         if room == 9:
             extra = medical_pickups(disc)

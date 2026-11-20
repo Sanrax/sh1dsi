@@ -41,6 +41,10 @@ const Door schoolDoors[] = {
     {SouthHall, FirstFloor, 612761, 81920, -1, 0, 3584},
     {SouthHall, Infirmary, 591462, 75366, 0, 1, 2304},
     {Infirmary, SouthHall, 233472, 589004, 0, -1, 2304},
+    {EastCorridor, UpperNorthHall, -210534, 292864, 1, 0, 3584},
+    {UpperNorthHall, EastCorridor, -61030, 784384, -1, 0, 3584},
+    {UpperNorthHall, ChemistryLab, -118374, 790937, 0, -1, 2304},
+    {ChemistryLab, UpperNorthHall, -261324, 396492, 0, 1, 2304},
     {SouthHall, Courtyard, 573440, 95027, 0, -1, 4864},
     {Courtyard, SouthHall, -80691, -282214, 0, 1, 4864},
     {Courtyard, NorthHall, -80691, -215040, 0, -1, 4864},
@@ -54,7 +58,9 @@ int roomOriginX(SchoolRoom room)
     switch (room) {
     case MusicRoom: return -100*4096;
     case Courtyard:
+    case UpperNorthHall:
     case SchoolCorridor: return -20*4096;
+    case ChemistryLab:
     case EastCorridor: return -60*4096;
     case FirstFloor: return 100*4096;
     case Infirmary: return 60*4096;
@@ -67,7 +73,8 @@ int roomOriginX(SchoolRoom room)
 int roomOriginZ(SchoolRoom room)
 {
     if (room == Infirmary) return 140*4096;
-    if (room == NorthHall) return 180*4096;
+    if (room == NorthHall || room == UpperNorthHall) return 180*4096;
+    if (room == ChemistryLab) return 100*4096;
     if (room == Courtyard) return -60*4096;
     return (room == EastCorridor || room == FirstFloor ? 60 : 20)*4096;
 }
@@ -97,6 +104,8 @@ bool roomLoad(FILE *file, SchoolRoom room)
     if (room == EastCorridor) magic = "SHE1";
     if (room == SouthHall) magic = "SHS1";
     if (room == NorthHall) magic = "SHU1";
+    if (room == UpperNorthHall) magic = "SHH1";
+    if (room == ChemistryLab) magic = "SHL1";
     if (room == Infirmary) magic = "SHI1";
     if (room == Courtyard) magic = "SHY1";
     if (fread(&header, sizeof header, 1, file) != 1) return false;
@@ -109,7 +118,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     enum { ItemPageBytes = 64*256/2, ItemPageOffset = 128*1024-ItemPageBytes };
     if (items && header.textureBytes < ItemPageBytes) return false;
     unsigned sceneBytes = header.textureBytes - (items ? ItemPageBytes : 0);
-    unsigned scenePages = room == SchoolCorridor ? 2 : 3;
+    unsigned scenePages = room == SchoolCorridor || room == UpperNorthHall || room == ChemistryLab ? 2 : 3;
     if (latchText) magic = firstFloorObstacles ? "SHF3" : "SHF2";
     if (southHallObstacles) magic = "SHS2";
     if (towerFloors) magic = "SHY2";
