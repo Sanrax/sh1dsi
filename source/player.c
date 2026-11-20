@@ -19,6 +19,10 @@ typedef struct {
     uint8_t u, v;
 } Corner;
 typedef struct {
+    uint32_t commands;
+    uint32_t parameters[2][3];
+} VertexPair;
+typedef struct {
     uint8_t palette, sides;
     uint16_t count;
 } Batch;
@@ -40,6 +44,7 @@ static int8_t frames[189][156];
 static Vertex vertices[384];
 static Corner corners[1500];
 static Batch batches[30];
+static VertexPair *pairs;
 static uint16_t vertexCount, batchCount;
 static unsigned clip, frameQ12, blendQ12, blendFrom, tickFraction;
 static int x = -409605, z = 81765, yaw = 1024;
@@ -246,19 +251,25 @@ bool playerLoad(FILE *file, unsigned version)
         if (vertices[i].bone >= 18)
             return false;
     }
-    unsigned next = 0;
+    unsigned next = 0, mostPairs = 0;
     for (unsigned i = 0; i < batchCount; i++) {
         Batch *b = &batches[i];
         if (fread(b, sizeof *b, 1, file) != 1 || b->palette >= 15 ||
             (b->sides != 3 && b->sides != 4) || b->count % b->sides ||
             b->count > 1500-next || fread(corners+next, sizeof(Corner), b->count, file) != b->count)
             return false;
+        unsigned count = b->count/2;
+        if (mostPairs < count) mostPairs = count;
         next += b->count;
     }
     for (unsigned i = 0; i < next; i++) {
         if (corners[i].vertex >= vertexCount)
             return false;
     }
+    VertexPair *buffer = mostPairs ? malloc(mostPairs*sizeof(*buffer)) : NULL;
+    if (mostPairs && !buffer) return false;
+    free(pairs);
+    pairs = buffer;
     ready = true;
     return true;
 }
@@ -704,11 +715,30 @@ ARM_CODE void playerDraw(unsigned firstPalette)
         const Batch *b = &batches[i];
         GFX_PAL_FORMAT = 2*(firstPalette + b->palette);
         glBegin(b->sides == 3 ? GL_TRIANGLES : GL_QUADS);
-        for (unsigned j = 0; j < b->count; j++, c++) {
+        unsigned count = b->count/2;
+        for (unsigned j = 0; j < count; j++, c += 2) {
+            VertexPair *pair = &pairs[j];
+            pair->commands = FIFO_COMMAND_PACK(FIFO_TEX_COORD, FIFO_VERTEX16, FIFO_TEX_COORD, FIFO_VERTEX16);
+            for (unsigned k = 0; k < 2; k++) {
+                const PackedPosition *v = &positions[c[k].vertex];
+                pair->parameters[k][0] = ((uint32_t)c[k].v << 20) | ((uint32_t)c[k].u << 4);
+                pair->parameters[k][1] = v->xy;
+                pair->parameters[k][2] = v->z;
+            }
+        }
+        if (count) {
+            unsigned bytes = count*sizeof(*pairs);
+            DC_FlushRange(pairs, bytes);
+            while (dmaBusy(0)) {}
+            dmaSetParams(0, pairs, (void *)&GFX_FIFO, DMA_FIFO | (bytes/sizeof(uint32_t)));
+            while (dmaBusy(0)) {}
+        }
+        if (b->count & 1) {
             const PackedPosition *v = &positions[c->vertex];
             glTexCoord2t16(c->u << 4, c->v << 4);
             GFX_VERTEX16 = v->xy;
             GFX_VERTEX16 = v->z;
+            c++;
         }
         glEnd();
     }

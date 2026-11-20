@@ -133,6 +133,19 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   round trip. The virtual console SD run walked and turned in the courtyard
   and returned to the southern hall.
 
+### Actor geometry DMA
+
+- Each palette batch sends pairs of textured vertices through the geometry
+  FIFO. One scratch buffer serves all batches and uses 4,480 bytes for
+  the current model. Odd batches send their last vertex directly.
+- In melonDS DSi mode, 64 draws at each of ten fixed poses across three
+  rooms reduced mean actor draw time from 1.038 to 0.983 ms. Submission,
+  including packing and cache maintenance, fell from 0.741 to 0.695 ms.
+  Mean scene intervals were 33.35 ms in both builds. All ten 256×192
+  frames matched pixel for pixel. Real hardware timing remains pending.
+- The production build passed the music-room corridor round trip over
+  DLDI and the courtyard round trip over virtual console SD.
+
 ## Scene and interaction checks
 
 - The top screen uses the native 256×192 viewport. Harry has 19 meshes and
