@@ -157,56 +157,61 @@ static void updateInfirmaryCamera(void)
     else if (distances[next] < distances[infirmaryRoad]-1433) infirmaryRoad = next;
 }
 
+enum { ChaseArea, ChaseAlongX, ChaseAlongZ };
+
+typedef struct {
+    int16_t minX, maxX, minZ, maxZ;
+    uint8_t axis;
+} ChaseRoad;
+
+// Horizontal bounds in the original camera roads' Q4 units.
+static const ChaseRoad chaseRoads[MusicRoom] = {
+    [FirstFloor]    = {1710, 1756,   680, 1169, ChaseAlongZ},
+    [SouthHall]     = {2086, 2393,   294,  337, ChaseAlongX},
+    [NorthHall]     = {1982, 2289,  3043, 3089, ChaseAlongX},
+    [Courtyard]     = {-436, -196, -1096, -848, ChaseArea},
+    [EastCorridor]  = {-814, -771,   684, 1168, ChaseAlongZ},
+    [SchoolCorridor] = {-473, -166,   294,  345, ChaseAlongX},
+    [UpperNorthHall] = {-545, -238,  3038, 3081, ChaseAlongX},
+    [EquipmentRoom] = {-1581, -1566, 1560, 1641, ChaseAlongZ}
+};
+
 static void advanceRoadCamera(void)
 {
-    if (roomCurrent() == Infirmary) {
+    SchoolRoom room = roomCurrent();
+    if (room == Infirmary) {
         updateInfirmaryCamera();
         return;
     }
-    if (roomCurrent() == ChemistryLab) {
+    if (room == ChemistryLab) {
         // MAP1_S01 switches between two stationary chase roads in the lab.
         int split = -246784;
         eastLabRoad = x > split + (eastLabRoad ? -1433 : 1433);
         return;
     }
-    if (roomCurrent() == MusicRoom) return;
+    if (room == MusicRoom) return;
     // Leave the entry view as Harry walks out along the road. The small
     // chase road places the ideal eye two metres away, twelve degrees to
     // one side of the heading opposite Harry (vcMakeIdealCamPosUseVC_ROAD_DATA).
     if (abs(x-entryX) > 8192 || abs(z-entryZ) > 8192 ||
-        (roomCurrent() == EquipmentRoom && x < EquipmentAisleSplit)) followingRoad = true;
+        (room == EquipmentRoom && x < EquipmentAisleSplit)) followingRoad = true;
     if (!followingRoad) return;
     int angle = (yaw + 2048 - 136)*8;
     int sx = x + 2*sinLerp(angle), sz = z + 2*cosLerp(angle);
-    if (roomCurrent() == SchoolCorridor) {
-        sx = limitChaseAxis(sx, -121088, -42496);
-        sz = limitChaseAxis(sz, 75264, 88320);
-    } else if (roomCurrent() == SouthHall) {
-        sx = limitChaseAxis(sx, 534016, 612608);
-        sz = limitChaseAxis(sz, 75264, 86272);
-        int offset = chaseAxisOffset(sx-x, sz-z, roadEyeX-x, sinLerp(yaw*8), cosLerp(yaw*8));
-        sx = limitChaseAxis(x+offset, 534016, 612608);
-    } else if (roomCurrent() == NorthHall) {
-        sx = limitChaseAxis(sx, 507392, 585984);
-        sz = limitChaseAxis(sz, 779008, 790784);
-    } else if (roomCurrent() == UpperNorthHall) {
-        sx = limitChaseAxis(sx, -139520, -60928);
-        sz = limitChaseAxis(sz, 777728, 788736);
-    } else if (roomCurrent() == EquipmentRoom) {
-        sx = limitChaseAxis(sx, -404736, -400896);
-        sz = limitChaseAxis(sz, 399360, 420096);
-    } else if (roomCurrent() == Courtyard) {
-        // MAP1_S00 courtyard chase road bounds.
-        sx = limitChaseAxis(sx, -111616, -50176);
-        sz = limitChaseAxis(sz, -280576, -217088);
-    } else if (roomCurrent() == FirstFloor) {
-        sx = limitChaseAxis(sx, 437760, 449536);
-        sz = limitChaseAxis(sz, 174080, 299264);
-        int offset = chaseAxisOffset(sz-z, sx-x, roadEyeZ-z, cosLerp(yaw*8), sinLerp(yaw*8));
-        sz = limitChaseAxis(z+offset, 174080, 299264);
-    } else {
-        sx = limitChaseAxis(sx, -208384, -197376);
-        sz = limitChaseAxis(sz, 175104, 299008);
+    const ChaseRoad *road = &chaseRoads[room];
+    int minX = road->minX*256, maxX = road->maxX*256;
+    int minZ = road->minZ*256, maxZ = road->maxZ*256;
+    sx = limitChaseAxis(sx, minX, maxX);
+    sz = limitChaseAxis(sz, minZ, maxZ);
+    if (road->axis != ChaseArea) {
+        int facingX = sinLerp(yaw*8), facingZ = cosLerp(yaw*8);
+        if (road->axis == ChaseAlongX) {
+            int offset = chaseAxisOffset(sx-x, sz-z, roadEyeX-x, facingX, facingZ);
+            sx = limitChaseAxis(x+offset, minX, maxX);
+        } else {
+            int offset = chaseAxisOffset(sz-z, sx-x, roadEyeZ-z, facingZ, facingX);
+            sz = limitChaseAxis(z+offset, minZ, maxZ);
+        }
     }
     roadEyeX += (sx-roadEyeX)/10;
     roadEyeZ += (sz-roadEyeZ)/10;

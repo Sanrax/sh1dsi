@@ -281,6 +281,22 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - The production routes entered from the infirmary, turned in the hall
   and crossed through the courtyard doors in both directions over DLDI
   and virtual console SD. Both routes preserved the inventory and latch.
+- The music-room corridor, eastern hallway, both north halls and eastern
+  equipment aisle now apply the same clearance along each road's long
+  axis. Across ten matched views, horizontal distance rose from
+  0.39–0.86 m to 2.37–2.69 m. The PS1 measured 2.26–3.35 m. All ten
+  native look targets were above the floor after the change. Four of the
+  five initial views moved closer to the PS1 in whole-frame RGB error.
+  The eastern hallway rose from 23.78 to 24.15/255.
+- Across 320 melonDS scene intervals after the turns, the mean was
+  33.33 ms before and after. Mean ARM9 submission was 4.23 ms in both
+  builds. The original samples mostly used 33.37 ms intervals and
+  included 50.05 ms intervals in the eastern hallway and equipment aisle.
+- The production DLDI run walked from the music room to the equipment
+  aisle and returned to the upstairs north hall. The virtual console SD
+  run crossed the courtyard, turned in the downstairs north hall and
+  returned through the same door. Both verified the original spawn poses
+  and a black lower screen.
 
 ## Chemistry lab route
 
