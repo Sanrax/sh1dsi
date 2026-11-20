@@ -369,12 +369,15 @@ def school_room(disc, room=39):
                       item_page=page)
     if room != 39:
         magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 16: b"SHU1", 23: b"SHY2", 31: b"SHE1",
-                 32: b"SHC1", 33: b"SHH1", 34: b"SHL1", 35: b"SHQ2"}[room]
+                 32: b"SHC1", 33: b"SHH1", 34: b"SHL2", 35: b"SHQ2"}[room]
         extra = b""
         if room == 9:
             extra = medical_pickups(disc)
         elif room == 12:
             extra = prompt_data(disc, 13, first_floor=True, choices=False)
+        elif room == 34:
+            # The intact hand sits at (-59.2, -1.0, 99.5) in MAP1_S01.
+            add_model(b"HAND_HID", (4096,0,0,0,4096,0,0,0,4096), (5324,-256,4992))
         elif room == 35:
             # Map_WorldObjectsInit places ACID_HID at (-101.2, -1.3, 100.3).
             add_model(b"ACID_HID", (4096,0,0,0,4096,0,0,0,4096), (4812,-333,5196), 5)

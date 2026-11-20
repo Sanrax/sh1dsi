@@ -2,7 +2,7 @@
 #define SH1_PLAYER_H
 #include "room.h"
 #include "checkpoint.h"
-#include "tower.h"
+#include "inspection.h"
 #include <stdio.h>
 
 bool playerLoad(FILE *file, unsigned version);
@@ -16,6 +16,7 @@ void playerWarpForMedal(void);
 bool playerFacingPiano(void);
 bool playerFacingNotebook(void);
 bool playerFacingChemical(void);
+bool playerFacingHand(void);
 TowerPoint playerFacingTower(void);
 void playerSavePose(Checkpoint *point);
 void playerRestorePose(const Checkpoint *point);

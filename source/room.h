@@ -16,6 +16,7 @@ extern const Door schoolDoors[];
 extern const unsigned schoolDoorCount;
 
 SchoolRoom roomCurrent(void);
+bool roomHasHand(void);
 int roomOriginX(SchoolRoom room);
 int roomOriginZ(SchoolRoom room);
 bool roomLoad(FILE *file, SchoolRoom room);

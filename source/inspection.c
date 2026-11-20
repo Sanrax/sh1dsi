@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Adapted from the MAP1_S00 tower events and Event_DisplayMapMsgWithBg.
+// Adapted from the school inspections and Event_DisplayMapMsgWithBg.
 // Copyright (C) 2026 shdecompilations
 #include <nds.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include "glyph.h"
-#include "tower.h"
+#include "inspection.h"
 
 typedef struct {
     uint16_t palette[256];
@@ -24,16 +24,21 @@ typedef struct {
     Message lock, inscription;
 } Art;
 
-static bool readMessage(FILE *file, uint32_t offset, Message *text)
+static bool readMessage(FILE *file, Message *text)
 {
-    if (offset < 20+3*sizeof(Background) || offset >= 200*1024 ||
-        fseek(file, offset, SEEK_SET) || fread(text, offsetof(Message, glyphs), 1, file) != 1 ||
+    if (fread(text, offsetof(Message, glyphs), 1, file) != 1 ||
         !text->count || text->count > sizeof text->glyphs/sizeof text->glyphs[0] || text->count != text->length)
         return false;
     return glyphsRead(file, text->glyphs, text->count);
 }
 
-static bool readArt(const char *dir, TowerPoint point, Art *art)
+static bool readTowerMessage(FILE *file, uint32_t offset, Message *text)
+{
+    return offset >= 20+3*sizeof(Background) && offset < 200*1024 &&
+           !fseek(file, offset, SEEK_SET) && readMessage(file, text);
+}
+
+static bool readTower(const char *dir, TowerPoint point, Art *art)
 {
     char path[64];
     snprintf(path, sizeof path, "%s/tower.dat", dir);
@@ -44,8 +49,8 @@ static bool readArt(const char *dir, TowerPoint point, Art *art)
     bool ok = fread(&header, sizeof header, 1, file) == 1 && !memcmp(header.magic, "SHT1", 4) &&
               !fseek(file, sizeof header + (point-TowerDoor)*sizeof(Background), SEEK_SET) &&
               fread(&art->scene, sizeof art->scene, 1, file) == 1 &&
-              readMessage(file, header.text[point], &art->inscription);
-    if (ok && point == TowerDoor) ok = readMessage(file, header.text[0], &art->lock);
+              readTowerMessage(file, header.text[point], &art->inscription);
+    if (ok && point == TowerDoor) ok = readTowerMessage(file, header.text[0], &art->lock);
     fclose(file);
     return ok;
 }
@@ -115,18 +120,25 @@ static void drawBackground(uint16_t *screen, const Background *image)
     }
 }
 
-unsigned towerInspect(const char *dir, TowerPoint point)
+static bool readHand(const char *dir, Art *art)
 {
-    Art *art = malloc(sizeof *art);
-    if (!art || !readArt(dir, point, art)) {
-        free(art);
-        return 0;
-    }
+    char path[64], magic[4];
+    snprintf(path, sizeof path, "%s/hand.dat", dir);
+    FILE *file = fopen(path, "rb");
+    if (!file) return false;
+    bool ok = fread(magic, sizeof magic, 1, file) == 1 && !memcmp(magic, "SHV1", 4) &&
+              fread(&art->scene, sizeof art->scene, 1, file) == 1 &&
+              readMessage(file, &art->inscription) && fgetc(file) == EOF && !ferror(file);
+    fclose(file);
+    return ok;
+}
 
+static void inspect(const Art *art, bool locked, unsigned roomFade, unsigned imageFade)
+{
     int bg = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     bgSetPriority(bg, 0);
     uint16_t *screen = bgGetGfxPtr(bg);
-    if (point == TowerDoor) {
+    if (locked) {
         // MAP1_S00 event 10 waits 0.3 s before the room message.
         for (unsigned i = 0; i < 21; i++) input();
         dmaFillHalfWords(0, screen, 256*192*2);
@@ -135,21 +147,37 @@ unsigned towerInspect(const char *dir, TowerPoint point)
         bgHide(bg);
     }
 
-    // USA trace from prompt to black, then the displayed image to full light.
-    unsigned roomFade = point == TowerDoor ? 60 : 57;
     fade(roomFade, true);
     bgHide(0);
     drawBackground(screen, &art->scene);
     bgShow(bg);
-    fade(33, false);
+    fade(imageFade, false);
     showMessage(screen, &art->inscription, 1);
-    fade(33, true);
+    fade(imageFade, true);
 
     bgHide(bg);
     bgInit(3, BgType_Bmp8, BgSize_B8_256x256, 0, 0);
     bgSetPriority(bg, 0);
     bgHide(bg);
     bgShow(0);
+}
+
+unsigned towerInspect(const char *dir, TowerPoint point)
+{
+    Art *art = malloc(sizeof *art);
+    bool ok = art && readTower(dir, point, art);
+    // USA trace from the prompt to black, then the image to full light.
+    unsigned roomFade = point == TowerDoor ? 60 : 57;
+    if (ok) inspect(art, point == TowerDoor, roomFade, 33);
     free(art);
-    return roomFade;
+    return ok ? roomFade : 0;
+}
+
+unsigned handInspect(const char *dir)
+{
+    Art *art = malloc(sizeof *art);
+    bool ok = art && readHand(dir, art);
+    if (ok) inspect(art, false, 33, 42);
+    free(art);
+    return ok ? 33 : 0;
 }

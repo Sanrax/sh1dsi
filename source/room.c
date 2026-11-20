@@ -30,6 +30,7 @@ static struct {
 } header;
 static Page pages[4], skin;
 static SchoolRoom current = MusicRoom;
+static bool handPresent;
 
 // MAP1_S00 and MAP1_S01 door points. Normals point into the room.
 const Door schoolDoors[] = {
@@ -55,6 +56,7 @@ const Door schoolDoors[] = {
 const unsigned schoolDoorCount = sizeof schoolDoors/sizeof schoolDoors[0];
 
 SchoolRoom roomCurrent(void) { return current; }
+bool roomHasHand(void) { return current == ChemistryLab && handPresent; }
 int roomOriginX(SchoolRoom room)
 {
     switch (room) {
@@ -119,6 +121,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     bool latchText = firstFloorObstacles || (room == FirstFloor && !memcmp(header.magic, "SHF2", 4));
     bool medical = room == Infirmary && !memcmp(header.magic, "SHI3", 4);
     bool chemical = room == EquipmentRoom && !memcmp(header.magic, "SHQ2", 4);
+    bool hand = room == ChemistryLab && !memcmp(header.magic, "SHL2", 4);
     bool infirmaryItems = medical || (room == Infirmary && !memcmp(header.magic, "SHI2", 4));
     bool items = chemical || infirmaryItems;
     unsigned itemBytes = chemical ? 64*64/2 : infirmaryItems ? 64*256/2 : 0;
@@ -131,6 +134,7 @@ bool roomLoad(FILE *file, SchoolRoom room)
     if (towerFloors) magic = "SHY2";
     if (infirmaryItems) magic = medical ? "SHI3" : "SHI2";
     if (chemical) magic = "SHQ2";
+    if (hand) magic = "SHL2";
     if ((corridor ? (memcmp(header.magic, magic, 4) || header.pages != scenePages + items || !playerReady() ||
                      sceneBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
          !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
@@ -216,8 +220,10 @@ bool roomLoad(FILE *file, SchoolRoom room)
             return false;
         pos += 4*b->quads;
     }
+    if (pos != total) return false;
     current = room;
-    return pos == total;
+    handPresent = hand;
+    return true;
 }
 
 void roomDraw(const Medallion *medal)

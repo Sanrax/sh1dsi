@@ -6,7 +6,7 @@ eastern hallway, descend the stairs, unlatch the first-floor door and enter
 the southern hallway. The courtyard connects the southern and northern halls.
 Harry can inspect the clock tower door and both medallion slots.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
-and equipment room. Harry can collect the Chemical from the equipment shelf.
+and equipment room. Harry can collect the Chemical and inspect the hand statue.
 In the infirmary he can pick up both medical supplies and use the notebook.
 A cold boot can resume at the desk with the puzzle,
 door latch and pickups intact. The full game remains unplayable.
@@ -15,7 +15,7 @@ door latch and pickups intact. The full game remains unplayable.
 
 - BlocksDS 1.24.0 and Wonderful GCC 16.2.0 produce a TWL-exclusive ROM
   (unit code 3). A forced rebuild and repeat conversion reproduced the ROM
-  and all fourteen local data files byte for byte.
+  and the local data files byte for byte.
 - USA 1.1 CUE, one MODE2/2352 track, 616,494,480 bytes, SHA-1
   `34278d31d9b9b12b3b5db5e45bcbe548991ecbc7`. Non-XA file entries agreed
   with upstream silentassets. All converted data stays on the owner's machine.
@@ -272,7 +272,10 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - At the west bench, melonDS stopped 7 mm from the PS1 stop. A host check
   backed away within the narrow aisle and reached the same contact again.
 - The lab event requires the Chemical item before it releases the gold
-  medallion. The current lab build supports traversal and collision.
+  medallion. The intact hand adds 83 original SCFE02 quads. The production
+  DLDI replay walked around the benches, opened the hand close-up with A,
+  then dismissed it with B. Mean RGB error was 1.18/255 and all 271 sampled
+  bright text pixels matched the PS1 close-up. The lower screen stayed black.
 
 ## Music-room posters
 

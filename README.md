@@ -20,7 +20,7 @@ python3 tools/prepare_assets.py "/path/to/Silent Hill (USA).cue"
 ```
 
 Run `make sdcard` after conversion. Copy the contents of `dist/` to the
-card root. The directory includes the ROM and fourteen local data files. Keep
+card root. The directory includes the ROM and fifteen local data files. Keep
 the generated game data on your own devices.
 
 The build starts with Harry standing at Midwich's piano. Up and Down walk forward and backward.
@@ -37,7 +37,8 @@ second-floor hallway. Follow it past the stair landing to the far double
 doors to reach the upstairs north hall. Its two single doors lead to the
 chemistry lab and equipment room. In the equipment room, go around the
 near end of the central shelves and face the Chemical bottle on the west
-shelf. Press A to inspect it and choose Yes to take it. Walk onto the stair
+shelf. Press A to inspect it and choose Yes to take it. In the lab, face the
+hand on the bench and press A to inspect it. Walk onto the stair
 landing in the second-floor hallway to reach the first floor, and turn back
 up the stairs to return.
 On the first floor, face the double

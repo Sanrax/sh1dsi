@@ -396,13 +396,13 @@ SchoolRoom playerDestination(bool action)
     return room;
 }
 
-static bool facingXEdge(int edgeX, int edgeZ, int halfWidth, int direction)
+static bool facingEdge(int edgeX, int edgeZ, int halfWidth, int nx, int nz)
 {
     // Event_CollideObbFacingCheck intersects a half-metre facing ray
-    // with a north-south interaction edge.
+    // with an axis-aligned interaction edge.
     int dx = edgeX - x, dz = edgeZ - z;
     int rayX = sinLerp(yaw*8)/2, rayZ = cosLerp(yaw*8)/2;
-    int reach = direction * rayX, distance = direction * dx;
+    int reach = rayX*nx + rayZ*nz, distance = dx*nx + dz*nz;
     if (reach <= 0 || distance < 0 || distance > reach)
         return false;
     int along = rayZ*dx - dz*rayX;
@@ -411,19 +411,25 @@ static bool facingXEdge(int edgeX, int edgeZ, int halfWidth, int direction)
 
 bool playerFacingPiano(void)
 {
-    return roomVersion < 3 || facingXEdge(-408371, 81510, 3072, 1);
+    return roomVersion < 3 || facingEdge(-408371, 81510, 3072, 1, 0);
 }
 
 bool playerFacingNotebook(void)
 {
     // MAP1_S00 point 89, facing east, triggerParam1 = 4 sixteenths of a metre.
-    return roomCurrent() == Infirmary && facingXEdge(252723, 575897, 1024, 1);
+    return roomCurrent() == Infirmary && facingEdge(252723, 575897, 1024, 1, 0);
 }
 
 bool playerFacingChemical(void)
 {
     // MAP1_S01 point 13 faces west across a 0.75-metre shelf segment.
-    return facingXEdge(-413696, 411238, 1536, -1);
+    return facingEdge(-413696, 411238, 1536, -1, 0);
+}
+
+bool playerFacingHand(void)
+{
+    // MAP1_S01 point 12 faces north across the lab bench.
+    return roomHasHand() && facingEdge(-242483, 406323, 1536, 0, 1);
 }
 
 TowerPoint playerFacingTower(void)
