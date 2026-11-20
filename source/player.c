@@ -104,28 +104,26 @@ static bool insideChaseClearance(int dx, int dz, int facingX, int facingZ)
     return distance < clearance;
 }
 
-static int firstFloorChaseZ(int aimX, int aimZ, int low, int high)
+static int chaseAxisOffset(int along, int across, int previous, int facing, int crossFacing)
 {
-    int dx = aimX-x, dz = aimZ-z;
-    int facingX = sinLerp(yaw*8), facingZ = cosLerp(yaw*8);
-    // If moving to the other side would pass too close, stay on the
-    // current side of Harry and seek clearance along the corridor.
-    bool south = dz < 0;
-    if (south != (roadEyeZ < z) && insideChaseClearance(dx, 0, facingX, facingZ)) {
-        south = roadEyeZ < z;
-        dz = 0;
+    // Keep the current side of Harry if a straight crossing would pass
+    // inside the exclusion radius. Search along the length of the road.
+    bool lower = along < 0;
+    if (lower != (previous < 0) && insideChaseClearance(0, across, facing, crossFacing)) {
+        lower = previous < 0;
+        along = 0;
     }
-    if (!insideChaseClearance(dx, dz, facingX, facingZ)) return aimZ;
+    if (!insideChaseClearance(along, across, facing, crossFacing)) return along;
 
-    int minDistance = abs(dz), maxDistance = MaxChaseClearance;
+    int minDistance = abs(along), maxDistance = MaxChaseClearance;
     while (maxDistance-minDistance > 64) {
         int trial = (minDistance+maxDistance)/2;
-        if (insideChaseClearance(dx, south ? -trial : trial, facingX, facingZ))
+        if (insideChaseClearance(lower ? -trial : trial, across, facing, crossFacing))
             minDistance = trial;
         else
             maxDistance = trial;
     }
-    return limitChaseAxis(z + (south ? -maxDistance : maxDistance), low, high);
+    return lower ? -maxDistance : maxDistance;
 }
 
 // MAP1_S00 camera_paths: two fixed positions and a higher priority road by
@@ -186,6 +184,8 @@ static void advanceRoadCamera(void)
     } else if (roomCurrent() == SouthHall) {
         sx = limitChaseAxis(sx, 534016, 612608);
         sz = limitChaseAxis(sz, 75264, 86272);
+        int offset = chaseAxisOffset(sx-x, sz-z, roadEyeX-x, sinLerp(yaw*8), cosLerp(yaw*8));
+        sx = limitChaseAxis(x+offset, 534016, 612608);
     } else if (roomCurrent() == NorthHall) {
         sx = limitChaseAxis(sx, 507392, 585984);
         sz = limitChaseAxis(sz, 779008, 790784);
@@ -201,7 +201,9 @@ static void advanceRoadCamera(void)
         sz = limitChaseAxis(sz, -280576, -217088);
     } else if (roomCurrent() == FirstFloor) {
         sx = limitChaseAxis(sx, 437760, 449536);
-        sz = firstFloorChaseZ(sx, limitChaseAxis(sz, 174080, 299264), 174080, 299264);
+        sz = limitChaseAxis(sz, 174080, 299264);
+        int offset = chaseAxisOffset(sz-z, sx-x, roadEyeZ-z, cosLerp(yaw*8), sinLerp(yaw*8));
+        sz = limitChaseAxis(z+offset, 174080, 299264);
     } else {
         sx = limitChaseAxis(sx, -208384, -197376);
         sz = limitChaseAxis(sz, 175104, 299008);
@@ -595,7 +597,9 @@ int playerSetCamera(void)
         eyeX = roadEyeX;
         eyeZ = roadEyeZ;
         bool rail = doorRail && !followingRoad;
-        eyeHeight = ((rail ? 7987 : 8600)-ground)/2;
+        // The authored southern hall road fixes the chase eye at Q4 -27.
+        const int chaseHeight = room == SouthHall ? 27*256 : 8600;
+        eyeHeight = ((rail ? 7987 : chaseHeight)-ground)/2;
         targetHeight = ((rail ? 3533 : 2816)-ground)/2;
         // The small road limits the camera to 2.5 metres above map origin.
         if (eyeHeight > 5120) eyeHeight = 5120;

@@ -267,7 +267,20 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - The production DLDI replay walked into the first-floor hall, turned and
   crossed the stairs in both directions with the original warp poses.
   A shorter virtual console SD replay also passed both stair transitions.
-  The southern hall still has a close approach to check in a separate pass.
+- The southern hall now uses the same clearance along its length and
+  the authored 1.69 m chase height. Across eight matched views, horizontal
+  camera distance rose from 0.39–0.91 m to 2.08–2.77 m. The locker pose
+  moved from 0.43 m to 2.77 m against 2.95 m on PS1. All eight native
+  look targets were above the floor. Whole-frame RGB error at the locker
+  rose from 22.51 to 22.99/255, while the centre pose improved from 44.20
+  to 31.95/255. Both first-floor camera poses matched the previous build.
+- At the settled locker turn endpoint, 64 melonDS scene intervals
+  averaged 33.43 ms before and after the change. ARM9 submission averaged
+  5.18 ms before and 5.17 ms after. The original NTSC-U idle locker trace
+  had 33 intervals at 33.37 ms and 16 at 50.05 ms.
+- The production routes entered from the infirmary, turned in the hall
+  and crossed through the courtyard doors in both directions over DLDI
+  and virtual console SD. Both routes preserved the inventory and latch.
 
 ## Chemistry lab route
 
