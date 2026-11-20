@@ -139,6 +139,23 @@ def infirmary_items(disc):
     return pixels, colors, poses
 
 
+def vertical_bounds(points, depth_spread):
+    # Some music-room decorations are slanted or split into triangles.
+    for axis, across in ((0, 2), (2, 0)):
+        depths = [p[axis] for p in points]
+        if max(depths)-min(depths) > depth_spread:
+            continue
+        horizontal = [p[across] for p in points]
+        vertical = [p[1] for p in points]
+        winding = sum(a[across]*b[1]-a[1]*b[across] for a, b in zip(points, points[1:]+points[:1]))
+        if not winding:
+            continue
+        side = 1 if (winding > 0) == (axis == 0) else -1
+        depth = min(depths) if side == 1 else max(depths)
+        return (axis, depth, side), (min(horizontal), max(horizontal), min(vertical), max(vertical))
+    return None
+
+
 def vertical_rectangle(points):
     for axis, across in ((0, 2), (2, 0)):
         if any(p[axis] != points[0][axis] for p in points[1:]):
@@ -214,6 +231,7 @@ def school_room(disc, room=39):
     groups = defaultdict(bytearray)
     walls = defaultdict(list)
     decorations = []
+    music_decorations = []
     vertex_scale = 4 if room in (12, 16, 31) else 8
     def add_model(name, matrix, position, state=0, *, item_page=None):
         model_data, meshes, base, ptr = models[name]
@@ -274,7 +292,17 @@ def school_room(disc, room=39):
                     group.extend(struct.pack("<3hBB", *point, u, v+v_offset))
                     points.append(point)
                 if not state and item_page is None and not flags & 1:
-                    rectangle = vertical_rectangle(points)
+                    music = room == 39
+                    poster = name == b"NULL_NEA" and mat == 2 and (j == 0 or (j == 1 and 40 <= k <= 47))
+                    if music and poster:
+                        face = vertical_bounds(points, 2*vertex_scale)
+                        if face:
+                            music_decorations.append((*face, group, start))
+                        continue
+                    if music and name in (b"NULL1", b"W5_FAR"):
+                        rectangle = vertical_bounds(points, 0)
+                    else:
+                        rectangle = vertical_rectangle(points)
                     if rectangle is not None:
                         plane, bounds = rectangle
                         if name == b"NULL_NEA":
@@ -305,6 +333,20 @@ def school_room(disc, room=39):
             axis, depth, side = plane
             for offset in range(start+2*axis, start+32, 8):
                 struct.pack_into("<h", group, offset, depth+side*2*vertex_scale)
+
+    # Preserve a two-Q8-unit gap for the music-room posters, including
+    # vertices shared by several triangles of the same decoration.
+    for (axis, depth, side), bounds, group, start in music_decorations:
+        left, right, bottom, top = bounds
+        for delta in range(-2*vertex_scale, 2*vertex_scale+1, vertex_scale):
+            wall = depth+delta
+            if not any(b[0] <= left and b[1] >= right and b[2] <= bottom and b[3] >= top
+                       for b in walls[axis, wall, side]):
+                continue
+            minimum = side*wall + 2*vertex_scale
+            for offset in range(start+2*axis, start+32, 8):
+                coord, = struct.unpack_from("<h", group, offset)
+                struct.pack_into("<h", group, offset, side*max(side*coord, minimum))
 
     if room == 9:
         page = len(page_info)

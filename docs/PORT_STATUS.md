@@ -269,6 +269,17 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - The lab event requires the Chemical item before it releases the gold
   medallion. The current lab build supports traversal and collision.
 
+## Music-room posters
+
+- Conversion gives the music-room decoration vertices 7.8 mm of wall
+  clearance. The fix covers 25 additional faces, including tilted quads
+  and triangles. It preserves their textures and UVs.
+- At 13 matched camera positions on each wall in melonDS DSi mode, the
+  west poster previously disappeared from the sampled region three times.
+  Both sampled posters stayed visible at all 13 positions with the fix.
+  The production ROM booted into the music room and passed the corridor
+  exit and return over DLDI with the regenerated room data.
+
 ## Next
 
 1. Connect the lab equipment room through MAP1_S01 points 46 and 50.
