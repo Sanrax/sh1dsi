@@ -58,7 +58,9 @@ static FILE *openRoom(SchoolRoom room)
     }
     char path[40];
     snprintf(path, sizeof path, "%s/%s.dat", assetDir, name);
-    return fopen(path, "rb");
+    FILE *file = fopen(path, "rb");
+    if (file) setvbuf(file, NULL, _IOFBF, 16*1024);
+    return file;
 }
 
 static bool loadTones(FILE *file, unsigned count)

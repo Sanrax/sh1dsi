@@ -1,5 +1,6 @@
 #include <nds.h>
 #include <string.h>
+#include <sys/stat.h>
 #include "room.h"
 #include "player.h"
 #include "collision.h"
@@ -183,6 +184,18 @@ static uint32_t *loadGeometry(FILE *file, uint32_t *out, unsigned quads, Geometr
     return out;
 }
 
+static long roomFileSize(FILE *file, long position)
+{
+    // An end seek discards read-ahead and can restart FAT reads mid-sector.
+    struct stat info;
+    int fd = fileno(file);
+    if (fd >= 0 && fstat(fd, &info) == 0 && S_ISREG(info.st_mode))
+        return info.st_size;
+    if (fseek(file, 0, SEEK_END)) return -1;
+    long size = ftell(file);
+    return fseek(file, position, SEEK_SET) ? -1 : size;
+}
+
 bool roomLoad(FILE *file, SchoolRoom room)
 {
     bool corridor = room != MusicRoom;
@@ -293,11 +306,13 @@ bool roomLoad(FILE *file, SchoolRoom room)
 
     // Derive the command buffer size from the validated on-card vertex count.
     long start = ftell(file);
-    if (start < 0 || fseek(file, 0, SEEK_END)) return false;
-    long bytes = ftell(file) - start - (long)(header.batches * sizeof(Batch));
+    if (start < 0) return false;
+    long endOfFile = roomFileSize(file, start);
+    long batchHeaders = header.batches * sizeof(Batch);
+    if (endOfFile < start || endOfFile-start < batchHeaders) return false;
+    long bytes = endOfFile - start - batchHeaders;
     unsigned maxVerts = room == Courtyard ? MaxRoomVertices : room == MusicRoom || room == SchoolCorridor ? 6144 : 8192;
-    if (bytes <= 0 || bytes > maxVerts*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)) ||
-        fseek(file, start, SEEK_SET))
+    if (bytes <= 0 || bytes > maxVerts*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)))
         return false;
     unsigned pos = 0, total = bytes / sizeof(Vertex);
     // Two full vertices need six parameters and one packed command word.

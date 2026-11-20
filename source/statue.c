@@ -32,8 +32,16 @@ bool statueLoad(FILE *file, unsigned textureOffset, unsigned palette)
     if (fread(&audio, sizeof audio, 1, file) != 1 || !audio.bytes ||
         audio.bytes > sizeof samples || !audio.rate || (audio.bytes & 3) ||
         (audio.loop & 1) || 2u*audio.loop >= audio.bytes || audio.volume > 127 || audio.pan > 127 ||
-        audio.reserved || fread(samples, 1, audio.bytes, file) != audio.bytes)
+        audio.reserved)
         return false;
+    // Keep the sample in the room stream's read-ahead window.
+    for (unsigned offset = 0; offset < audio.bytes;) {
+        unsigned bytes = audio.bytes-offset;
+        if (bytes > 2048) bytes = 2048;
+        if (fread((uint8_t *)samples + offset, 1, bytes, file) != bytes)
+            return false;
+        offset += bytes;
+    }
     DC_FlushRange(samples, audio.bytes);
     smokeTexture = textureOffset >> 3;
     smokePalette = palette*2;

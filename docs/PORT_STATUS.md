@@ -140,6 +140,22 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   full falling-medallion sequence over DLDI, plus the southern hall to
   courtyard round trip over virtual console SD.
 
+### Room loading
+
+- Room streams use a 16 KiB read-ahead buffer. The loader takes the file
+  length from the open descriptor when available, preserving the buffer
+  through the switch to geometry. Large audio reads use 2 KiB requests.
+  The room files keep their existing layout. [BlocksDS filesystem I/O](https://blocksds.skylyrac.net/docs/internal/design_guide/#5-filesystem-support)
+- In melonDS DSi mode, each room was timed for six loads after one warm-up,
+  from opening the file through closing it. The mean of the 11 room medians
+  fell from 61.99 to 20.75 ms on virtual console SD and from 45.97 to
+  44.24 ms on DLDI. The virtual SD courtyard fell from 76.22 to 28.40 ms
+  and the lab from 86.36 to 28.50 ms. Real hardware timing remains pending.
+- All eleven rooms matched geometry and VRAM checksums on both paths.
+  The resident lab audio buffer matched on virtual console SD. Production
+  replays passed the music-room corridor and courtyard round trips. The
+  loader rejected both truncation cases with the existing error screen.
+
 ## Animated character submission
 
 - The actor draw uses ARM instructions for the fixed-point math and packs
