@@ -92,6 +92,7 @@ int roomOriginZ(SchoolRoom room)
 }
 
 enum { MaxBatches = 128, MaxRoomVertices = 11000, ChunkQuads = 32 };
+enum { MaxChunks = MaxRoomVertices/(4*ChunkQuads) + MaxBatches };
 typedef struct {
     int16_t bounds[6]; // Minimum XYZ, then maximum XYZ.
     uint16_t words;
@@ -104,7 +105,9 @@ typedef struct {
 } ClipPlane;
 
 static Batch batches[MaxBatches];
-static GeometryChunk chunks[MaxRoomVertices/(4*ChunkQuads) + MaxBatches];
+static GeometryChunk chunks[MaxChunks];
+static bool visibleChunks[MaxChunks], visibilityValid;
+static int visibilityMatrix[16];
 static unsigned batchWords[MaxBatches];
 static uint32_t *geometry;
 
@@ -384,6 +387,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     uint32_t *compact = realloc(geometry, geometryBytes);
     if (compact) geometry = compact;
     DC_FlushRange(geometry, geometryBytes);
+    visibilityValid = false;
     current = room;
     wideGeometry = streamed ? (layout.flags & RoomWideVertices) != 0 :
                    room == EastCorridor || room == FirstFloor || room == NorthHall;
@@ -402,10 +406,13 @@ bool roomLoadShared(FILE *file)
     return loadRoom(file, MusicRoom, false);
 }
 
-static void roomFrustum(ClipPlane planes[6], int scale)
+static bool updateRoomFrustum(ClipPlane planes[6], int scale)
 {
     int clip[16];
     glGetFixed(GL_GET_MATRIX_CLIP, clip);
+    if (visibilityValid && !memcmp(clip, visibilityMatrix, sizeof clip)) return false;
+    memcpy(visibilityMatrix, clip, sizeof clip);
+    visibilityValid = true;
     for (unsigned axis = 0; axis < 3; axis++) {
         ClipPlane *low = &planes[2*axis], *high = low+1;
         for (unsigned i = 0; i < 3; i++) {
@@ -417,6 +424,7 @@ static void roomFrustum(ClipPlane planes[6], int scale)
         low->offset = ((int64_t)clip[15]+clip[12+axis])*4096;
         high->offset = ((int64_t)clip[15]-clip[12+axis])*4096;
     }
+    return true;
 }
 
 static ARM_CODE inline bool chunkVisible(const GeometryChunk *chunk, const ClipPlane planes[6])
@@ -443,11 +451,12 @@ static inline void submitGeometry(const uint32_t *commands, unsigned words)
 }
 
 static ARM_CODE void submitVisible(const uint32_t *commands, const GeometryChunk *chunk,
-                                   unsigned count, const ClipPlane planes[6])
+                                   unsigned count, bool *inView, const ClipPlane *updated)
 {
     unsigned run = 0;
     for (unsigned i = 0; i < count; i++) {
-        if (chunkVisible(&chunk[i], planes)) {
+        if (updated) inView[i] = chunkVisible(&chunk[i], updated);
+        if (inView[i]) {
             run += chunk[i].words;
         } else {
             if (run) submitGeometry(commands, run);
@@ -498,9 +507,10 @@ void roomDraw(const Medallion *medal)
     glColor(RGB15(31,31,31));
     const uint32_t *commands = geometry;
     const GeometryChunk *chunk = chunks;
+    bool *inView = visibleChunks;
     ClipPlane planes[6];
     // Only the room geometry gets the additional scale, applied below.
-    roomFrustum(planes, wideGeometry ? 2 : 1);
+    const ClipPlane *updated = updateRoomFrustum(planes, wideGeometry ? 2 : 1) ? planes : NULL;
     if (playerReady()) {
         GFX_TEX_FORMAT = (skin.offset >> 3) | (TEXTURE_SIZE_256 << 20)
                          | (TEXTURE_SIZE_256 << 23) | (GL_RGB16 << 26);
@@ -542,7 +552,7 @@ void roomDraw(const Medallion *medal)
             glPolyFmt(POLY_ALPHA((b->flags & 1) ? 16 : 31) | POLY_CULL_FRONT);
             glBegin(GL_QUADS);
             if (b->state == StaticBatch)
-                submitVisible(commands, chunk, chunkCount, planes);
+                submitVisible(commands, chunk, chunkCount, inView, updated);
             else
                 submitGeometry(commands, count);
             glEnd();
@@ -550,6 +560,7 @@ void roomDraw(const Medallion *medal)
         }
         commands += count;
         chunk += chunkCount;
+        inView += chunkCount;
     }
     statueDrawSmoke();
     pickupDrawItem();

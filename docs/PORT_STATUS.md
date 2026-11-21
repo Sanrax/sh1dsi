@@ -142,6 +142,25 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   full falling-medallion sequence over DLDI, plus the southern hall to
   courtyard round trip over virtual console SD.
 
+### Reusing visibility checks
+
+- Static chunks reuse their visibility results when all 16 entries in
+  the clip matrix match. A camera change recalculates visibility during
+  submission, and a room load clears the cache. The cache uses 278
+  bytes of main RAM.
+- Six melonDS DSi views contributed 128 samples each. Mean ARM9
+  submission time fell from 2.143 to 2.055 ms. Forcing a recalculation
+  on every submission measured 2.152 ms. Mean frame intervals were
+  33.39 ms in all three runs. All six 256×192 captures matched, including
+  the held medallion event frame. Peak geometry RAM use remained
+  1,143 polygons and 4,581 vertices with no overflow.
+- The 16- and 8-quad experiments submitted fewer offscreen quads and
+  raised mean ARM9 time to 2.184 and 2.412 ms. Deferring empty batch
+  setup measured 2.146 ms. The production build uses 32-quad chunks.
+- The production ROM passed the infirmary round trip over DLDI and
+  refreshed the visibility cache while crossing the courtyard ramp
+  over virtual console SD.
+
 ### Room loading
 
 - Room streams use a 16 KiB read-ahead buffer. The loader takes the file
