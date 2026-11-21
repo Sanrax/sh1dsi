@@ -10,5 +10,6 @@ typedef struct {
 } Glyph;
 
 bool glyphsRead(FILE *file, Glyph *data, unsigned count);
+void glyphsDraw(uint16_t *pixels, const Glyph *text, unsigned count);
 
 #endif

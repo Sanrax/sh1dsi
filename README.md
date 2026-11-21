@@ -61,8 +61,10 @@ Press A to operate it. The silver medallion placement enables the switch.
 Once the boiler is running, face the clock tower door and press A to enter.
 The courtyard door is one-way. Walk to the hatch and press A to descend into
 the passage. Face either ladder and press A to climb to its tower. Start skips
-a climb once Harry starts moving. The far tower's outer door is the current
-end of the port. The climbs require the updated `passage.dat` and `fartower.dat`.
+a climb once Harry starts moving. The far tower's outer door opens onto the
+Otherworld courtyard. The arrival scene uses the original dialogue, and Start
+skips it. Harry can walk the courtyard after the scene. This transition
+requires the locally generated `otherworld.dat`.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

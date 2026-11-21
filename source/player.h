@@ -7,7 +7,13 @@
 
 bool playerLoad(FILE *file, unsigned version);
 bool playerReady(void);
-typedef enum { PlayerMove, PlayerKneel, PlayerRise, PlayerPour } PlayerAction;
+typedef enum { PlayerMove, PlayerKneel, PlayerRise, PlayerPour, PlayerLookAround, PlayerScriptedWalk } PlayerAction;
+typedef struct {
+    int x, y, z, watchX, watchY, watchZ;
+} CameraPose;
+bool playerLoadCourtyardLook(FILE *file);
+void playerScriptedPose(int worldX, int worldZ, int heading);
+void playerFinishOtherworld(bool skipped);
 bool playerTick(int turn, int walk, PlayerAction action);
 bool playerStopped(void);
 bool playerActionDone(PlayerAction action);

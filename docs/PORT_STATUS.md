@@ -9,8 +9,8 @@ Harry places the silver medallion, and the infirmary notebook saves that state.
 The courtyard connects the southern and northern halls.
 Harry can inspect the clock tower door and place both medallions. With the
 boiler powered he can enter the tower and cross the underground passage.
-Both ladders work in both directions. The far tower's outer door leads to the
-Otherworld courtyard on PS1. The DSi port currently reaches that door.
+Both ladders work in both directions. Harry can use the far tower's outer
+door, watch or skip the Otherworld arrival scene and walk the courtyard.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -863,14 +863,45 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - At the sampled poses, the mean RGB error against PS1 was about 12.8/255
   on the ladder and 22.5/255 in the far tower. The native scenes are
   darker, and the original ambience and movement audio remain pending.
-- The private PS1 replay reaches MAP1_S02 room 23 and completes the
-  courtyard intro in 1,611 VBlanks. The original restores control at
-  Q12 XYZ (−74458, 0, −254955), yaw 3584. The DSi exit and cutscene are pending.
+
+## Otherworld courtyard
+
+- The far tower's outer door loads the original MAP1_S02 courtyard
+  chunk, `SUFFFE`. Six floor planes cover the entrances and diagonal
+  tower ramp. Harry follows the intro's walk and camera pan, plays the
+  original 47-frame look animation and regains control in the courtyard.
+- The US disc's three dialogue lines decode locally to 37.8 kHz stereo
+  PCM. The loader releases the 959,616-byte buffer after the scene. The
+  converted glyphs retain the original font and line breaks.
+  [PlayStation XA audio format](https://psx-spx.consoledev.net/cdromformat/#cdrom-xa-audio-adpcm-compression)
+- The PS1 intro took 1,611 VBlanks. Most of its frame intervals were
+  50.05 ms (476 of 520), with 42 at 66.73 ms and one each at 33.37 ms
+  and 133.47 ms. The 19 sampled gameplay intervals after the intro
+  were 15 at 50.05 ms and four at 66.73 ms.
+- Two BlocksDS builds generated identical TWL ROMs and 21 sidecars. The
+  new `otherworld.dat` is 1,146,672 bytes and the previous 20 files match
+  byte for byte.
+- melonDS 1.1 in DSi mode completed the full intro over DLDI and skipped
+  it during the first voice over virtual console SD. Normal and skipped
+  arrivals match the PS1 poses at Q12 X/Z (−74458, −254955) and
+  (−74465, −254935), both with yaw 3584. Movement resumed and both sound
+  channels stopped. The lower screen stayed black. The stereo channel
+  buffers matched the local conversion and the mixer produced sound for
+  all three lines. [Emulator sound state](https://github.com/melonDS-emu/melonDS/blob/1.1/src/SPU.cpp)
+- The DLDI room read took 276.60 ms in the instrumented run. Mean frame
+  intervals were 33.367 ms across 797 intro intervals and 33.430 ms
+  across 59 courtyard gameplay intervals. Mean ARM9 submission was
+  2.066 and 2.392 ms. Peak use was 779 polygons and 3,054 vertices
+  with no geometry overflow.
+- The sampled images had mean RGB errors of 11.2–20.8 out of 255.
+  The native ramp view is brighter. Camera easing and scripted walk
+  use interpolated positions. The flashlight, rain and courtyard music
+  remain pending, and the courtyard exits are pending.
 
 ## Next
 
-1. Stream the Otherworld `SUFFFE` courtyard and connect the far tower's outer door.
-2. Port the courtyard intro's movement, flashlight, camera and dialogue.
+1. Port the Otherworld flashlight and rain, then compare the intro lighting to PS1.
+2. Connect the courtyard doors and verify the first Otherworld hall route.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

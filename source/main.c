@@ -8,6 +8,7 @@
 #include "pickup.h"
 #include "notebook.h"
 #include "statue.h"
+#include "otherworld.h"
 
 typedef struct {
     uint16_t palette[256];
@@ -59,6 +60,7 @@ static FILE *openRoom(SchoolRoom room)
     case Courtyard: name = "courtyard"; break;
     case ClockTower: name = "clockroom"; break;
     case FarClockTower: name = "fartower"; break;
+    case OtherworldCourtyard: name = "otherworld"; break;
     case TowerPassage: name = "passage"; break;
     case BasementStair: name = "basement"; break;
     case BoilerRoom: name = "boiler"; break;
@@ -167,7 +169,7 @@ static void changeRoom(RoomExit exit)
     bool east = next == EastCorridor || from == EastCorridor;
     bool hall = east || from == Courtyard || next == Courtyard ||
                 (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
-    bool towerDoor = next == ClockTower && from == Courtyard;
+    bool towerDoor = (next == ClockTower && from == Courtyard) || next == OtherworldCourtyard;
     bool door = !exit.stairs && next != TowerPassage && from != TowerPassage;
     bool boilerDoor = toneCount > BoilerDoorClose && (next == BoilerRoom || from == BoilerRoom);
     FILE *file = openRoom(next);
@@ -185,6 +187,7 @@ static void changeRoom(RoomExit exit)
         stop("Invalid school room data.");
     }
     playerEnterRoom(from, exit.stairs);
+    if (next == OtherworldCourtyard) otherworldStartIntro();
     updateBoilerHum();
     // GameBoot_InGameStartup step 11 keeps the load screen for at least
     // one second, including time already spent on disc or card reads.
@@ -276,7 +279,9 @@ int main(void)
         while (debt >= step) {
             int sound = -1;
             if (point.ticks != UINT32_MAX) point.ticks++;
-            if (inRoom && playerLadderActive()) {
+            if (inRoom && otherworldIntroActive()) {
+                roomChanged |= otherworldTickIntro(pressed & KEY_START);
+            } else if (inRoom && playerLadderActive()) {
                 SchoolRoom arrival = roomCurrent();
                 roomChanged |= playerLadderTick(pressed & KEY_START, &arrival);
                 if (arrival != roomCurrent()) {
@@ -315,7 +320,7 @@ int main(void)
                     } else if (next != roomCurrent()) {
                         inspectionFade = 0;
                         changeRoom(exit);
-                        enteringRoom = !playerLadderActive();
+                        enteringRoom = !playerLadderActive() && !otherworldIntroActive();
                         roomChanged = true;
                         previousTime = systemCounterGetTicks();
                         debt = step;
@@ -390,7 +395,8 @@ int main(void)
             memcpy(BG_PALETTE, image->palette, sizeof image->palette);
         }
         if (inRoom) {
-            pickupDrawPrompt(bg);
+            if (roomCurrent() == OtherworldCourtyard) otherworldDrawSubtitle(bg);
+            else pickupDrawPrompt(bg);
             updateBoilerHum();
         }
         previousImage = imageIndex;

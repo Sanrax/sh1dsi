@@ -6,6 +6,7 @@
 #include "collision.h"
 #include "room.h"
 #include "statue.h"
+#include "otherworld.h"
 
 typedef struct {
     int8_t parent, rotation, translation, offset[3];
@@ -35,12 +36,12 @@ _Static_assert(sizeof(Bone) == 6 && sizeof(Vertex) == 8 &&
                sizeof(Corner) == 4 && sizeof(Batch) == 4, "player file layout");
 
 static Bone bones[18];
-enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward, Kneel, Rise, Pour, DescendLadder, AscendLadder };
-static const unsigned firstFrame[] = {0, 40, 53, 66, 89, 113, 128, 140, 189, 226};
-static const unsigned frameCount[] = {40, 13, 13, 23, 24, 15, 12, 49, 37, 37};
-static const unsigned frameRate[] = {10, 15, 15, 22, 23, 15, 15, 15, 18, 18};
-static const unsigned blendRate[] = {5, 50, 50, 50, 20, 10, 10, 10, 10, 10};
-static int8_t frames[263][156];
+enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward, Kneel, Rise, Pour, DescendLadder, AscendLadder, LookAround };
+static const unsigned firstFrame[] = {0, 40, 53, 66, 89, 113, 128, 140, 189, 226, 263};
+static const unsigned frameCount[] = {40, 13, 13, 23, 24, 15, 12, 49, 37, 37, 47};
+static const unsigned frameRate[] = {10, 15, 15, 22, 23, 15, 15, 15, 18, 18, 9};
+static const unsigned blendRate[] = {5, 50, 50, 50, 20, 10, 10, 10, 10, 10, 10};
+static int8_t frames[310][156];
 static int ladderAge = -1;
 static int ladderHeight;
 static SchoolRoom ladderTower;
@@ -59,9 +60,6 @@ static bool ready, halfFrame;
 
 static int roadEyeX, roadEyeZ, entryX, entryZ;
 static bool followingRoad, doorRail;
-typedef struct {
-    int x, y, z, watchX, watchY, watchZ;
-} CameraPose;
 typedef struct {
     SchoolRoom room, from;
     CameraPose camera;
@@ -82,6 +80,7 @@ static const DoorView doorViews[] = {
     {FirstFloor, BasementStair, {442003, -5049, 182974, 451525, 736, 173841}}
 };
 static const CameraPose *doorView;
+static const CameraPose otherworldArrival = {-72982, -14626, -228551, -77354, -3034, -252059};
 static bool eastLabRoad, northPassageRoad;
 enum { PassageRoadSplit = -243712 }; // Q4(-59.5 m), converted to Q12.
 enum { EquipmentAisleSplit = -407552 };
@@ -185,6 +184,7 @@ static const ChaseRoad chaseRoads[MusicRoom] = {
     [SouthHall]     = {2086, 2393,   294,  337, ChaseAlongX},
     [NorthHall]     = {1982, 2289,  3043, 3089, ChaseAlongX},
     [Courtyard]     = {-436, -196, -1096, -848, ChaseArea},
+    [OtherworldCourtyard] = {-436, -196, -1096, -848, ChaseArea},
     [EastCorridor]  = {-814, -771,   684, 1168, ChaseAlongZ},
     [SchoolCorridor] = {-473, -166,   294,  345, ChaseAlongX},
     [UpperNorthHall] = {-545, -238,  3038, 3081, ChaseAlongX},
@@ -218,7 +218,7 @@ static void advanceRoadCamera(void)
         roadEyeZ += limitToRoad((target-roadEyeZ)/7, -288, 288);
         return;
     }
-    if (room == MusicRoom || room == ClockTower || room == FarClockTower) return;
+    if (room == MusicRoom || room == ClockTower || room == FarClockTower || otherworldIntroActive()) return;
     // Leave the entry view as Harry walks out along the road. The small
     // chase road places the ideal eye two metres away, twelve degrees to
     // one side of the heading opposite Harry (vcMakeIdealCamPosUseVC_ROAD_DATA).
@@ -355,6 +355,12 @@ bool playerLoadPour(FILE *file)
     return fread(frames+firstFrame[Pour], sizeof frames[0], frameCount[Pour], file) == frameCount[Pour];
 }
 
+bool playerLoadCourtyardLook(FILE *file)
+{
+    return fread(frames+firstFrame[LookAround], sizeof frames[0],
+                 frameCount[LookAround], file) == frameCount[LookAround];
+}
+
 bool playerLoadLadder(FILE *file, bool ascent)
 {
     unsigned count = frameCount[DescendLadder] + (ascent ? frameCount[AscendLadder] : 0);
@@ -387,9 +393,12 @@ bool playerTick(int turn, int walk, PlayerAction action)
     tickFraction += 33366 * 4096;
     int dt = tickFraction / 1000000;
     tickFraction %= 1000000;
+    static const unsigned scripted[] = {
+        [PlayerKneel] = Kneel, [PlayerRise] = Rise, [PlayerPour] = Pour,
+        [PlayerLookAround] = LookAround, [PlayerScriptedWalk] = WalkForward
+    };
     unsigned next = action == PlayerMove ?
-        locomotion(roomVersion >= 3 ? turn : 0, roomVersion >= 4 ? walk : 0, dt) :
-        action == PlayerKneel ? Kneel : action == PlayerRise ? Rise : Pour;
+        locomotion(roomVersion >= 3 ? turn : 0, roomVersion >= 4 ? walk : 0, dt) : scripted[action];
     advanceRoadCamera();
     if (next != clip) {
         blendFrom = firstFrame[clip] + (frameQ12 >> 12);
@@ -401,7 +410,7 @@ bool playerTick(int turn, int walk, PlayerAction action)
         unsigned advance = dt * blendRate[clip];
         blendQ12 = advance < blendQ12 ? blendQ12-advance : 0;
     } else {
-        frameQ12 += dt * frameRate[clip];
+        frameQ12 += dt * frameRate[clip] - (clip == LookAround ? dt/10 : 0);
         if (clip < Kneel)
             frameQ12 %= frameCount[clip]*4096;
         else if (frameQ12 >= (frameCount[clip]-1)*4096)
@@ -410,14 +419,31 @@ bool playerTick(int turn, int walk, PlayerAction action)
     return true;
 }
 
-static void warp(int worldX, int worldZ, int heading)
+void playerScriptedPose(int worldX, int worldZ, int heading)
 {
     x = worldX;
     z = worldZ;
     yaw = heading;
+}
+
+static void warp(int worldX, int worldZ, int heading)
+{
+    playerScriptedPose(worldX, worldZ, heading);
     speed = 0;
     clip = Idle;
     frameQ12 = blendQ12 = 0;
+}
+
+void playerFinishOtherworld(bool skipped)
+{
+    warp(skipped ? -74465 : -74458, skipped ? -254935 : -254955, 3584);
+    doorView = &otherworldArrival;
+    entryX = x;
+    entryZ = z;
+    roadEyeX = doorView->x;
+    roadEyeZ = doorView->z;
+    followingRoad = false;
+    doorRail = true;
 }
 
 static void warpToLadder(void)
@@ -500,6 +526,10 @@ void playerEnterRoom(SchoolRoom from, const StairExit *stairs)
 {
     doorView = NULL;
     SchoolRoom to = roomCurrent();
+    if (to == OtherworldCourtyard) {
+        warp(-54556, -278859, 3584);
+        return;
+    }
     if (to == ClockTower || to == FarClockTower) {
         // MAP1_S00 points 19–21, with the inward offset from SysState_LoadRoom.
         bool southAscent = from == TowerPassage && to == ClockTower;
@@ -585,6 +615,8 @@ RoomExit playerDestination(bool action)
     if ((room == ClockTower && facingEdge(-409600, -249036, 2048, 0, -1)) ||
         (room == FarClockTower && facingEdge(-573440, -242483, 2048, 0, 1)))
         return (RoomExit){TowerPassage, NULL};
+    if (room == FarClockTower && facingEdge(-573440, -249036, 1536, 0, -1))
+        return (RoomExit){OtherworldCourtyard, NULL};
     int rayX = sinLerp(yaw*8)/2, rayZ = cosLerp(yaw*8)/2;
     for (unsigned i = 0; i < schoolDoorCount; i++) {
         const Door *d = &schoolDoors[i];
@@ -733,11 +765,15 @@ int playerSetCamera(void)
     bool stairwell = room == EastCorridor || room == FirstFloor || room == BasementStair;
     bool boiler = room == BoilerRoom;
     bool infirmary = room == Infirmary;
-    bool courtyard = room == Courtyard;
+    bool courtyard = room == Courtyard || room == OtherworldCourtyard;
     bool lab = room == ChemistryLab;
     int ground = collisionFloor(x, z).height;
     RoomOrigin roomOffset = roomOrigin();
     int origin = roomOffset.x, originZ = roomOffset.z;
+    if (otherworldIntroActive()) {
+        CameraPose view = otherworldIntroView();
+        return setCameraPose(&view, origin, originZ);
+    }
     if (room == ClockTower) {
         // Fixed road at (-99.9, -2.7, -60.3) in MAP1_S00.
         static const CameraPose view = {-409088, -11008, -246784, -411040, 5248, -246304};

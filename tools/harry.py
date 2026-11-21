@@ -21,6 +21,15 @@ def ladder_frames(disc):
     return frames
 
 
+def courtyard_look_frames(disc):
+    # MAP1_S02 state 74 plays clip 53 at 8.9 frames per second.
+    source = disc.read("ANIM/HB_M1S02.ANM")
+    frames = source[(970-676)*156:(1017-676)*156]
+    if len(frames) != 47*156:
+        raise ValueError("incomplete courtyard look animation")
+    return frames
+
+
 def player_data(disc):
     model = disc.read("CHARA/HERO.ILM")
     _, models, headers, order = struct.unpack_from("<4I", model, 4)

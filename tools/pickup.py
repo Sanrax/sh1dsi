@@ -5,9 +5,10 @@ import struct
 from notebook import font_advance
 
 
-def prompt_data(disc, number, *, first_floor=False, choices=True, map_bearings=False):
-    overlay = disc.read("VIN/MAP1_S00.BIN" if first_floor else "VIN/MAP1_S01.BIN")
-    table = 0x800dd1bc if first_floor else 0x800dcf5c
+def prompt_data(disc, number, *, first_floor=False, choices=True, map_bearings=False, subtitle=False):
+    scene = 2 if subtitle else 0 if first_floor else 1
+    overlay = disc.read(f"VIN/MAP1_S{scene:02d}.BIN")
+    table = (0x800dd1bc, 0x800dcf5c, 0x800e1854)[scene]
     base = 0x800c9578
 
     def message(number):
@@ -45,7 +46,10 @@ def prompt_data(disc, number, *, first_floor=False, choices=True, map_bearings=F
     commands = []
     widths = []
     x = row = color = 0
-    for token in re.findall(r"~[A-Z][0-9]?|[^\s]", message(number)):
+    text = message(number)
+    if subtitle:
+        text = re.sub(r"^~J0\([0-9.]+\)", "", text)
+    for token in re.findall(r"~[A-Z][0-9]?|[^\s]", text):
         if token == "~N":
             widths.append(x)
             x = 0

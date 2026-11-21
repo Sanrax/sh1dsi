@@ -3,9 +3,10 @@ from collections import defaultdict
 import math
 import struct
 
-from harry import ladder_frames, player_data, pour_frames
+from harry import courtyard_look_frames, ladder_frames, player_data, pour_frames
 from pickup import chemical_pickup, gold_pickup, medical_pickups, prompt_data, silver_pickup
 from vab import statue_sound
+from xa import courtyard_voices
 
 
 ROOM_EDGE_HEIGHTS = 1
@@ -23,6 +24,7 @@ ROOM_LAYOUTS = {
     21: 0,
     22: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES | ROOM_LADDER_ASCENT,
     23: ROOM_FLOOR_PLANES,
+    24: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES,
     31: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES,
 }
 
@@ -77,7 +79,7 @@ def collision_edges(ipd, room):
                 13: (30720, 0, 80, 12, 80, 0), 9: (10240, 30720, 45, 11, 49, 0),
                 20: (-30720, -20480, 16, 3, 16, 0), 21: (-40960, -20480, 16, 3, 16, 0),
                 22: (-20480, -20480, 28, 8, 32, 0),
-                23: (-10240, -20480, 204, 61, 236, 0),
+                23: (-10240, -20480, 204, 61, 236, 0), 24: (-10240, -20480, 172, 31, 175, 0),
                 16: (30720, 40960, 33, 6, 34, 0),
                 33: (-10240, 40960, 40, 8, 40, 0), 34: (-20480, 20480, 38, 5, 38, 15),
                 35: (-30720, 20480, 40, 7, 40, 0)}[room]
@@ -133,6 +135,10 @@ def collision_edges(ipd, room):
         # The entrance and tower ramps remain traversable.
         if room == 23 and (floor in (1, 30, 37, 38, 39, 40) or 50 <= floor < 60 or other != 255):
             continue
+        # The alternate courtyard includes two entrance ramps and the
+        # diagonal tower ramp. Their surfaces belong to the floor query.
+        if room == 24 and (other != 255 or floor in (7, 15, 16, 17, 18, 28, 29)):
+            continue
         if other != 255:
             raise ValueError("unexpected shared collision edge")
         ax, ay, az = struct.unpack_from("<3h", collision, vert+6*a)
@@ -164,7 +170,8 @@ def collision_edges(ipd, room):
         return output
 
     floors = bytearray()
-    floor_planes = {3: (0, 1), 22: range(3, 8), 31: (11, 12), 23: (*range(37, 41), *range(50, 60))}[room]
+    floor_planes = {3: (0, 1), 22: range(3, 8), 31: (11, 12), 23: (*range(37, 41), *range(50, 60)),
+                    24: (15, 16, 17, 18, 28, 29)}[room]
     floor_count = 0
     for plane in floor_planes:
         edges = []
@@ -295,9 +302,10 @@ def smoke_atlas(disc):
 
 def school_room(disc, room=39):
     cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3),
-              23: (255, 254), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
+              23: (255, 254), 24: (255, 254), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
               3: (1, 255), 2: (0, 255), 20: (253, 254), 21: (252, 254), 22: (254, 254)}[room]
-    data = disc.read(f"BG/SC{cx:02X}{cz:02X}.IPD")
+    prefix = "SU" if room == 24 else "SC"
+    data = disc.read(f"BG/{prefix}{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
     lm, = struct.unpack_from("<I", data, 4)
@@ -324,7 +332,7 @@ def school_room(disc, room=39):
         cluts = list(struct.iter_unpack("<16H", tim[20:20 + rows*32]))
         pixels = bytearray(tim[image+12:image+size])
         regions = ()
-        if room == 23 and name == "SC1FSE2":
+        if room in (23, 24) and name == "SC1FSE2":
             # The tree and window palettes each have their own cutout index.
             regions = ((2, 14, 0, (0, 63, 0, 127)), (4, 15, 0, (64, 159, 0, 63)))
         if room == 22 and name == "SC1FURA2":
@@ -516,6 +524,10 @@ def school_room(disc, room=39):
             extra = prompt_data(disc, 21, first_floor=True, choices=False, map_bearings=True)
         elif room == 22:
             extra = ladder_frames(disc)
+        elif room == 24:
+            extra = courtyard_look_frames(disc) + b"".join(
+                prompt_data(disc, n, choices=False, map_bearings=True, subtitle=True) for n in (15, 16, 17)
+            ) + courtyard_voices(disc)
         elif room == 9:
             extra = medical_pickups(disc)
         elif room == 12:
