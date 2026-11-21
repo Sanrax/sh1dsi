@@ -279,6 +279,8 @@ int main(void)
         while (debt >= step) {
             int sound = -1;
             if (point.ticks != UINT32_MAX) point.ticks++;
+            if (inRoom && roomHasNormals())
+                roomChanged |= lightingTick((pressed & KEY_Y) && !otherworldIntroActive());
             if (inRoom && otherworldIntroActive()) {
                 roomChanged |= otherworldTickIntro(pressed & KEY_START);
             } else if (inRoom && playerLadderActive()) {
@@ -383,6 +385,7 @@ int main(void)
             debt -= step;
         }
 
+        lightingScreen(inRoom && roomHasNormals(), otherworldIntroActive());
         int imageIndex = inRoom ? 2 : piano.checking;
         if (inRoom && (previousImage != imageIndex || roomChanged)) {
             roomDraw(&medal);

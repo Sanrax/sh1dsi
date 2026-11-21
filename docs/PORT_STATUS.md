@@ -11,6 +11,7 @@ Harry can inspect the clock tower door and place both medallions. With the
 boiler powered he can enter the tower and cross the underground passage.
 Both ladders work in both directions. Harry can use the far tower's outer
 door, watch or skip the Otherworld arrival scene and walk the courtyard.
+Y switches the flashlight after the scene, changing the light and fog.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -895,14 +896,46 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   with no geometry overflow.
 - The sampled images had mean RGB errors of 11.2–20.8 out of 255.
   The native ramp view is brighter. Camera easing and scripted walk
-  use interpolated positions. The flashlight, rain and courtyard music
-  remain pending, and the courtyard exits are pending.
+  use interpolated positions.
+
+## Otherworld flashlight and fog
+
+- The converted courtyard includes the original LM normals. The runtime
+  shades 5,214 shared position and normal pairs for 10,548 corners.
+  Harry's animated torso positions the lamp and his heading aims it.
+  Y switches the light after the intro with a 15-step fade.
+- The PS1 replay measured full beam intensity at 0.70 and disabled fog.
+  With the light off, the original uses a blue-gray tint and black fog
+  near 9.30 metres. The DSi uses a W-buffer fog table and a top-screen
+  blend for the original brightness pass. Harry's mesh uses a shared
+  tint, and the DSi fog ramp and color quantization differ from PS1.
+  [DS fog registers](https://mgba-emu.github.io/gbatek/#ds-3d-toon-edge-fog-alpha-blending-anti-aliasing)
+  [DS 2D blending of 3D output](https://mgba-emu.github.io/gbatek/#ds-3d-final-2d-output)
+- In six matched melonDS 1.1 DSi views, RGB mean absolute error against
+  resampled PS1 captures fell from 16.83–20.97 to 1.29–8.41 on a 0–255
+  scale. The captures cover the intro, both flashlight settings, turning
+  and walking. The PS1 replay is `clock-otherworld-light` on the local
+  diagnostics branch.
+- Stable courtyard views averaged 33.43 ms per scene submission (29.9
+  FPS) in the DSi emulator. The per-view mean ARM9 submission times were
+  5.94–7.97 ms, compared with 6.46–11.30 ms in the first per-corner
+  implementation. Peak geometry was 769 polygons and 3,014 vertices
+  without overflow. Physical frame pacing still needs measurement.
+- The uninstrumented build passed a checkpoint-to-courtyard replay over
+  both melonDS DLDI and virtual console SD, including a full intro and
+  a Start skip. Both runs switched the beam off and back on, then turned
+  and walked. The lower screen stayed black.
+- Two clean BlocksDS builds reproduced the TWL ROM and all 21 sidecars.
+  The updated `otherworld.dat` is 1,156,622 bytes. The other 20 data
+  files are byte-identical. The previous courtyard data still loads
+  with its static lighting.
+- The courtyard exits, rain and original music remain pending.
 
 ## Next
 
-1. Port the Otherworld flashlight and rain, then compare the intro lighting to PS1.
-2. Connect the courtyard doors and verify the first Otherworld hall route.
-3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
+1. Connect the courtyard doors and verify the first Otherworld hall route.
+2. Port the courtyard rain and ambience and compare them with the PS1 replay.
+3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
 shdecompilations. [Pinned upstream source](https://github.com/shdecompilations/silent-hill-decomp/tree/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce)

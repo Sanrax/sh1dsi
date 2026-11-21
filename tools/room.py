@@ -16,6 +16,7 @@ ROOM_GROUND_PLANES = 8
 ROOM_BOILER_EVENT = 16
 ROOM_DOOR_NOTICE = 32
 ROOM_LADDER_ASCENT = 64
+ROOM_NORMALS = 128
 
 ROOM_LAYOUTS = {
     2: ROOM_BOILER_EVENT,
@@ -24,7 +25,7 @@ ROOM_LAYOUTS = {
     21: 0,
     22: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES | ROOM_LADDER_ASCENT,
     23: ROOM_FLOOR_PLANES,
-    24: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES,
+    24: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_NORMALS,
     31: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES,
 }
 
@@ -360,16 +361,31 @@ def school_room(disc, room=39):
 
     # Group opaque polygons by texture and CLUT without duplicating any texture.
     groups = defaultdict(bytearray)
+    normals = defaultdict(bytearray)
     walls = defaultdict(list)
     decorations = []
     music_decorations = []
     layout = ROOM_LAYOUTS.get(room)
+    lit = layout is not None and layout & ROOM_NORMALS
     wide = room in (12, 16) if layout is None else (layout & ROOM_WIDE_VERTICES) != 0
     vertex_scale = 4 if wide else 8
     def add_model(name, matrix, position, state=0, *, item_page=None):
         model_data, meshes, base, ptr = models[name]
         for j in range(meshes):
-            faces, nverts, _, _, prim, xy, z, _, _ = struct.unpack_from("<4B5I", model_data, ptr + 24*j)
+            faces, nverts, normal_count, ref_count, prim, xy, z, normal_ptr, refs = struct.unpack_from(
+                "<4B5I", model_data, ptr + 24*j
+            )
+            if lit:
+                # The LM maps every corner to a normal and the vertex
+                # used for the PS1 lighting query.
+                corner_normals = []
+                for i in range(normal_count):
+                    *normal, count = struct.unpack_from("<3bB", model_data, normal_ptr+4*i)
+                    rotated = [sum(matrix[3*a+k]*normal[k] for k in range(3)) >> 12 for a in range(3)]
+                    encoded = struct.pack("<3bx", *(max(-128, min(127, n)) for n in rotated))
+                    corner_normals.extend([encoded] * count)
+                if len(corner_normals) != ref_count:
+                    raise ValueError("unexpected LM normal map")
             vertices = []
             for v in range(nverts):
                 coord = (*struct.unpack_from("<hh", model_data, xy+4*v),
@@ -410,7 +426,8 @@ def school_room(disc, room=39):
                         if not valid:
                             raise ValueError("texture region overlaps a different palette")
                 flags = (face[7] >> 7) | (color_keys[mat][row] << 1) | (untextured << 2)
-                group = groups[state, mat, row, flags]
+                key = state, mat, row, flags
+                group = groups[key]
                 start = len(group)
                 points = []
                 for corner in (0, 1, 3, 2):  # PS1 quad strip to DS perimeter
@@ -423,6 +440,11 @@ def school_room(disc, room=39):
                         raise ValueError("common item UV outside atlas")
                     point = vertices[idx]
                     group.extend(struct.pack("<3hBB", *point, u, v+v_offset))
+                    if lit:
+                        index = face[16+corner]
+                        if index >= ref_count or model_data[refs+index] != face[12+corner]:
+                            raise ValueError("LM normal refers to a different lighting vertex")
+                        normals[key].extend(corner_normals[index])
                     points.append(point)
                 if not state and item_page is None and not flags & 1:
                     music = room == 39
@@ -601,7 +623,24 @@ def school_room(disc, room=39):
     result.extend(palettes)
     result.extend(collision_edges(data, room))
     result.extend(extra)
-    for key, quads in sorted(groups.items(), key=lambda g: (g[0][3] & 1, g[0])):
+    batches = sorted(groups.items(), key=lambda group: (group[0][3] & 1, group[0]))
+    if lit:
+        # A position and normal can be shared even across texture seams.
+        points = {}
+        corners = []
+        for key, quads in batches:
+            batch = bytearray()
+            for vertex, normal in zip(struct.iter_unpack("<6s2s", quads),
+                                      struct.iter_unpack("<4s", normals[key]), strict=True):
+                position, uv = vertex
+                point = points.setdefault(position + normal[0], len(points))
+                batch.extend(struct.pack("<H2s", point, uv))
+            corners.append(batch)
+        result.extend(struct.pack("<H", len(points)))
+        result.extend(b"".join(points))
+    else:
+        corners = (quads for _, quads in batches)
+    for (key, quads), batch in zip(batches, corners, strict=True):
         result.extend(struct.pack("<4BI", *key, len(quads)//32))
-        result.extend(quads)
+        result.extend(batch)
     return result

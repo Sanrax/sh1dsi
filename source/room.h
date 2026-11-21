@@ -17,6 +17,7 @@ extern const Door schoolDoors[];
 extern const unsigned schoolDoorCount;
 
 SchoolRoom roomCurrent(void);
+bool roomHasNormals(void);
 bool roomHasHand(void);
 bool roomCanDissolveHand(void);
 typedef struct { int x, z; } RoomOrigin; // Q12 world coordinates.

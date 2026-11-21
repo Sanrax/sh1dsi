@@ -920,7 +920,7 @@ typedef struct {
     int32_t z;
 } PackedPosition;
 
-ARM_CODE void playerDraw(unsigned firstPalette)
+ARM_CODE void playerDraw(unsigned firstPalette, unsigned fog, Flashlight *lamp)
 {
     Matrix world[18];
     static PackedPosition positions[384];
@@ -940,10 +940,26 @@ ARM_CODE void playerDraw(unsigned firstPalette)
     // PS1 bone coordinates are in Q8. Convert root pose to room-local DS units.
     RoomOrigin origin = roomOrigin();
     int height = onLadder() ? ladderHeight : collisionFloor(x, z).height;
+    if (lamp) {
+        // Game_FlashlightAttribsSet attaches the light origin to the torso
+        // and aims it from Harry's root heading, pitched down 15 degrees.
+        static const int16_t offset[] = {-21, -72, 30};
+        const Matrix *torso = &world[1];
+        int bx = torso->t[0] + dot(torso->r[0], offset);
+        int bz = torso->t[2] + dot(torso->r[2], offset);
+        int c = cosLerp(yaw*8), s = sinLerp(yaw*8);
+        int pitch = cosLerp(170*8);
+        *lamp = (Flashlight){
+            .x = (x >> 4)-(origin.x >> 4)+((c*bx+s*bz) >> 12),
+            .y = (height >> 4)+torso->t[1]+dot(torso->r[1], offset),
+            .z = (z >> 4)-(origin.z >> 4)+((c*bz-s*bx) >> 12),
+            .dx = (s*pitch) >> 12, .dy = sinLerp(170*8), .dz = (c*pitch) >> 12
+        };
+    }
     glTranslatef32(((x >> 4)-(origin.x >> 4))*8, -height/2,
                    ((origin.z >> 4)-(z >> 4))*8);
     glRotateYi(-yaw*8);
-    glPolyFmt(POLY_ALPHA(31) | POLY_CULL_FRONT);
+    glPolyFmt(POLY_ALPHA(31) | POLY_CULL_FRONT | fog);
     const Corner *c = corners;
     for (unsigned i = 0; i < batchCount; i++) {
         const Batch *b = &batches[i];

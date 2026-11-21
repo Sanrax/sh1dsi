@@ -1,6 +1,7 @@
 #ifndef SH1_PLAYER_H
 #define SH1_PLAYER_H
 #include "room.h"
+#include "lighting.h"
 #include "checkpoint.h"
 #include "inspection.h"
 #include <stdio.h>
@@ -43,6 +44,6 @@ typedef struct {
 RoomExit playerDestination(bool action);
 void playerEnterRoom(SchoolRoom from, const StairExit *stairs);
 int playerSetCamera(void);
-void playerDraw(unsigned firstPalette);
+void playerDraw(unsigned firstPalette, unsigned fog, Flashlight *lamp);
 
 #endif

@@ -7,6 +7,7 @@
 #include "pickup.h"
 #include "statue.h"
 #include "otherworld.h"
+#include "lighting.h"
 
 typedef struct {
     uint32_t offset;
@@ -22,10 +23,8 @@ typedef struct {
 enum { StaticBatch, HangingSilverBatch, FallenSilverBatch, DrinkBatch, KitBatch, ChemicalBatch,
        IntactHandBatch, OpenHandBatch, GoldAtHandBatch, BoilerUnwiredBatch, BoilerReadyBatch, BoilerGlowBatch };
 
-typedef struct {
-    int16_t x, y, z;
-    uint8_t u, v;
-} Vertex;
+typedef RoomVertex Vertex;
+_Static_assert(sizeof(LitPoint) == 10 && sizeof(LitCorner) == 4, "lit room vertex layout");
 
 _Static_assert(sizeof(Vertex) == 8, "room vertex layout");
 
@@ -35,7 +34,7 @@ static struct {
     uint32_t textureBytes, paletteBytes;
 } header;
 static Page pages[4], skin;
-enum { RoomEdgeHeights = 1, RoomFloorPlanes = 2, RoomWideVertices = 4, RoomGroundPlanes = 8, RoomBoilerEvent = 16, RoomDoorNotice = 32, RoomLadderAscent = 64 };
+enum { RoomEdgeHeights = 1, RoomFloorPlanes = 2, RoomWideVertices = 4, RoomGroundPlanes = 8, RoomBoilerEvent = 16, RoomDoorNotice = 32, RoomLadderAscent = 64, RoomNormals = 128 };
 static SchoolRoom current = MusicRoom;
 static RoomOrigin currentOrigin = {-100*4096, 20*4096};
 static bool handPresent, handPuzzle, wideGeometry;
@@ -113,6 +112,12 @@ static bool visibleChunks[MaxChunks], visibilityValid;
 static int visibilityMatrix[16];
 static unsigned batchWords[MaxBatches];
 static uint32_t *geometry;
+static LitCorner *litGeometry;
+static LitPoint *lightPoints;
+static uint16_t *lightColors;
+static uint16_t lightCount;
+
+bool roomHasNormals(void) { return litGeometry != NULL; }
 
 static bool upload(FILE *file, void *vram, unsigned size)
 {
@@ -191,6 +196,33 @@ static uint32_t *loadGeometry(FILE *file, uint32_t *out, unsigned quads, Geometr
     return out;
 }
 
+static bool loadLitGeometry(FILE *file, LitCorner *vertices, unsigned count, GeometryChunk **chunk)
+{
+    if (fread(vertices, sizeof *vertices, count, file) != count) return false;
+    for (unsigned i = 0; i < count; i++)
+        if (vertices[i].point >= lightCount) return false;
+    for (unsigned i = 0; i < count;) {
+        GeometryChunk *part = (*chunk)++;
+        unsigned size = count-i < 4*ChunkQuads ? count-i : 4*ChunkQuads;
+        unsigned end = i+size;
+        const LitPoint *first = &lightPoints[vertices[i].point];
+        part->bounds[0] = part->bounds[3] = first->x;
+        part->bounds[1] = part->bounds[4] = first->y;
+        part->bounds[2] = part->bounds[5] = first->z;
+        part->words = size;
+        for (; i < end; i++) {
+            const LitPoint *v = &lightPoints[vertices[i].point];
+            if (v->x < part->bounds[0]) part->bounds[0] = v->x;
+            if (v->x > part->bounds[3]) part->bounds[3] = v->x;
+            if (v->y < part->bounds[1]) part->bounds[1] = v->y;
+            if (v->y > part->bounds[4]) part->bounds[4] = v->y;
+            if (v->z < part->bounds[2]) part->bounds[2] = v->z;
+            if (v->z > part->bounds[5]) part->bounds[5] = v->z;
+        }
+    }
+    return true;
+}
+
 static long roomFileSize(FILE *file, long position)
 {
     // An end seek discards read-ahead and can restart FAT reads mid-sector.
@@ -225,7 +257,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     struct { uint8_t room, flags; uint16_t reserved; } layout = {0};
     if (streamed && (!corridor || fread(&layout, sizeof layout, 1, file) != 1 ||
                      layout.room != room || layout.reserved ||
-                     (layout.flags & ~(RoomEdgeHeights | RoomFloorPlanes | RoomWideVertices | RoomGroundPlanes | RoomBoilerEvent | RoomDoorNotice | RoomLadderAscent)) ||
+                     (layout.flags & ~(RoomEdgeHeights | RoomFloorPlanes | RoomWideVertices | RoomGroundPlanes | RoomBoilerEvent | RoomDoorNotice | RoomLadderAscent | RoomNormals)) ||
+                     ((layout.flags & RoomNormals) && (!hasOrigin || room != OtherworldCourtyard)) ||
                      ((layout.flags & RoomLadderAscent) && (!hasOrigin || room != TowerPassage)) ||
                      ((layout.flags & RoomDoorNotice) && (!hasOrigin || room != ClockTower)) ||
                      ((layout.flags & RoomBoilerEvent) && (!hasOrigin || room != BoilerRoom)) ||
@@ -376,6 +409,26 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
                  !pickupLoadEmptyHand(file)))
         return false;
 
+    bool lit = layout.flags & RoomNormals;
+    if (scenery) {
+        free(lightPoints);
+        free(lightColors);
+        lightPoints = NULL;
+        lightColors = NULL;
+    }
+    if (lit) {
+        if (fread(&lightCount, sizeof lightCount, 1, file) != 1 ||
+            !lightCount || lightCount > MaxRoomVertices)
+            return false;
+        lightPoints = malloc(lightCount*sizeof *lightPoints);
+        lightColors = malloc(lightCount*sizeof *lightColors);
+        if (!lightPoints || !lightColors ||
+            fread(lightPoints, sizeof *lightPoints, lightCount, file) != lightCount)
+            return false;
+        for (unsigned i = 0; i < lightCount; i++)
+            if (lightPoints[i].reserved) return false;
+    }
+
     // Derive the command buffer size from the validated on-card vertex count.
     long start = ftell(file);
     if (start < 0) return false;
@@ -385,15 +438,18 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     long bytes = endOfFile - start - batchHeaders;
     unsigned maxVerts = streamed || room == Courtyard ? MaxRoomVertices :
                         room == MusicRoom || room == SchoolCorridor ? 6144 : 8192;
-    if (bytes <= 0 || bytes > maxVerts*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)))
+    size_t stride = lit ? sizeof(LitCorner) : sizeof(Vertex);
+    if (bytes <= 0 || bytes > maxVerts*(long)stride || bytes % (4*stride))
         return false;
     if (!scenery) return true;
-    unsigned pos = 0, total = bytes / sizeof(Vertex);
+    unsigned pos = 0, total = bytes / stride;
     // Two full vertices need six parameters and one packed command word.
     size_t geometryBytes = total/2 * 7 * sizeof(*geometry);
     free(geometry);
-    geometry = malloc(geometryBytes);
-    if (!geometry) return false;
+    free(litGeometry);
+    geometry = lit ? NULL : malloc(geometryBytes);
+    litGeometry = lit ? malloc(total*sizeof *litGeometry) : NULL;
+    if (!geometry && !litGeometry) return false;
     unsigned maxState = boiler ? BoilerGlowBatch : pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
                         corridor ? StaticBatch : FallenSilverBatch;
     uint32_t *end = geometry;
@@ -406,17 +462,26 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
             ((chemical || pour) && b->page >= scenePages) ||
             b->quads > (total-pos)/4)
             return false;
-        uint32_t *next = loadGeometry(file, end, b->quads, &chunk);
-        if (!next) return false;
-        batchWords[i] = next-end;
-        end = next;
+        if (lit) {
+            if (!loadLitGeometry(file, litGeometry+pos, 4*b->quads, &chunk)) return false;
+            batchWords[i] = 4*b->quads;
+        } else {
+            uint32_t *next = loadGeometry(file, end, b->quads, &chunk);
+            if (!next) return false;
+            batchWords[i] = next-end;
+            end = next;
+        }
         pos += 4*b->quads;
     }
     if (pos != total) return false;
-    geometryBytes = (end-geometry)*sizeof(*geometry);
-    uint32_t *compact = realloc(geometry, geometryBytes);
-    if (compact) geometry = compact;
-    DC_FlushRange(geometry, geometryBytes);
+    if (lit) {
+        lightingReset();
+    } else {
+        geometryBytes = (end-geometry)*sizeof(*geometry);
+        uint32_t *compact = realloc(geometry, geometryBytes);
+        if (compact) geometry = compact;
+        DC_FlushRange(geometry, geometryBytes);
+    }
     visibilityValid = false;
     currentOrigin = origin;
     current = room;
@@ -481,6 +546,25 @@ static inline void submitGeometry(const uint32_t *commands, unsigned words)
     while (dmaBusy(0)) {}
 }
 
+// Vertices share shaded positions and normals, with independent texture coordinates.
+static ARM_CODE void submitLitGeometry(const LitCorner *corners, unsigned count)
+{
+    static uint32_t commands[5*4*ChunkQuads] __attribute__((aligned(32)));
+    uint32_t *out = commands;
+    for (unsigned i = 0; i < count; i++) {
+        const LitCorner *corner = &corners[i];
+        const LitPoint *point = &lightPoints[corner->point];
+        *out++ = FIFO_COMMAND_PACK(FIFO_COLOR, FIFO_TEX_COORD, FIFO_VERTEX16, 0);
+        *out++ = lightColors[corner->point];
+        *out++ = ((uint32_t)corner->v << 20) | ((uint32_t)corner->u << 4);
+        *out++ = (uint16_t)point->x | ((uint32_t)(uint16_t)point->y << 16);
+        *out++ = (uint32_t)(int32_t)point->z;
+    }
+    unsigned words = out-commands;
+    DC_FlushRange(commands, words*sizeof(*commands));
+    submitGeometry(commands, words);
+}
+
 static ARM_CODE void submitVisible(const uint32_t *commands, const GeometryChunk *chunk,
                                    unsigned count, bool *inView, const ClipPlane *updated)
 {
@@ -533,10 +617,14 @@ void roomDraw(const Medallion *medal)
     glTranslatef32(0, -eyeY, 0);
 
     glEnable(GL_TEXTURE_2D | GL_BLEND);
+    unsigned fog = litGeometry ? lightingFog() : 0;
+    if (!litGeometry) glDisable(GL_FOG);
     glClearColor(0, 0, 0, 31);
     glClearPolyID(63);
     glClearDepth(0x7fff);
-    glColor(RGB15(31,31,31));
+    glColor(litGeometry ? lightingActorColor() : RGB15(31,31,31));
+    Flashlight lamp = {0};
+    const LitCorner *lit = litGeometry;
     const uint32_t *commands = geometry;
     const GeometryChunk *chunk = chunks;
     bool *inView = visibleChunks;
@@ -546,8 +634,9 @@ void roomDraw(const Medallion *medal)
     if (playerReady()) {
         GFX_TEX_FORMAT = (skin.offset >> 3) | (TEXTURE_SIZE_256 << 20)
                          | (TEXTURE_SIZE_256 << 23) | (GL_RGB16 << 26);
-        playerDraw(skin.firstPalette);
+        playerDraw(skin.firstPalette, fog, lit ? &lamp : NULL);
     }
+    if (lit) lightingShade(lightPoints, lightColors, lightCount, &lamp);
     if (wideGeometry) glScalef32(8192, 8192, 8192);
     bool visible[] = {
         [StaticBatch] = true,
@@ -584,20 +673,28 @@ void roomDraw(const Medallion *medal)
                              | (GL_RGB16 << 26) | ((b->flags & 2) ? GL_TEXTURE_COLOR0_TRANSPARENT : 0);
             GFX_PAL_FORMAT = (p->firstPalette + b->palette) * 2;
             // PS1 visible faces wind clockwise in these screen coordinates.
-            glPolyFmt(POLY_ALPHA((b->flags & 1) ? 16 : 31) | POLY_CULL_FRONT);
+            glPolyFmt(POLY_ALPHA((b->flags & 1) ? 16 : 31) | POLY_CULL_FRONT | fog);
             glBegin(GL_QUADS);
-            if (b->state == StaticBatch)
+            if (lit) {
+                const LitCorner *vertices = lit;
+                for (unsigned j = 0; j < chunkCount; j++) {
+                    if (updated) inView[j] = chunkVisible(&chunk[j], updated);
+                    if (inView[j]) submitLitGeometry(vertices, chunk[j].words);
+                    vertices += chunk[j].words;
+                }
+            } else if (b->state == StaticBatch)
                 submitVisible(commands, chunk, chunkCount, inView, updated);
             else
                 submitGeometry(commands, count);
             glEnd();
             if (moving) glPopMatrix(1);
         }
-        commands += count;
+        if (lit) lit += count;
+        else commands += count;
         chunk += chunkCount;
         inView += chunkCount;
     }
     statueDrawSmoke();
     pickupDrawItem();
-    glFlush(0);
+    glFlush(litGeometry ? GL_WBUFFERING : 0);
 }
