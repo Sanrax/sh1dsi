@@ -78,6 +78,8 @@ hall. Use either of the first two classroom doors on the east wall. Face
 the card on the desk in the north classroom and press A to inspect it.
 Pick it up, then use the door at the south end to cross into the next
 classroom. Its southwest door opens onto the far side of the barrier.
+Use the double doors across this section of the east hall to enter the
+south hall, then turn back to return.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

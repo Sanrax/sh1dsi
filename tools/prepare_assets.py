@@ -106,6 +106,7 @@ def prepare(cue):
         otherworld_lobby = school_room(disc, 26)
         otherworld_side = school_room(disc, 27)
         otherworld_east = school_room(disc, 28)
+        otherworld_south = school_room(disc, 11)
         classroom_north = school_room(disc, 29)
         classroom_south = school_room(disc, 30)
     write_asset(OUTPUT.with_name("notebook.dat"), notebook)
@@ -133,6 +134,7 @@ def prepare(cue):
     write_asset(OUTPUT.with_name("otherworldlobby.dat"), otherworld_lobby)
     write_asset(OUTPUT.with_name("otherworldside.dat"), otherworld_side)
     write_asset(OUTPUT.with_name("otherworldeast.dat"), otherworld_east)
+    write_asset(OUTPUT.with_name("otherworldsouth.dat"), otherworld_south)
     write_asset(OUTPUT.with_name("classroomnorth.dat"), classroom_north)
     write_asset(OUTPUT.with_name("classroomsouth.dat"), classroom_south)
 

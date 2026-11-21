@@ -21,6 +21,7 @@ ROOM_NORMALS = 128
 ROOM_LAYOUTS = {
     2: ROOM_BOILER_EVENT,
     3: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES,
+    11: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_NORMALS,
     20: ROOM_DOOR_NOTICE,
     21: 0,
     22: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES | ROOM_LADDER_ASCENT,
@@ -83,7 +84,7 @@ def collision_edges(ipd, room):
     expected = {2: (0, -10240, 35, 9, 43, 0), 3: (10240, -10240, 25, 4, 26, 0),
                 39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
                 31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0),
-                13: (30720, 0, 80, 12, 80, 0), 9: (10240, 30720, 45, 11, 49, 0),
+                13: (30720, 0, 80, 12, 80, 0), 11: (30720, 0, 33, 7, 35, 0), 9: (10240, 30720, 45, 11, 49, 0),
                 20: (-30720, -20480, 16, 3, 16, 0), 21: (-40960, -20480, 16, 3, 16, 0),
                 22: (-20480, -20480, 28, 8, 32, 0),
                 23: (-10240, -20480, 204, 61, 236, 0), 24: (-10240, -20480, 172, 31, 175, 0),
@@ -126,6 +127,9 @@ def collision_edges(ipd, room):
         if room == 22 and ((floor < 3 and i not in (4, 6, 10, 12)) or other != 255):
             continue
         if room == 13 and floor in (3, 4):
+            continue
+        # The alternate southern hallway's inside walls and the lockers.
+        if room == 11 and not (i in (0, 4) or 7 <= i <= 14 or i >= 23):
             continue
         # SC0304's inner shell follows the usable hallway around its alcove.
         if room == 16 and (floor == 1 or (floor == 0 and not 5 <= i <= 12)):
@@ -198,7 +202,7 @@ def collision_edges(ipd, room):
         return output
 
     floors = bytearray()
-    floor_planes = {3: (0, 1), 22: range(3, 8), 31: (11, 12), 23: (*range(37, 41), *range(50, 60)),
+    floor_planes = {11: (3,), 3: (0, 1), 22: range(3, 8), 31: (11, 12), 23: (*range(37, 41), *range(50, 60)),
                     24: (15, 16, 17, 18, 28, 29), 25: (1,), 26: (2,), 28: range(1, 8)}[room]
     floor_count = 0
     for plane in floor_planes:
@@ -339,10 +343,10 @@ def smoke_atlas(disc):
 
 
 def school_room(disc, room=39):
-    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3),
+    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 11: (3, 0), 9: (1, 3),
               23: (255, 254), 24: (255, 254), 25: (3, 4), 26: (2, 3), 27: (3, 3), 28: (2, 1), 29: (3, 2), 30: (3, 1), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
               3: (1, 255), 2: (0, 255), 20: (253, 254), 21: (252, 254), 22: (254, 254)}[room]
-    prefix = "SU" if room in (24, 25, 26, 27, 28, 29, 30) else "SC"
+    prefix = "SU" if room in (11, 24, 25, 26, 27, 28, 29, 30) else "SC"
     data = disc.read(f"BG/{prefix}{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -706,7 +710,7 @@ def school_room(disc, room=39):
     # so convert the texels and CLUTs together after all textured batches are known.
     for page, (name, size, cluts) in enumerate(scene_textures):
         row_keys = [{idx for idx, color in enumerate(clut) if color == 0} for clut in cluts]
-        if room in (25, 28) and name == "SU1FT1":
+        if room in (11, 25, 28) and name == "SU1FT1":
             # CLUT 4 has unused zero entries after index 10. Its tile and
             # CLUT 0 both use index 1 for transparency.
             offset, width, _, _ = page_info[page]

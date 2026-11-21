@@ -17,7 +17,7 @@ The north hall connects to the lobby, where Harry can collect the first-aid
 kit and handgun bullets and inspect the fans. The north hall also connects
 through the side hall to the Otherworld east hall. Harry can take the Picture
 Card from the north classroom and cross the south classroom to get past
-the east hall barrier.
+the east hall barrier and enter the Otherworld south hall.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -1063,7 +1063,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   112,364 bytes. The host checkpoint test preserves the Picture Card
   flag alongside legacy SHC1/SHC2 compatibility and interrupted writes.
 - The uninstrumented ROM ran from a powered-boiler checkpoint over
-  virtual console SD in melonDS 1.1 DSi mode. The run went through the
+  virtual console SD and DLDI in melonDS 1.1 DSi mode. Both runs went through the
   tower, passage, courtyard and halls, then declined and accepted the
   Picture Card, read the scattered-cards notice, and returned to the
   east hall below the barrier. The three door poses matched the PS1 X/Z
@@ -1084,9 +1084,31 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   original ambience remain pending. Physical DSi and Pico-Launcher
   testing remains pending.
 
+## Otherworld south hall
+
+- MAP1_S02 points 64 and 48 connect the lower east hall to the south
+  hall in both directions. The south hall uses the original `SU0300`
+  geometry, normals, floor and both locker banks. The doors use the
+  PS1 arrival cameras and pair 13 sounds.
+- Original PS1 and native melonDS DSi arrivals matched exactly in X/Z
+  and heading. The south hall entry and east hall return differed from
+  the PS1 views by 2.83 and 8.95 RGB values on average on a 0–255 scale.
+  The native locker stops were within 18 Q12 units (4.4 mm) of PS1 along
+  both contact axes in the diagnostic run. The uninstrumented ROM
+  repeated both locker stops and door crossings after reaching the
+  south hall from the powered-boiler checkpoint over virtual console SD.
+- The PS1 east locker replay held 33.367 ms across 161 intervals. The
+  west view averaged 35.718 ms across 149 intervals, including 21
+  three-VBlank frames. The native hall averaged 33.362 ms across 2,698
+  intervals in melonDS 1.1 DSi mode. Its 95th percentile was 33.430 ms
+  and its longest interval was 33.476 ms. Peak use was 967 polygons,
+  3,822 vertices and 4.705 ms of submission time with no overflow.
+- The reproducible unit-code-3 build adds `otherworldsouth.dat`
+  (105,887 bytes). The previous 27 data files are byte-identical.
+
 ## Next
 
-1. Follow the east hall to the next rooms and implement the Picture Card slot.
+1. Connect reception through the south hall and implement the Picture Card slot.
 2. Port the courtyard rain, fan sound and room ambience against the PS1 replay.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 

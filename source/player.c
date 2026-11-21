@@ -94,7 +94,9 @@ static const DoorView doorViews[] = {
     {SouthClassroom, NorthClassroom, {581555, -10993, 255217, 586700, -4096, 266703}, 0},
     {NorthClassroom, SouthClassroom, {570480, -10941, 398047, 578974, -4096, 388095}, 0},
     {OtherworldEastHall, SouthClassroom, {448313, -8003, 199475, 425784, -3404, 199220}, 0},
-    {SouthClassroom, OtherworldEastHall, {579417, -10936, 231074, 569176, -4096, 223092}, 0}
+    {SouthClassroom, OtherworldEastHall, {579417, -10936, 231074, 569176, -4096, 223092}, 0},
+    {OtherworldSouthHall, OtherworldEastHall, {611334, -8003, 81920, 588805, -3404, 81676}, 0},
+    {OtherworldEastHall, OtherworldSouthHall, {438052, -8003, 201113, 460583, -3404, 201355}, 0}
 };
 static const CameraPose *doorView;
 static const CameraPose otherworldArrival = {-72982, -14626, -228551, -77354, -3034, -252059};
@@ -199,6 +201,7 @@ typedef struct {
 static const ChaseRoad chaseRoads[MusicRoom] = {
     [FirstFloor]    = {1710, 1756,   680, 1169, ChaseAlongZ},
     [SouthHall]     = {2086, 2393,   294,  337, ChaseAlongX},
+    [OtherworldSouthHall] = {2086, 2393, 294, 337, ChaseAlongX},
     [NorthHall]     = {1982, 2289,  3043, 3089, ChaseAlongX},
     [Courtyard]     = {-436, -196, -1096, -848, ChaseArea},
     [OtherworldCourtyard] = {-436, -196, -1096, -848, ChaseArea},
@@ -800,7 +803,7 @@ int playerSetCamera(void)
     bool classroom = room == NorthClassroom || room == SouthClassroom;
     bool corridor = classroom || room == SchoolCorridor || room == SouthHall || room == NorthHall ||
                     room == UpperNorthHall || room == OtherworldNorthHall || room == OtherworldLobby ||
-                    room == OtherworldSideHall || room == OtherworldEastHall;
+                    room == OtherworldSideHall || room == OtherworldEastHall || room == OtherworldSouthHall;
     bool equipment = room == EquipmentRoom;
     bool stairwell = room == EastCorridor || room == FirstFloor || room == BasementStair;
     bool boiler = room == BoilerRoom;
