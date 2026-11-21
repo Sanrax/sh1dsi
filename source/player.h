@@ -34,6 +34,8 @@ bool playerFacingTowerExit(void);
 bool playerFacingLobbyFan(void);
 bool playerFacingChemical(void);
 bool playerFacingHand(void);
+bool playerFacingCard(void);
+bool playerFacingScatteredCards(void);
 TowerPoint playerFacingTower(void);
 void playerSavePose(Checkpoint *point);
 void playerRestorePose(const Checkpoint *point);
@@ -41,9 +43,10 @@ typedef struct StairExit StairExit;
 typedef struct {
     SchoolRoom room;
     const StairExit *stairs;
+    const Door *arrival;
 } RoomExit;
 RoomExit playerDestination(bool action);
-void playerEnterRoom(SchoolRoom from, const StairExit *stairs);
+void playerEnterRoom(SchoolRoom from, RoomExit exit);
 int playerSetCamera(void);
 void playerDraw(unsigned firstPalette, unsigned fog, Flashlight *lamp);
 

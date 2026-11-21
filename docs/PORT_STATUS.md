@@ -15,7 +15,9 @@ Y switches the flashlight after the scene, changing the light and fog.
 The north doors reach the Otherworld north hall and lead back to the courtyard.
 The north hall connects to the lobby, where Harry can collect the first-aid
 kit and handgun bullets and inspect the fans. The north hall also connects
-through the side hall to the Otherworld east hall's barrier.
+through the side hall to the Otherworld east hall. Harry can take the Picture
+Card from the north classroom and cross the south classroom to get past
+the east hall barrier.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -1040,9 +1042,51 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   of the east hall barrier. Point 29 in the first classroom starts
   the original Picture Card event.
 
+## Otherworld classrooms
+
+- The north and south classrooms use original `SU0302` and `SU0301`
+  geometry, textures, normals and interior collision. All four door
+  connections retain their paired arrival points and pair 12 sounds.
+  The two doors to the north classroom each keep their own PS1 arrival
+  view. Chase cameras use the classroom roads and the east hall rail
+  continues south of the barrier.
+- The north classroom uses the original desk prop, inspection model and
+  prompt for the Picture Card. Declining leaves the card on the desk.
+  Accepting sets the inventory flag and removes the prop. Interacting
+  with the remaining cards shows the original message.
+- Both classrooms replayed on the verified USA 1.1 disc in Beetle PSX.
+  Each had 175 gameplay intervals at 33.367 ms during the entry and walk.
+  The original eight door directions were captured in separate runs.
+- BlocksDS 1.24.0 and Wonderful GCC 16.2.0 reproduced the unit-code-3
+  ROM and 27 local data files in two clean builds. The 25 earlier data
+  files matched the previous milestone. The new files are 131,222 and
+  112,364 bytes. The host checkpoint test preserves the Picture Card
+  flag alongside legacy SHC1/SHC2 compatibility and interrupted writes.
+- The uninstrumented ROM ran from a powered-boiler checkpoint over
+  virtual console SD in melonDS 1.1 DSi mode. The run went through the
+  tower, passage, courtyard and halls, then declined and accepted the
+  Picture Card, read the scattered-cards notice, and returned to the
+  east hall below the barrier. The three door poses matched the PS1 X/Z
+  and headings exactly. The measured entry views differed by 7.06–11.46
+  RGB values on average on a 0–255 scale. The native prompt view differed
+  by 9.08. Lighting and the moving chase camera remain approximate.
+- A DLDI timing run in melonDS 1.1 DSi mode averaged 33.368 ms in the
+  north classroom across 1,893 intervals and 33.357 ms in the south
+  classroom across 1,148. The 95th percentile was 33.430 ms in both
+  rooms. The respective longest intervals were 49.968 ms and 33.448 ms.
+  Peak geometry use was 610 polygons and 2,389 vertices in the north
+  classroom, and 514 and 2,003 in the south, with no overflow in either.
+  Peak submission time was 3.75 ms and 3.14 ms respectively. The DLDI
+  run exercised all eight classroom door directions and matched each
+  arrival's PS1 X/Z and heading. A separate DSi test showed and dismissed
+  the original first-floor latch notice before using the unlocked door.
+- The Picture Card slot, jammed-door messages, classroom enemies and
+  original ambience remain pending. Physical DSi and Pico-Launcher
+  testing remains pending.
+
 ## Next
 
-1. Connect both classrooms around the east hall barrier and port the Picture Card pickup.
+1. Follow the east hall to the next rooms and implement the Picture Card slot.
 2. Port the courtyard rain, fan sound and room ambience against the PS1 replay.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 

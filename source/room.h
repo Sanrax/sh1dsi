@@ -5,7 +5,7 @@
 #include "medallion.h"
 
 typedef enum { MusicRoom = 39, EquipmentRoom = 35, ChemistryLab = 34, UpperNorthHall = 33, SchoolCorridor = 32,
-               EastCorridor = 31, OtherworldEastHall = 28, OtherworldSideHall = 27, OtherworldLobby = 26,
+               EastCorridor = 31, SouthClassroom = 30, NorthClassroom = 29, OtherworldEastHall = 28, OtherworldSideHall = 27, OtherworldLobby = 26,
                OtherworldNorthHall = 25, OtherworldCourtyard = 24, Courtyard = 23,
                TowerPassage = 22, FarClockTower = 21, ClockTower = 20,
                FirstFloor = 12, SouthHall = 13, NorthHall = 16, Infirmary = 9,

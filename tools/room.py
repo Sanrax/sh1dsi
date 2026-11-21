@@ -4,7 +4,7 @@ import math
 import struct
 
 from harry import courtyard_look_frames, ladder_frames, player_data, pour_frames
-from pickup import chemical_pickup, gold_pickup, lobby_pickups, medical_pickups, prompt_data, silver_pickup
+from pickup import chemical_pickup, gold_pickup, lobby_pickups, medical_pickups, picture_card, prompt_data, silver_pickup
 from vab import statue_sound
 from xa import courtyard_voices
 
@@ -30,6 +30,8 @@ ROOM_LAYOUTS = {
     26: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES | ROOM_NORMALS,
     27: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
     28: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES | ROOM_NORMALS,
+    29: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
+    30: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
     31: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES,
 }
 
@@ -88,6 +90,7 @@ def collision_edges(ipd, room):
                 16: (30720, 40960, 33, 6, 34, 0), 25: (30720, 40960, 24, 4, 24, 0),
                 26: (20480, 30720, 61, 7, 63, 0), 27: (30720, 30720, 16, 5, 20, 0),
                 28: (20480, 10240, 51, 13, 53, 0),
+                29: (30720, 20480, 34, 6, 34, 0), 30: (30720, 10240, 40, 6, 42, 0),
                 33: (-10240, 40960, 40, 8, 40, 0), 34: (-20480, 20480, 38, 5, 38, 15),
                 35: (-30720, 20480, 40, 7, 40, 0)}[room]
     if (x, z, vertices, surfaces, count, cylinders) != expected:
@@ -159,6 +162,10 @@ def collision_edges(ipd, room):
         # The alternate courtyard includes two entrance ramps and the
         # diagonal tower ramp. Their surfaces belong to the floor query.
         if room == 24 and (other != 255 or floor in (7, 15, 16, 17, 18, 28, 29)):
+            continue
+        # Keep the inside shell and the desks. The outer shell is beyond
+        # the usable classrooms. Shared edges 11 and 13 in room 30 lie outside it.
+        if (room == 29 and i < 8) or (room == 30 and (i < 8 or i in (11, 13))):
             continue
         if other != 255:
             raise ValueError("unexpected shared collision edge")
@@ -333,9 +340,9 @@ def smoke_atlas(disc):
 
 def school_room(disc, room=39):
     cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3),
-              23: (255, 254), 24: (255, 254), 25: (3, 4), 26: (2, 3), 27: (3, 3), 28: (2, 1), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
+              23: (255, 254), 24: (255, 254), 25: (3, 4), 26: (2, 3), 27: (3, 3), 28: (2, 1), 29: (3, 2), 30: (3, 1), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
               3: (1, 255), 2: (0, 255), 20: (253, 254), 21: (252, 254), 22: (254, 254)}[room]
-    prefix = "SU" if room in (24, 25, 26, 27, 28) else "SC"
+    prefix = "SU" if room in (24, 25, 26, 27, 28, 29, 30) else "SC"
     data = disc.read(f"BG/{prefix}{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -381,6 +388,19 @@ def school_room(disc, room=39):
                 for j in range(y*words*2+left//2, y*words*2+right//2+1):
                     pixels[j] ^= mask | mask << 4
             cluts[row] = tuple(cluts[row][j ^ mask] for j in range(16))
+        if room == 29 and name == "SU2FC11":
+            if {i for i, color in enumerate(cluts[2]) if color == 0} != {0, 15}:
+                raise ValueError("unexpected classroom cutout palette")
+            # Both transparent indices share the door tile. Move them to
+            # index 1, already used by the page's other cutout palette.
+            remapped_regions[i, 2] = (208, 255, 0, 127)
+            indices = (1, 0, *range(2, 15), 1)
+            for y in range(128):
+                for x in range(y*128+104, y*128+128):
+                    value = pixels[x]
+                    pixels[x] = indices[value & 15] | indices[value >> 4] << 4
+            color = cluts[2]
+            cluts[2] = (color[1], 0, *color[2:15], color[1])
         if room == 23 and name == "SC1FSEH":
             # The last CLUT is unreferenced in this IPD.
             cluts = cluts[:7]
@@ -624,6 +644,16 @@ def school_room(disc, room=39):
             extra = courtyard_look_frames(disc) + b"".join(
                 prompt_data(disc, n, choices=False, map_bearings=True, subtitle=True) for n in (15, 16, 17)
             ) + courtyard_voices(disc)
+        elif room == 29:
+            # Map_WorldObjectsInit places the card with a 46.2-degree yaw.
+            angle = int(46.2*4096/360)*math.tau/4096
+            c, s = round(math.cos(angle)*4096), round(math.sin(angle)*4096)
+            x, y, z = (int(v*4096)>>4 for v in (139.199, -0.8753, 99.3733))
+            add_model(b"KEY_HIDE", (c,0,s,0,4096,0,-s,0,c), (x-30720,y,z-20480), 16)
+            extra, pixels, colors = picture_card(disc)
+            page_info.append((len(pages), 64, len(palettes)//32, 1))
+            pages.extend(pixels)
+            palettes.extend(colors)
         elif room == 26:
             extra = lobby_pickups(disc) + b"".join(
                 prompt_data(disc, n, choices=False, map_bearings=True, otherworld=True) for n in (48, 49)

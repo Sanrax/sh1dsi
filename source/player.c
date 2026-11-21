@@ -63,29 +63,38 @@ static bool followingRoad, doorRail;
 typedef struct {
     SchoolRoom room, from;
     CameraPose camera;
+    int doorZ; // Select the entry when two doors connect the same rooms.
 } DoorView;
-// Measured views at the courtyard and upstairs doors.
+// Measured views at the door and stair arrivals.
 static const DoorView doorViews[] = {
-    {Courtyard, SouthHall, {-80691, -10451, -280786, -80899, -6046, -258222}},
-    {Courtyard, NorthHall, {-80691, -10451, -216468, -80449, -5852, -238997}},
-    {NorthHall, Courtyard, {546816, -8003, 772695, 546561, -3404, 795226}},
-    {OtherworldCourtyard, OtherworldNorthHall, {-80691, -10451, -216468, -80438, -5852, -238997}},
-    {OtherworldNorthHall, OtherworldCourtyard, {546816, -8003, 772695, 546561, -3404, 795226}},
-    {OtherworldLobby, OtherworldNorthHall, {409600, -7987, 561752, 409356, -3388, 584283}},
-    {OtherworldNorthHall, OtherworldLobby, {546816, -8003, 789510, 547058, -3404, 766981}},
-    {OtherworldSideHall, OtherworldNorthHall, {543744, -8601, 576307, 543976, -2816, 564018}},
-    {OtherworldNorthHall, OtherworldSideHall, {564838, -8003, 789510, 565091, -3404, 766981}},
-    {OtherworldEastHall, OtherworldSideHall, {441548, -8003, 297991, 441777, -3404, 275462}},
-    {OtherworldSideHall, OtherworldEastHall, {560912, -8601, 572802, 571566, -2816, 564423}},
-    {UpperNorthHall, EastCorridor, {-62457, -7987, 784384, -84986, -3388, 784129}},
-    {UpperNorthHall, ChemistryLab, {-118374, -7987, 789511, -118145, -3388, 766982}},
-    {EastCorridor, UpperNorthHall, {-209115, -7987, 292864, -186584, -3388, 293117}},
-    {EquipmentRoom, UpperNorthHall, {-402816, -8601, 413736, -403915, -2816, 401473}},
-    {UpperNorthHall, EquipmentRoom, {-131481, -7987, 789512, -131252, -3388, 766982}},
-    {BasementStair, FirstFloor, {224047, -10240, -85118, 234373, -10000, -77339}},
-    {BoilerRoom, BasementStair, {88832, -6921, -68113, 88695, -2816, -84057}},
-    {BasementStair, BoilerRoom, {220964, -7987, -70451, 243480, -3687, -70198}},
-    {FirstFloor, BasementStair, {442003, -5049, 182974, 451525, 736, 173841}}
+    {Courtyard, SouthHall, {-80691, -10451, -280786, -80899, -6046, -258222}, 0},
+    {Courtyard, NorthHall, {-80691, -10451, -216468, -80449, -5852, -238997}, 0},
+    {NorthHall, Courtyard, {546816, -8003, 772695, 546561, -3404, 795226}, 0},
+    {OtherworldCourtyard, OtherworldNorthHall, {-80691, -10451, -216468, -80438, -5852, -238997}, 0},
+    {OtherworldNorthHall, OtherworldCourtyard, {546816, -8003, 772695, 546561, -3404, 795226}, 0},
+    {OtherworldLobby, OtherworldNorthHall, {409600, -7987, 561752, 409356, -3388, 584283}, 0},
+    {OtherworldNorthHall, OtherworldLobby, {546816, -8003, 789510, 547058, -3404, 766981}, 0},
+    {OtherworldSideHall, OtherworldNorthHall, {543744, -8601, 576307, 543976, -2816, 564018}, 0},
+    {OtherworldNorthHall, OtherworldSideHall, {564838, -8003, 789510, 565091, -3404, 766981}, 0},
+    {OtherworldEastHall, OtherworldSideHall, {441548, -8003, 297991, 441777, -3404, 275462}, 0},
+    {OtherworldSideHall, OtherworldEastHall, {560912, -8601, 572802, 571566, -2816, 564423}, 0},
+    {UpperNorthHall, EastCorridor, {-62457, -7987, 784384, -84986, -3388, 784129}, 0},
+    {UpperNorthHall, ChemistryLab, {-118374, -7987, 789511, -118145, -3388, 766982}, 0},
+    {EastCorridor, UpperNorthHall, {-209115, -7987, 292864, -186584, -3388, 293117}, 0},
+    {EquipmentRoom, UpperNorthHall, {-402816, -8601, 413736, -403915, -2816, 401473}, 0},
+    {UpperNorthHall, EquipmentRoom, {-131481, -7987, 789512, -131252, -3388, 766982}, 0},
+    {BasementStair, FirstFloor, {224047, -10240, -85118, 234373, -10000, -77339}, 0},
+    {BoilerRoom, BasementStair, {88832, -6921, -68113, 88695, -2816, -84057}, 0},
+    {BasementStair, BoilerRoom, {220964, -7987, -70451, 243480, -3687, -70198}, 0},
+    {FirstFloor, BasementStair, {442003, -5049, 182974, 451525, 736, 173841}, 0},
+    {NorthClassroom, OtherworldEastHall, {567327, -10982, 420909, 560623, -4096, 433260}, 431718},
+    {NorthClassroom, OtherworldEastHall, {572418, -10944, 393185, 561236, -4096, 387192}, 387481},
+    {OtherworldEastHall, NorthClassroom, {448313, -8003, 294502, 425784, -3404, 294247}, 294502},
+    {OtherworldEastHall, NorthClassroom, {448313, -8003, 251904, 425784, -3404, 251649}, 251904},
+    {SouthClassroom, NorthClassroom, {581555, -10993, 255217, 586700, -4096, 266703}, 0},
+    {NorthClassroom, SouthClassroom, {570480, -10941, 398047, 578974, -4096, 388095}, 0},
+    {OtherworldEastHall, SouthClassroom, {448313, -8003, 199475, 425784, -3404, 199220}, 0},
+    {SouthClassroom, OtherworldEastHall, {579417, -10936, 231074, 569176, -4096, 223092}, 0}
 };
 static const CameraPose *doorView;
 static const CameraPose otherworldArrival = {-72982, -14626, -228551, -77354, -3034, -252059};
@@ -196,6 +205,8 @@ static const ChaseRoad chaseRoads[MusicRoom] = {
     [OtherworldLobby] = {1572, 1572, 2188, 2272, ChaseAlongZ},
     [OtherworldSideHall] = {2108, 2364, 2187, 2291, ChaseAlongX},
     [OtherworldEastHall] = {1710, 1756, 964, 1169, ChaseAlongZ},
+    [NorthClassroom] = {2182, 2265, 1505, 1681, ChaseArea},
+    [SouthClassroom] = {2212, 2297, 867, 1041, ChaseArea},
     [EastCorridor]  = {-814, -771,   684, 1168, ChaseAlongZ},
     [SchoolCorridor] = {-473, -166,   294,  345, ChaseAlongX},
     [UpperNorthHall] = {-545, -238,  3038, 3081, ChaseAlongX},
@@ -240,8 +251,10 @@ static void advanceRoadCamera(void)
     int angle = (yaw + 2048 - 136)*8;
     int sx = x + 2*sinLerp(angle), sz = z + 2*cosLerp(angle);
     static const ChaseRoad basementRamp = {913, 913, -331, -284, ChaseAlongZ};
-    const ChaseRoad *road = room == BasementStair && x >= 57*4096 ? &basementRamp :
-                            &chaseRoads[room == OtherworldNorthHall ? NorthHall : room];
+    static const ChaseRoad eastLowerHall = {1710, 1756, 762, 964, ChaseAlongZ};
+    const ChaseRoad *road = &chaseRoads[room == OtherworldNorthHall ? NorthHall : room];
+    if (room == BasementStair && x >= 57*4096) road = &basementRamp;
+    if (room == OtherworldEastHall && z < eastLowerHall.maxZ*256) road = &eastLowerHall;
     int minX = road->minX*256, maxX = road->maxX*256;
     int minZ = road->minZ*256, maxZ = road->maxZ*256;
     sx = limitChaseAxis(sx, minX, maxX);
@@ -534,7 +547,7 @@ static const StairExit stairExits[] = {
     {BasementStair, FirstFloor, 245760, -77824, 6144, 6144, 454656, 174489, 3072, 442003, 182974}
 };
 
-void playerEnterRoom(SchoolRoom from, const StairExit *stairs)
+void playerEnterRoom(SchoolRoom from, RoomExit exit)
 {
     doorView = NULL;
     SchoolRoom to = roomCurrent();
@@ -556,12 +569,16 @@ void playerEnterRoom(SchoolRoom from, const StairExit *stairs)
         warpToLadder();
         return;
     }
+    const Door *d = exit.arrival;
     for (unsigned j = 0; j < sizeof doorViews/sizeof doorViews[0]; j++) {
-        if (doorViews[j].room == to && doorViews[j].from == from) {
-            doorView = &doorViews[j].camera;
+        const DoorView *view = &doorViews[j];
+        if (view->room == to && view->from == from &&
+            (!view->doorZ || (d && d->z == view->doorZ))) {
+            doorView = &view->camera;
             break;
         }
     }
+    const StairExit *stairs = exit.stairs;
     if (stairs) {
         warp(stairs->arrivalX, stairs->arrivalZ, stairs->arrivalYaw);
         entryX = x;
@@ -571,43 +588,38 @@ void playerEnterRoom(SchoolRoom from, const StairExit *stairs)
         roadEyeZ = stairs->eyeZ;
         return;
     }
-    for (unsigned i = 0; i < schoolDoorCount; i++) {
-        const Door *d = &schoolDoors[i];
-        if (d->room == to && d->other == from) {
-            int heading = d->nx ? (d->nx > 0 ? 1024 : 3072) : (d->nz > 0 ? 0 : 2048);
-            warp(d->x + 1638*d->nx, d->z + 1638*d->nz, heading);
-            entryX = x;
-            entryZ = z;
-            followingRoad = false;
-            if (doorView) {
-                roadEyeX = doorView->x;
-                roadEyeZ = doorView->z;
-                doorRail = true;
-                return;
-            }
-            doorRail = from == EastCorridor || d->room == EastCorridor;
-            // Camera entry anchors for MAP_POINTS 39, 51 and 36.
-            roadEyeX = !doorRail ? -116992 : d->room == EastCorridor ? -209108 : -41644;
-            roadEyeZ = !doorRail ? 83807 : z;
-            if (from == Courtyard) {
-                doorRail = true;
-                roadEyeX = x;
-                roadEyeZ = z+206;
-            } else if (d->room == ChemistryLab) {
-                eastLabRoad = false;
-            } else if (d->room == Infirmary) {
-                infirmaryRoad = 0;
-            } else if (from == Infirmary) {
-                doorRail = true;
-                roadEyeX = x;
-                roadEyeZ = z-212;
-            } else if (d->room == SouthHall || from == SouthHall) {
-                doorRail = true;
-                roadEyeX = d->room == SouthHall ? 611329 : x-212;
-                roadEyeZ = z;
-            }
-            return;
-        }
+    if (!d) return;
+    int heading = d->nx ? (d->nx > 0 ? 1024 : 3072) : (d->nz > 0 ? 0 : 2048);
+    warp(d->x + 1638*d->nx, d->z + 1638*d->nz, heading);
+    entryX = x;
+    entryZ = z;
+    followingRoad = false;
+    if (doorView) {
+        roadEyeX = doorView->x;
+        roadEyeZ = doorView->z;
+        doorRail = true;
+        return;
+    }
+    doorRail = from == EastCorridor || d->room == EastCorridor;
+    // Camera entry anchors for MAP_POINTS 39, 51 and 36.
+    roadEyeX = !doorRail ? -116992 : d->room == EastCorridor ? -209108 : -41644;
+    roadEyeZ = !doorRail ? 83807 : z;
+    if (from == Courtyard) {
+        doorRail = true;
+        roadEyeX = x;
+        roadEyeZ = z+206;
+    } else if (d->room == ChemistryLab) {
+        eastLabRoad = false;
+    } else if (d->room == Infirmary) {
+        infirmaryRoad = 0;
+    } else if (from == Infirmary) {
+        doorRail = true;
+        roadEyeX = x;
+        roadEyeZ = z-212;
+    } else if (d->room == SouthHall || from == SouthHall) {
+        doorRail = true;
+        roadEyeX = d->room == SouthHall ? 611329 : x-212;
+        roadEyeZ = z;
     }
 }
 
@@ -620,27 +632,21 @@ RoomExit playerDestination(bool action)
         const StairExit *exit = &stairExits[i];
         if (exit->from == room && abs(x - exit->triggerX) <= exit->halfWidth &&
             abs(z - exit->triggerZ) <= exit->halfDepth)
-            return (RoomExit){exit->to, exit};
+            return (RoomExit){.room = exit->to, .stairs = exit};
     }
-    if (!action || roomVersion < 5) return (RoomExit){room, NULL};
+    if (!action || roomVersion < 5) return (RoomExit){.room = room};
     // MAP1_S00 points 19 and 21 face opposite ways inside the towers.
     if ((room == ClockTower && facingEdge(-409600, -249036, 2048, 0, -1)) ||
         (room == FarClockTower && facingEdge(-573440, -242483, 2048, 0, 1)))
-        return (RoomExit){TowerPassage, NULL};
+        return (RoomExit){.room = TowerPassage};
     if (room == FarClockTower && facingEdge(-573440, -249036, 1536, 0, -1))
-        return (RoomExit){OtherworldCourtyard, NULL};
-    int rayX = sinLerp(yaw*8)/2, rayZ = cosLerp(yaw*8)/2;
+        return (RoomExit){.room = OtherworldCourtyard};
     for (unsigned i = 0; i < schoolDoorCount; i++) {
         const Door *d = &schoolDoors[i];
-        if (d->room != room) continue;
-        int dx = d->x-x, dz = d->z-z;
-        int along = -dx*d->nx - dz*d->nz;
-        int reach = -rayX*d->nx - rayZ*d->nz;
-        if (reach > 0 && along >= 0 && along <= reach &&
-            abs(rayX*dz - dx*rayZ) <= d->halfWidth*reach)
-            return (RoomExit){d->other, NULL};
+        if (d->room == room && facingEdge(d->x, d->z, d->halfWidth, -d->nx, -d->nz))
+            return (RoomExit){.room = d->other, .arrival = &schoolDoors[i ^ 1]};
     }
-    return (RoomExit){room, NULL};
+    return (RoomExit){.room = room};
 }
 
 static bool facingEdge(int edgeX, int edgeZ, int halfWidth, int nx, int nz)
@@ -712,6 +718,19 @@ bool playerFacingHand(void)
     return roomHasHand() && facingEdge(-242483, 406323, 1536, 0, 1);
 }
 
+bool playerFacingCard(void)
+{
+    // MAP1_S02 points 29 and 30 approach the corner of the same desk.
+    return facingEdge(569344, 406732, 1024, 1, 0) ||
+           facingEdge(570572, 405504, 1024, 0, 1);
+}
+
+bool playerFacingScatteredCards(void)
+{
+    return facingEdge(569344, 407961, 2304, 1, 0) ||
+           facingEdge(571801, 405504, 2304, 0, 1);
+}
+
 TowerPoint playerFacingTower(void)
 {
     if (roomCurrent() != Courtyard) return NoTowerPoint;
@@ -778,7 +797,8 @@ int playerSetCamera(void)
     // Its one-metre watch circle extends away from the room camera whenever
     // the distance to Harry is below four metres.
     SchoolRoom room = roomCurrent();
-    bool corridor = room == SchoolCorridor || room == SouthHall || room == NorthHall ||
+    bool classroom = room == NorthClassroom || room == SouthClassroom;
+    bool corridor = classroom || room == SchoolCorridor || room == SouthHall || room == NorthHall ||
                     room == UpperNorthHall || room == OtherworldNorthHall || room == OtherworldLobby ||
                     room == OtherworldSideHall || room == OtherworldEastHall;
     bool equipment = room == EquipmentRoom;
@@ -866,13 +886,13 @@ int playerSetCamera(void)
         bool rail = doorRail && !followingRoad;
         // The authored southern hall road fixes the chase eye at Q4 -27.
         int chaseHeight = room == SouthHall ? 27*256 : 8600;
-        bool lobby = room == OtherworldLobby;
-        if (lobby) chaseHeight = 43*256;
+        bool highEye = room == OtherworldLobby || classroom;
+        if (highEye) chaseHeight = 43*256;
         if (boiler) chaseHeight = (z < -68403 ? 27 : 38)*256;
         eyeHeight = ((rail ? 7987 : chaseHeight)-ground)/2;
-        targetHeight = ((rail ? 3533 : lobby ? 4096 : 2816)-ground)/2;
+        targetHeight = ((rail ? 3533 : highEye ? 4096 : 2816)-ground)/2;
         // The small road limits the camera to 2.5 metres above map origin.
-        if (eyeHeight > 5120 && !lobby) eyeHeight = 5120;
+        if (eyeHeight > 5120 && !highEye) eyeHeight = 5120;
     }
     int dx = x-eyeX, dz = z-eyeZ;
     int length = sqrt32(dx*dx + dz*dz);

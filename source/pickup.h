@@ -2,7 +2,7 @@
 #define SH1_PICKUP_H
 #include "player.h"
 
-typedef enum { SilverMedallion, HealthDrink, FirstAidKit, Chemical, GoldMedallion, LobbyKit, LobbyBullets } PickupItem;
+typedef enum { SilverMedallion, HealthDrink, FirstAidKit, Chemical, GoldMedallion, LobbyKit, LobbyBullets, PictureCard } PickupItem;
 typedef enum { PickupQuiet, PickupMove, PickupCancel, PickupConfirm,
                PickupBoilerSwitch, PickupBoilerStart } PickupSound;
 
@@ -18,6 +18,7 @@ bool boilerGlow(void);
 unsigned boilerVolume(void);
 bool pickupLoadEmptyShelf(FILE *file);
 bool pickupLoadEmptyHand(FILE *file);
+bool pickupLoadScatteredCards(FILE *file);
 bool latchStart(void);
 unsigned pickupFlags(void);
 void pickupRestore(unsigned flags);

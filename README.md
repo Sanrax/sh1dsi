@@ -74,7 +74,10 @@ far opening to read both pages of the fan warning. The lobby entrance
 returns to the north hall. The single door immediately
 right of the lobby double doors leads to the side hall. Walk across
 the side hall to the single door on the same wall to reach the east
-hall. The barrier blocks the east hall farther down.
+hall. Use either of the first two classroom doors on the east wall. Face
+the card on the desk in the north classroom and press A to inspect it.
+Pick it up, then use the door at the south end to cross into the next
+classroom. Its southwest door opens onto the far side of the barrier.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

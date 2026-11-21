@@ -66,6 +66,8 @@ static FILE *openRoom(SchoolRoom room)
     case OtherworldLobby: name = "otherworldlobby"; break;
     case OtherworldSideHall: name = "otherworldside"; break;
     case OtherworldEastHall: name = "otherworldeast"; break;
+    case NorthClassroom: name = "classroomnorth"; break;
+    case SouthClassroom: name = "classroomsouth"; break;
     case TowerPassage: name = "passage"; break;
     case BasementStair: name = "basement"; break;
     case BoilerRoom: name = "boiler"; break;
@@ -174,8 +176,10 @@ static void changeRoom(RoomExit exit)
     bool east = next == EastCorridor || from == EastCorridor;
     bool otherworldIntro = from == FarClockTower && next == OtherworldCourtyard;
     bool otherworldHall = from == OtherworldNorthHall || next == OtherworldNorthHall;
-    bool sideHall = from == OtherworldSideHall || next == OtherworldSideHall;
-    bool hall = east || from == Courtyard || next == Courtyard || otherworldHall || sideHall ||
+    bool pair12 = from == OtherworldSideHall || next == OtherworldSideHall ||
+                  from == NorthClassroom || next == NorthClassroom ||
+                  from == SouthClassroom || next == SouthClassroom;
+    bool hall = east || from == Courtyard || next == Courtyard || otherworldHall || pair12 ||
                 (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
     bool towerDoor = (next == ClockTower && from == Courtyard) || otherworldIntro;
     bool door = !exit.stairs && next != TowerPassage && from != TowerPassage;
@@ -187,7 +191,7 @@ static void changeRoom(RoomExit exit)
     } else if (boilerDoor) {
         opening = BoilerDoorOpen;
         closing = BoilerDoorClose;
-    } else if (sideHall && toneCount > SideHallClose) {
+    } else if (pair12 && toneCount > SideHallClose) {
         opening = SideHallOpen;
         closing = SideHallClose;
     } else if (otherworldHall && toneCount > OtherworldDoorClose) {
@@ -208,7 +212,7 @@ static void changeRoom(RoomExit exit)
         setBrightness(1, 0);
         stop("Invalid school room data.");
     }
-    playerEnterRoom(from, exit.stairs);
+    playerEnterRoom(from, exit);
     if (otherworldIntro) otherworldStartIntro();
     updateBoilerHum();
     // GameBoot_InGameStartup step 11 keeps the load screen for at least
@@ -309,7 +313,7 @@ int main(void)
                 SchoolRoom arrival = roomCurrent();
                 roomChanged |= playerLadderTick(pressed & KEY_START, &arrival);
                 if (arrival != roomCurrent()) {
-                    changeRoom((RoomExit){arrival, NULL});
+                    changeRoom((RoomExit){.room = arrival});
                     previousTime = systemCounterGetTicks();
                     debt = step;
                 }
@@ -340,7 +344,7 @@ int main(void)
                     RoomExit exit = playerDestination(pressed & KEY_A);
                     TowerPoint tower = pressed & (KEY_A | KEY_SELECT) ? playerFacingTower() : NoTowerPoint;
                     if ((pressed & KEY_A) && tower == TowerDoor && boilerPowered())
-                        exit = (RoomExit){ClockTower, NULL};
+                        exit = (RoomExit){.room = ClockTower};
                     SchoolRoom next = exit.room;
                     if (next == SouthHall && roomCurrent() == FirstFloor && !latchUnlocked()) {
                         if (latchStart()) sound = DoorUnlock;

@@ -22,7 +22,7 @@ typedef struct {
 
 enum { StaticBatch, HangingSilverBatch, FallenSilverBatch, DrinkBatch, KitBatch, ChemicalBatch,
        IntactHandBatch, OpenHandBatch, GoldAtHandBatch, BoilerUnwiredBatch, BoilerReadyBatch, BoilerGlowBatch,
-       LobbyKitBatch, LobbyBulletsBatch, LobbyNearFanBatch, LobbyFarFanBatch };
+       LobbyKitBatch, LobbyBulletsBatch, LobbyNearFanBatch, LobbyFarFanBatch, PictureCardBatch };
 
 typedef RoomVertex Vertex;
 _Static_assert(sizeof(LitPoint) == 10 && sizeof(LitCorner) == 4, "lit room vertex layout");
@@ -41,7 +41,8 @@ static RoomOrigin currentOrigin = {-100*4096, 20*4096};
 static bool handPresent, handPuzzle, wideGeometry;
 static unsigned fanAngle[2];
 
-// MAP1_S00–S02 door points. Normals point into the room.
+// MAP1_S00–S02 door points. Each adjacent pair links two doors.
+// Normals point into the room.
 const Door schoolDoors[] = {
     {MusicRoom, SchoolCorridor, -417792, 97075, 0, -1, 2304},
     {SchoolCorridor, MusicRoom, -116326, 75366, 0, 1, 2304},
@@ -69,9 +70,18 @@ const Door schoolDoors[] = {
     {OtherworldSideHall, OtherworldNorthHall, 543948, 560332, 0, 1, 2304},
     {OtherworldSideHall, OtherworldEastHall, 570163, 560332, 0, 1, 2304},
     {OtherworldEastHall, OtherworldSideHall, 441548, 299417, 0, -1, 2304},
+    {OtherworldEastHall, NorthClassroom, 449740, 294502, -1, 0, 2304},
+    {NorthClassroom, OtherworldEastHall, 556236, 431718, 1, 0, 2304},
+    {OtherworldEastHall, NorthClassroom, 449740, 251904, -1, 0, 2304},
+    {NorthClassroom, OtherworldEastHall, 556236, 387481, 1, 0, 2304},
+    {NorthClassroom, SouthClassroom, 578355, 383385, 0, 1, 2304},
+    {SouthClassroom, NorthClassroom, 586547, 271974, 0, -1, 2304},
+    {SouthClassroom, OtherworldEastHall, 564428, 223641, 1, 0, 2304},
+    {OtherworldEastHall, SouthClassroom, 449740, 199475, -1, 0, 2304},
     {BasementStair, BoilerRoom, 219545, -70451, 1, 0, 2304},
     {BoilerRoom, BasementStair, 93388, -79872, -1, 0, 2304}
 };
+_Static_assert((sizeof schoolDoors/sizeof schoolDoors[0]) % 2 == 0, "paired room doors");
 const unsigned schoolDoorCount = sizeof schoolDoors/sizeof schoolDoors[0];
 
 SchoolRoom roomCurrent(void) { return current; }
@@ -114,6 +124,8 @@ static RoomOrigin legacyRoomOrigin(SchoolRoom room)
     case OtherworldLobby:
     case OtherworldSideHall:
     case OtherworldEastHall:
+    case NorthClassroom:
+    case SouthClassroom:
     case TowerPassage: break; // These rooms require a stream origin.
     case SouthHall: return (RoomOrigin){140*4096, 20*4096};
     }
@@ -278,8 +290,9 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     bool hasOrigin = !memcmp(header.magic, "SHM2", 4);
     bool streamed = hasOrigin || !memcmp(header.magic, "SHM1", 4);
     bool lobby = room == OtherworldLobby;
+    bool pictureCard = room == NorthClassroom;
     bool otherworld = room == OtherworldCourtyard || room == OtherworldNorthHall || lobby ||
-                      room == OtherworldSideHall || room == OtherworldEastHall;
+                      room == OtherworldSideHall || room == OtherworldEastHall || pictureCard || room == SouthClassroom;
     if (!hasOrigin && (room == BasementStair || room == BoilerRoom ||
                        room == ClockTower || room == FarClockTower || room == TowerPassage ||
                        otherworld))
@@ -344,8 +357,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     bool pour = room == ChemistryLab && !memcmp(header.magic, "SHL3", 4);
     bool infirmaryItems = medical || (room == Infirmary && !memcmp(header.magic, "SHI2", 4));
     enum { KeyTileBytes = 64*64/2, SmokeTileBytes = 32*128, SupplyTileBytes = 64*128/2 };
-    unsigned itemPages = pour ? 2 : chemical || infirmaryItems || lobby ? 1 : 0;
-    unsigned itemBytes = pour ? KeyTileBytes+SmokeTileBytes : chemical ? KeyTileBytes :
+    unsigned itemPages = pour ? 2 : chemical || infirmaryItems || lobby || pictureCard ? 1 : 0;
+    unsigned itemBytes = pour ? KeyTileBytes+SmokeTileBytes : (chemical || pictureCard) ? KeyTileBytes :
                          infirmaryItems ? 64*256/2 : lobby ? SupplyTileBytes : 0;
     unsigned itemOffset = 128*1024-itemBytes;
     if (header.textureBytes < itemBytes) return false;
@@ -437,6 +450,9 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
                   !pickupLoad(file, LobbyBullets, itemOffset, pages[scenePages].firstPalette+1) ||
                   !lobbyFanLoad(file)))
         return false;
+    if (pictureCard && (!pickupLoad(file, PictureCard, itemOffset, pages[scenePages].firstPalette) ||
+                        !pickupLoadScatteredCards(file)))
+        return false;
     if (chemical && (!pickupLoad(file, Chemical, itemOffset, pages[scenePages].firstPalette) ||
                      !pickupLoadEmptyShelf(file)))
         return false;
@@ -487,7 +503,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     geometry = lit ? NULL : malloc(geometryBytes);
     litGeometry = lit ? malloc(total*sizeof *litGeometry) : NULL;
     if (!geometry && !litGeometry) return false;
-    unsigned maxState = lobby ? LobbyFarFanBatch : boiler ? BoilerGlowBatch : pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
+    unsigned maxState = pictureCard ? PictureCardBatch : lobby ? LobbyFarFanBatch : boiler ? BoilerGlowBatch : pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
                         corridor ? StaticBatch : FallenSilverBatch;
     uint32_t *end = geometry;
     GeometryChunk *chunk = chunks;
@@ -692,13 +708,14 @@ void roomDraw(const Medallion *medal)
         [LobbyBulletsBatch] = !pickupHidden(LobbyBullets),
         [LobbyNearFanBatch] = true,
         [LobbyFarFanBatch] = true,
+        [PictureCardBatch] = !pickupHidden(PictureCard),
     };
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];
         unsigned count = batchWords[i];
         unsigned chunkCount = (b->quads+ChunkQuads-1)/ChunkQuads;
         if (count && visible[b->state]) {
-            bool spinning = b->state >= LobbyNearFanBatch;
+            bool spinning = b->state == LobbyNearFanBatch || b->state == LobbyFarFanBatch;
             bool moving = b->state == HangingSilverBatch && medal->phase >= MedalSwing;
             if (moving) {
                 // SHR1 stores the hanging model with its Q8 pivot baked in.

@@ -23,7 +23,7 @@ typedef struct {
 
 static Corner silverCorners[156*3], drinkCorners[124*3], kitCorners[76*3];
 static Corner chemicalCorners[188*3], goldCorners[156*3];
-static Corner lobbyKitCorners[76*3], lobbyBulletCorners[44*3];
+static Corner lobbyKitCorners[76*3], lobbyBulletCorners[44*3], cardCorners[4*3];
 static const struct {
     int x, z;
     unsigned flag;
@@ -37,19 +37,21 @@ static const struct {
     [GoldMedallion] = {0, 0, GoldHeld, goldCorners, sizeof goldCorners/sizeof(Corner)},
     [LobbyKit] = {402227, 573849, LobbyKitHeld, lobbyKitCorners, sizeof lobbyKitCorners/sizeof(Corner)},
     [LobbyBullets] = {399441, 567705, LobbyBulletsHeld, lobbyBulletCorners, sizeof lobbyBulletCorners/sizeof(Corner)},
+    [PictureCard] = {0, 0, PictureCardHeld, cardCorners, sizeof cardCorners/sizeof(Corner)},
 };
 static Model models[sizeof pickups/sizeof pickups[0]];
 static uint16_t fontPalette[16];
 static enum { Inactive, Stopping, Kneeling, Preparing, Inspecting, Rising, LatchNotice,
               EmptyShelfNotice, EmptyHandNotice, BoilerStopping, BoilerPrompt,
-              BoilerStarting, BoilerNoEffect, BoilerRunning, TowerInsideNotice, LobbyFanNotice } phase;
+              BoilerStarting, BoilerNoEffect, BoilerRunning, TowerInsideNotice, LobbyFanNotice, ScatteredCardsNotice } phase;
 static PickupItem activeItem;
 static unsigned ticks, selected, flash, shown;
 static unsigned collected;
 
 static Glyph latchGlyphs[24], emptyShelfGlyphs[24], emptyHandGlyphs[48], towerDoorGlyphs[24];
 static uint16_t latchCount, emptyShelfCount, emptyHandCount, towerDoorCount;
-static Glyph fanGlyphs[2][48];
+static Glyph scatteredCardsGlyphs[24], fanGlyphs[2][48];
+static uint16_t scatteredCardsCount;
 static uint16_t fanCount[2];
 static unsigned fanPage;
 static bool unlocked, powered;
@@ -159,6 +161,11 @@ bool pickupLoadEmptyShelf(FILE *file) { return loadNotice(file, emptyShelfGlyphs
 
 bool pickupLoadEmptyHand(FILE *file) { return loadNotice(file, emptyHandGlyphs, 48, &emptyHandCount); }
 
+bool pickupLoadScatteredCards(FILE *file)
+{
+    return loadNotice(file, scatteredCardsGlyphs, 24, &scatteredCardsCount);
+}
+
 bool latchStart(void)
 {
     if (unlocked || !latchCount || pickupActive()) return false;
@@ -216,6 +223,15 @@ void pickupStart(void)
         }
         return;
     }
+    if (roomCurrent() == NorthClassroom) {
+        if (models[PictureCard].loaded && !pickupHidden(PictureCard) && playerFacingCard())
+            preparePickup(PictureCard);
+        else if (scatteredCardsCount && playerFacingScatteredCards()) {
+            phase = ScatteredCardsNotice;
+            shown = 0;
+        }
+        return;
+    }
     PickupItem first, last;
     if (roomCurrent() == MusicRoom) {
         first = last = SilverMedallion;
@@ -254,11 +270,6 @@ PickupSound pickupTick(unsigned pressed)
     const Model *m = &models[activeItem];
     const unsigned promptDelay = silver ? 16 : 21;
     switch (phase) {
-    case LatchNotice:
-    case EmptyShelfNotice:
-    case EmptyHandNotice:
-    case BoilerNoEffect:
-    case BoilerRunning:
     case LobbyFanNotice:
         if (shown < fanCount[fanPage])
             shown = (pressed & (KEY_A | KEY_B)) ? fanCount[fanPage] : shown+1;
@@ -268,13 +279,20 @@ PickupSound pickupTick(unsigned pressed)
             else phase = Inactive;
         }
         break;
+    case LatchNotice:
+    case EmptyShelfNotice:
+    case EmptyHandNotice:
+    case BoilerNoEffect:
+    case BoilerRunning:
+    case ScatteredCardsNotice:
     case TowerInsideNotice: {
         // Event_DisplayMapMsgWithSfx delays the first latch glyph by 0.2 s.
         bool latch = phase == LatchNotice;
         unsigned count = latch ? latchCount : phase == EmptyHandNotice ? emptyHandCount :
                          phase == BoilerNoEffect ? boilerNoEffectCount :
                          phase == BoilerRunning ? boilerRunningCount :
-                         phase == TowerInsideNotice ? towerDoorCount : emptyShelfCount;
+                         phase == TowerInsideNotice ? towerDoorCount :
+                         phase == ScatteredCardsNotice ? scatteredCardsCount : emptyShelfCount;
         bool advance = pressed & (KEY_A | KEY_B);
         if (latch && ++ticks < 12) break;
         if (shown < count) {
@@ -398,7 +416,7 @@ void pickupDrawItem(void)
         scale = silver ? (int)(age-2)*4096/15 : (int)age*4096/(chemical ? 21 : 15);
     if (scale > 4096) scale = 4096;
     glScalef32(scale, scale, scale);
-    unsigned height = silver || chemical || activeItem == GoldMedallion ? TEXTURE_SIZE_64 :
+    unsigned height = silver || chemical || activeItem == GoldMedallion || activeItem == PictureCard ? TEXTURE_SIZE_64 :
                       activeItem == LobbyKit || activeItem == LobbyBullets ? TEXTURE_SIZE_128 : TEXTURE_SIZE_256;
     GFX_TEX_FORMAT = m->textureAddress | (TEXTURE_SIZE_64 << 20) | (height << 23) | (GL_RGB16 << 26);
     GFX_PAL_FORMAT = m->paletteAddress;
@@ -423,7 +441,8 @@ void pickupDrawPrompt(int bg)
                         phase == BoilerNoEffect ? boilerNoEffect :
                         phase == BoilerRunning ? boilerRunning :
                         phase == TowerInsideNotice ? towerDoorGlyphs :
-                        phase == LobbyFanNotice ? fanGlyphs[fanPage] : models[activeItem].glyphs;
+                        phase == LobbyFanNotice ? fanGlyphs[fanPage] :
+                        phase == ScatteredCardsNotice ? scatteredCardsGlyphs : models[activeItem].glyphs;
     if (!visible) {
         bgHide(bg);
         lastShown = 0;

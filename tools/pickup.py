@@ -115,12 +115,12 @@ def model_corners(tmd, counts, material, first_row, row_offset, *, u_offset=0):
     return data
 
 
-def key_item_tile(disc, first_row, clut):
+def key_item_tile(disc, first_row, clut, *, column=0):
     tim = disc.read("ITEM/TIM01.TIM")
     image = 8 + struct.unpack_from("<I", tim, 8)[0]
     if struct.unpack_from("<I4H", tim, image) != (32780, 0, 0, 64, 256):
         raise ValueError("unexpected key item texture")
-    pixels = b"".join(tim[image+12+y*128:image+12+y*128+32] for y in range(first_row, first_row+64))
+    pixels = b"".join(tim[image+12+y*128+column//2:image+44+y*128+column//2] for y in range(first_row, first_row+64))
     return pixels, tim[20+clut*32:20+(clut+1)*32]
 
 
@@ -152,6 +152,13 @@ def medical_pickups(disc):
         data.extend(model_corners(disc.read(f"ITEM/{name}.TMD"), counts, (clut, 15), first_row, 0))
         data.extend(prompt_data(disc, message, first_floor=True))
     return data
+
+def picture_card(disc):
+    model = model_corners(disc.read("ITEM/UNQ55.TMD"), (8, 2, 4), (458, 14), 192, 192, u_offset=64)
+    model.extend(prompt_data(disc, 29, map_bearings=True, otherworld=True))
+    model.extend(prompt_data(disc, 45, choices=False, map_bearings=True, otherworld=True))
+    return model, *key_item_tile(disc, 192, 7, column=64)
+
 
 def lobby_pickups(disc):
     kit = model_corners(disc.read("ITEM/UNQ20.TMD"), (40, 34, 76), (11, 15), 0, 0)
