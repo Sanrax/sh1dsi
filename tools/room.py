@@ -211,6 +211,7 @@ def school_room(disc, room=39):
     palettes = bytearray()
     page_info = []
     color_keys = []
+    scene_textures = []
     remapped_regions = {}
     for i in range(mat_count):
         material = lm + mat_ptr + i*24
@@ -240,16 +241,11 @@ def school_room(disc, room=39):
             # The last CLUT is unreferenced in this IPD.
             cluts = cluts[:7]
             page_info[-1] = (*page_info[-1][:3], len(cluts))
-        # A PS1 transparent texel is a zero palette word. DS paletted textures
-        # support a transparent index of zero only. Permute the page once.
-        indices = {idx for clut in cluts for idx, color in enumerate(clut) if color == 0}
-        if len(indices) > 1:
-            raise ValueError(f"incompatible transparent indices on {name}")
-        key = next(iter(indices), 0)
-        color_keys.append([clut[key] == 0 for clut in cluts])
-        pages.extend(byte ^ (key | key << 4) for byte in pixels)
+        color_keys.append([0 in clut for clut in cluts])
+        scene_textures.append((name, len(pixels), cluts))
+        pages.extend(pixels)
         for clut in cluts:
-            palettes.extend(struct.pack("<16H", *(clut[idx ^ key] for idx in range(16))))
+            palettes.extend(struct.pack("<16H", *clut))
 
     # Group opaque polygons by texture and CLUT without duplicating any texture.
     groups = defaultdict(bytearray)
@@ -441,6 +437,25 @@ def school_room(disc, room=39):
         pages.extend(texture)
         palettes.extend(clut)
         extra = player + pickup
+    # PS1 transparency uses a zero palette word. The DS can key only index 0,
+    # so convert the texels and CLUTs together after all textured batches are known.
+    for page, (name, size, cluts) in enumerate(scene_textures):
+        row_keys = [{idx for idx, color in enumerate(clut) if color == 0} for clut in cluts]
+        indices = set().union(*row_keys)
+        if len(indices) > 1:
+            indices = set().union(*(row_keys[row] for _, mat, row, flags in groups
+                                    if mat == page and not flags & 4))
+            if len(indices) > 1:
+                raise ValueError(f"incompatible transparent indices on {name}")
+        key = next(iter(indices), 0)
+        if key:
+            offset, _, first, count = page_info[page]
+            mask = key | key << 4
+            pages[offset:offset+size] = bytes(byte ^ mask for byte in pages[offset:offset+size])
+            palettes[first*32:(first+count)*32] = b"".join(
+                struct.pack("<16H", *(clut[idx ^ key] for idx in range(16))) for clut in cluts
+            )
+
     result = bytearray(struct.pack("<4sHHII", magic, len(page_info), len(groups), len(pages), len(palettes)))
     for page in page_info:
         result.extend(struct.pack("<IHHI", *page))

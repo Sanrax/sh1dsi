@@ -323,10 +323,22 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   (454656, 188006) downstairs and (−192512, 174899) upstairs with yaw 3072.
   The native replays retained the items and latch and kept the lower LCD black.
 - The basement stair and boiler room each need 80 KiB of scenery textures,
-  which fits before the resident player texture. One boiler-room texture
-  page has multiple transparency indices, all in palette rows that static
-  instances leave unused. Check whether runtime props use those rows before
-  extending the converter and connecting the basement.
+  which fits before the resident player texture. The boiler props use index
+  zero for transparency. The conflicting index belongs to an unused row.
+  The basement stair IPD includes a sloped floor plane. The next route
+  check needs the landing height and slope on both crossings.
+
+### Texture palette conversion
+
+- When a texture page has multiple transparency indices, the converter
+  checks the palette rows referenced by textured batches, including event
+  props. It remaps the selected key to index zero and rejects conflicts
+  between referenced rows. [DS 3D texture parameters](https://mgba-emu.github.io/gbatek/#ds-3d-texture-attributes)
+- All 15 stock sidecars and the BlocksDS ROM reproduced byte for byte.
+  A fixture placed a second key in an unused infirmary row. All 42
+  sampled frames per path matched stock captures in melonDS DSi mode over
+  DLDI and virtual console SD. Host checks also rejected conflicts in a
+  static row and a row used only by an event prop.
 
 ## Downstairs collision
 
