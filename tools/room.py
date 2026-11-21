@@ -21,6 +21,8 @@ ROOM_NORMALS = 128
 ROOM_LAYOUTS = {
     2: ROOM_BOILER_EVENT,
     3: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES,
+    6: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
+    7: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
     8: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
     10: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES | ROOM_NORMALS,
     11: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_NORMALS,
@@ -85,7 +87,8 @@ def collision_edges(ipd, room):
     edge_heights = layout is not None and layout & ROOM_EDGE_HEIGHTS
     collision = memoryview(ipd)[0x54:]
     x, z, vertices, surfaces, count, cylinders, vert, surface, polygon = struct.unpack_from("<ii4B3I", collision)
-    expected = {2: (0, -10240, 35, 9, 43, 0), 3: (10240, -10240, 25, 4, 26, 0),
+    expected = {6: (0, 20480, 16, 3, 16, 0), 7: (0, 30720, 36, 5, 36, 0),
+                2: (0, -10240, 35, 9, 43, 0), 3: (10240, -10240, 25, 4, 26, 0),
                 39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
                 31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0),
                 13: (30720, 0, 80, 12, 80, 0), 11: (30720, 0, 33, 7, 35, 0), 9: (10240, 30720, 45, 11, 49, 0), 8: (10240, 0, 34, 6, 34, 0),
@@ -185,6 +188,10 @@ def collision_edges(ipd, room):
             continue
         # SU0101's inside shell, cross-hall barrier and locker banks.
         if room == 10 and not (6 <= i <= 11 or i in (13, 14) or i >= 30):
+            continue
+        # The teachers' rooms share outer shells and overhead beams.
+        # The northern room also has a desk and two low chairs.
+        if room in (6, 7) and (i < 8 or 12 <= i < 16):
             continue
         if room == 8 and i < 8:
             continue
@@ -369,10 +376,10 @@ def smoke_atlas(disc):
 
 
 def school_room(disc, room=39):
-    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 11: (3, 0), 8: (1, 0), 10: (1, 1), 14: (0, 0), 17: (253, 1), 9: (1, 3),
+    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 11: (3, 0), 6: (0, 2), 7: (0, 3), 8: (1, 0), 10: (1, 1), 14: (0, 0), 17: (253, 1), 9: (1, 3),
               23: (255, 254), 24: (255, 254), 25: (3, 4), 26: (2, 3), 27: (3, 3), 28: (2, 1), 29: (3, 2), 30: (3, 1), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
               3: (1, 255), 2: (0, 255), 20: (253, 254), 21: (252, 254), 22: (254, 254)}[room]
-    prefix = "SU" if room in (8, 10, 11, 14, 17, 24, 25, 26, 27, 28, 29, 30) else "SC"
+    prefix = "SU" if room in (6, 7, 8, 10, 11, 14, 17, 24, 25, 26, 27, 28, 29, 30) else "SC"
     data = disc.read(f"BG/{prefix}{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -427,6 +434,9 @@ def school_room(disc, room=39):
             regions = ((1, 10, 0, (80, 127, 128, 175)),)
         if room == 14 and name == "SU1FWW2":
             regions = ((6, 15, 0, (96, 191, 128, 255)),)
+        if room == 6 and name == "SU2FC11":
+            # The chain's tile uses index 0 while the door and window use 1.
+            regions = ((3, 0, 1, (160, 207, 0, 143)),)
         for row, key, target, rect in regions:
             if {j for j, value in enumerate(cluts[row]) if not value} != {key}:
                 raise ValueError("unexpected cutout palette")
@@ -437,7 +447,7 @@ def school_room(disc, room=39):
                 for j in range(y*words*2+left//2, y*words*2+right//2+1):
                     pixels[j] ^= mask | mask << 4
             cluts[row] = tuple(cluts[row][j ^ mask] for j in range(16))
-        if room == 29 and name == "SU2FC11":
+        if room in (6, 7, 29) and name == "SU2FC11":
             if {i for i, color in enumerate(cluts[2]) if color == 0} != {0, 15}:
                 raise ValueError("unexpected classroom cutout palette")
             # Both transparent indices share the door tile. Move them to
@@ -618,6 +628,14 @@ def school_room(disc, room=39):
             for offset in range(start+2*axis, start+32, 8):
                 coord, = struct.unpack_from("<h", group, offset)
                 struct.pack_into("<h", group, offset, side*max(side*coord, minimum))
+
+    if room == 7:
+        # Map_WorldObjectsInit places both parts of the original phone.
+        angle = int(-78.3*4096/360)*math.tau/4096
+        c, s = round(math.cos(angle)*4096), round(math.sin(angle)*4096)
+        x, y, z = (int(v*4096)>>4 for v in (18.974, -0.9, 143.515))
+        for name in (b"PHONE3_H", b"PHONE2_H"):
+            add_model(name, (c,0,s,0,4096,0,-s,0,c), (x,y,z-30720))
 
     if room == 26:
         tim = disc.read("ITEM/TIM00.TIM")

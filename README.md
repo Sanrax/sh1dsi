@@ -86,7 +86,11 @@ with the Picture Card in inventory. After the animation and message,
 press A to go through the unlocked door into the west hall. Face the
 nearby west-wall door and press A to enter the women's restroom. Leave the
 restroom to reach the upstairs west hall. Returning through the same doors
-takes Harry back to the first-floor west hall.
+takes Harry back to the first-floor west hall. The next two doors on the
+west wall lead into the southern teachers' room. Cross that room and use
+its north door to reach the northern teachers' room. Keep to the east of
+the desk and chairs and leave by the east door near the far end to get
+past the west-hall barrier. The phone call scene is still pending.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

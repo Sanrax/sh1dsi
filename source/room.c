@@ -84,6 +84,15 @@ static const Door schoolDoors[] = {
     {OtherworldReception, OtherworldSouthHall, 234291, 87244, 0, -1, 2304},
     {OtherworldReception, OtherworldWestHall, 229376, 79052, 1, 0, 2304},
     {OtherworldWestHall, OtherworldReception, 255590, 173670, -1, 0, 2304},
+    // MAP1_S02 points 83/87, 84/88, 86/91 and 89/92.
+    {OtherworldWestHall, TeachersSouth, 242483, 196608, 1, 0, 2304},
+    {TeachersSouth, OtherworldWestHall, 90931, 391577, -1, 0, 2304},
+    {OtherworldWestHall, TeachersSouth, 242483, 239206, 1, 0, 2304},
+    {TeachersSouth, OtherworldWestHall, 90931, 435814, -1, 0, 2304},
+    {OtherworldWestHall, TeachersNorth, 242483, 292044, 1, 0, 2304},
+    {TeachersNorth, OtherworldWestHall, 95027, 595558, -1, 0, 2304},
+    {TeachersSouth, TeachersNorth, 68812, 439910, 0, -1, 2304},
+    {TeachersNorth, TeachersSouth, 72908, 547225, 0, 1, 2304},
     {BasementStair, BoilerRoom, 219545, -70451, 1, 0, 2304},
     {BoilerRoom, BasementStair, 93388, -79872, -1, 0, 2304}
 };
@@ -159,6 +168,8 @@ static RoomOrigin legacyRoomOrigin(SchoolRoom room)
     case OtherworldRestroom:
     case OtherworldUpperRestroom:
     case OtherworldUpperWestHall:
+    case TeachersSouth:
+    case TeachersNorth:
     case NorthClassroom:
     case SouthClassroom:
     case TowerPassage: break; // These rooms require a stream origin.
@@ -330,7 +341,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
                       room == OtherworldSideHall || room == OtherworldEastHall ||
                       room == OtherworldSouthHall || room == OtherworldReception || room == OtherworldWestHall ||
                       pictureCard || room == SouthClassroom || roomIsRestroom(room) ||
-                      room == OtherworldUpperWestHall;
+                      room == OtherworldUpperWestHall || roomIsTeachersRoom(room);
     if (!hasOrigin && (room == BasementStair || room == BoilerRoom ||
                        room == ClockTower || room == FarClockTower || room == TowerPassage ||
                        otherworld))

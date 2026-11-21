@@ -20,7 +20,8 @@ Card from the north classroom and cross the south classroom to get past
 the east hall barrier and reach reception through the Otherworld south hall.
 Harry can use the Picture Card in reception to open the west hall.
 The women's restroom takes Harry from there to the upstairs west hall
-and back.
+and back. The two first-floor teachers' rooms provide a route around
+the west-hall barrier. The original phone call remains to be ported.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -1207,10 +1208,46 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   `restroom.dat` (133,158 bytes) and `otherworldupperwest.dat`
   (132,936 bytes). The previous 31 data files are byte-identical.
 
+## Otherworld teachers' rooms
+
+- MAP1_S02 door pairs 83/87, 84/88, 86/91 and 89/92 connect the two
+  teachers' rooms and both sides of the first-floor west-hall barrier.
+  The `SU0002` and `SU0003` streams include the original inside walls,
+  desk and chair collision, both phone parts, camera bounds and door
+  sound pair 12.
+- In melonDS 1.1 DSi mode over DLDI, all eight arrivals matched the
+  PS1 X/Z coordinates and heading. Entry views with the flashlight on
+  differed by 7.18–9.58 RGB values on average on a 0–255 scale.
+- The production virtual-SD replay started at the powered-boiler
+  checkpoint and used the original route to collect the Picture Card.
+  It opened the west hall, took all three detour doors and emerged
+  beyond the barrier with the card, unlocked reception door and
+  flashlight state intact.
+- The PS1 northbound walks averaged 33.367 ms in the southern room
+  (178 intervals) and 35.894 ms in the northern room (165 intervals).
+  During the instrumented DSi route the averages were 33.379 ms
+  (665 intervals) and 33.361 ms (1,221 intervals). The 95th percentile
+  was 33.430 ms in both rooms, with a 49.970 ms maximum during the
+  route. Peak submission was 3.728 and 7.310 ms respectively. Peak
+  geometry use was 287 polygons and 1,096 vertices in the south and
+  778 polygons and 3,061 vertices in the north, with zero overflows.
+  These are emulator measurements. Beetle PSX ran the verified disc
+  with the owner's SCPH-7001 BIOS and logged its expected SCPH-5501
+  hash warning.
+- BlocksDS 1.24.0 produced two identical unit-code-3 ROMs. The 35
+  local data files include `teacherssouth.dat` (105,940 bytes) and
+  `teachersnorth.dat` (128,100 bytes). The other 33 files match the
+  previous build byte for byte.
+- The phone props are visible. The PS1 event at point 91 triggers
+  automatically, plays two original stereo XA streams, and returns
+  control with flags 98 and 122 set. The original replay measured
+  1,980 VBlanks including the scripted message hold and 155 VBlanks
+  with Start pressed early. The native event is pending.
+
 ## Next
 
-1. Connect the first-floor teachers' rooms around the west-hall barrier and port the phone call.
-2. Port the courtyard rain, fan sound and room ambience against the PS1 replay.
+1. Port the teachers' room phone event with the original camera, animation, audio and skip behavior.
+2. Follow the next school routes toward the Rubber Ball and rooftop puzzle.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

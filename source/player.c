@@ -102,7 +102,15 @@ static const DoorView doorViews[] = {
     {OtherworldWestHall, OtherworldReception, {254163, -8003, 173670, 231634, -3404, 173415}, 0},
     {OtherworldReception, OtherworldWestHall, {246138, -9728, 77312, 233955, -5120, 79183}, 0},
     {OtherworldUpperWestHall, OtherworldUpperRestroom, {-407361, -8003, 168755, -384830, -3404, 169008}, 0},
-    {OtherworldWestHall, OtherworldRestroom, {243902, -8003, 170393, 266433, -3404, 170646}, 0}
+    {OtherworldWestHall, OtherworldRestroom, {243902, -8003, 170393, 266433, -3404, 170646}, 0},
+    {TeachersSouth, OtherworldWestHall, {78870, -8601, 401479, 86656, -2816, 390191}, 391577},
+    {TeachersSouth, OtherworldWestHall, {77134, -8601, 427665, 86658, -2816, 436794}, 435814},
+    {TeachersNorth, OtherworldWestHall, {83627, -8601, 585217, 90800, -2816, 597155}, 0},
+    {OtherworldWestHall, TeachersSouth, {243902, -8003, 196608, 266433, -3404, 196850}, 196608},
+    {OtherworldWestHall, TeachersSouth, {243902, -8003, 239206, 266433, -3404, 239448}, 239206},
+    {TeachersNorth, TeachersSouth, {72704, -8601, 563336, 72934, -2816, 551019}, 0},
+    {TeachersSouth, TeachersNorth, {76797, -8601, 425958, 67874, -2816, 435622}, 0},
+    {OtherworldWestHall, TeachersNorth, {243902, -8003, 292044, 266433, -3404, 292297}, 0}
 };
 static const CameraPose *doorView;
 static const CameraPose otherworldArrival = {-72982, -14626, -228551, -77354, -3034, -252059};
@@ -217,6 +225,8 @@ static const ChaseRoad chaseRoads[MusicRoom] = {
     [OtherworldLobby] = {1572, 1572, 2188, 2272, ChaseAlongZ},
     [OtherworldSideHall] = {2108, 2364, 2187, 2291, ChaseAlongX},
     [OtherworldEastHall] = {1710, 1756, 964, 1169, ChaseAlongZ},
+    [TeachersSouth] = {252, 355, 1523, 1718, ChaseArea},
+    [TeachersNorth] = {268, 371, 2137, 2332, ChaseArea},
     [NorthClassroom] = {2182, 2265, 1505, 1681, ChaseArea},
     [SouthClassroom] = {2212, 2297, 867, 1041, ChaseArea},
     [EastCorridor]  = {-814, -771,   684, 1168, ChaseAlongZ},
@@ -850,7 +860,8 @@ int playerSetCamera(void)
     SchoolRoom room = roomCurrent();
     bool classroom = room == NorthClassroom || room == SouthClassroom;
     bool reception = room == OtherworldReception;
-    bool corridor = classroom || reception || room == SchoolCorridor || room == SouthHall || room == NorthHall ||
+    bool corridor = classroom || reception || roomIsTeachersRoom(room) ||
+                    room == SchoolCorridor || room == SouthHall || room == NorthHall ||
                     room == UpperNorthHall || room == OtherworldNorthHall || room == OtherworldLobby ||
                     room == OtherworldSideHall || room == OtherworldEastHall ||
                     room == OtherworldSouthHall || room == OtherworldWestHall ||

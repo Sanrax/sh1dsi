@@ -72,6 +72,8 @@ static FILE *openRoom(SchoolRoom room)
     case OtherworldRestroom:
     case OtherworldUpperRestroom: name = "restroom"; break;
     case OtherworldUpperWestHall: name = "otherworldupperwest"; break;
+    case TeachersSouth: name = "teacherssouth"; break;
+    case TeachersNorth: name = "teachersnorth"; break;
     case NorthClassroom: name = "classroomnorth"; break;
     case SouthClassroom: name = "classroomsouth"; break;
     case TowerPassage: name = "passage"; break;
@@ -192,7 +194,8 @@ static void changeRoom(RoomExit exit)
                   from == NorthClassroom || next == NorthClassroom ||
                   from == SouthClassroom || next == SouthClassroom ||
                   from == OtherworldReception || next == OtherworldReception ||
-                  roomIsRestroom(from) || roomIsRestroom(next);
+                  roomIsRestroom(from) || roomIsRestroom(next) ||
+                  roomIsTeachersRoom(from) || roomIsTeachersRoom(next);
     bool hall = east || from == Courtyard || next == Courtyard || otherworldHall || pair12 ||
                 (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
     bool towerDoor = (next == ClockTower && from == Courtyard) || otherworldIntro;
