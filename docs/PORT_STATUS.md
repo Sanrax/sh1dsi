@@ -349,6 +349,21 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   stream grew by 16 bytes and the floor plane array by 252 bytes.
   The counted floor data is ready for the basement stream.
 
+### Room collision edge counts
+
+- The eastern stairwell and first floor now store their edge counts in
+  their sidecars. The loader uses the same count validation as the
+  courtyard and accepts the earlier sidecars. The two streams each grow
+  by two bytes.
+- Host checks matched 659,976 collision moves per room against the
+  previous loader. Synthetic 25- and 35-edge tables also loaded.
+  Truncated tables and counts that exceeded storage were rejected.
+- New sidecars passed the existing stair round trip in melonDS DSi mode
+  over DLDI and virtual console SD. Both routes matched the PS1 arrival
+  poses and stopped at Q12 X 437861 on two attempts to back into the
+  first-floor double door. The DLDI replay also passed with the earlier
+  sidecars.
+
 ### Texture palette conversion
 
 - When a texture page has multiple transparency indices, the converter

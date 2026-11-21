@@ -211,6 +211,13 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (fread(&header, sizeof header, 1, file) != 1) return false;
     bool firstFloorObstacles = room == FirstFloor && !memcmp(header.magic, "SHF3", 4);
     bool southHallObstacles = room == SouthHall && !memcmp(header.magic, "SHS2", 4);
+    bool countedFirstFloor = room == FirstFloor && !memcmp(header.magic, "SHF4", 4);
+    bool countedEast = room == EastCorridor && !memcmp(header.magic, "SHE2", 4);
+    EdgeLayout edgeLayout = LegacyEdges;
+    if (room == Courtyard || countedFirstFloor || countedEast)
+        edgeLayout = CountedEdges;
+    else if (firstFloorObstacles || southHallObstacles)
+        edgeLayout = ExpandedEdges;
     FloorLayout floorLayout = NoFloorData;
     if (room == Courtyard) {
         magic = "SHY1";
@@ -223,7 +230,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
             floorLayout = LegacyCourtyardFloors;
         }
     }
-    bool latchText = firstFloorObstacles || (room == FirstFloor && !memcmp(header.magic, "SHF2", 4));
+    bool latchText = countedFirstFloor || firstFloorObstacles ||
+                     (room == FirstFloor && !memcmp(header.magic, "SHF2", 4));
     bool medical = room == Infirmary && !memcmp(header.magic, "SHI3", 4);
     bool chemical = room == EquipmentRoom && !memcmp(header.magic, "SHQ2", 4);
     bool hand = room == ChemistryLab && !memcmp(header.magic, "SHL2", 4);
@@ -237,7 +245,9 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (header.textureBytes < itemBytes) return false;
     unsigned sceneBytes = header.textureBytes - itemBytes;
     unsigned scenePages = room == SchoolCorridor || room == UpperNorthHall || room == ChemistryLab ? 2 : 3;
-    if (latchText) magic = firstFloorObstacles ? "SHF3" : "SHF2";
+    if (countedFirstFloor) magic = "SHF4";
+    else if (latchText) magic = firstFloorObstacles ? "SHF3" : "SHF2";
+    if (countedEast) magic = "SHE2";
     if (southHallObstacles) magic = "SHS2";
     if (infirmaryItems) magic = medical ? "SHI3" : "SHI2";
     if (chemical) magic = "SHQ2";
@@ -294,7 +304,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     vramSetBankC(VRAM_C_TEXTURE_SLOT0);
     vramSetBankE(VRAM_E_TEX_PALETTE);
     if ((corridor || header.magic[3] >= '4') &&
-        !collisionLoad(file, room, firstFloorObstacles || southHallObstacles, floorLayout)) return false;
+        !collisionLoad(file, room, edgeLayout, floorLayout)) return false;
     if (latchText && !latchLoad(file)) return false;
     if (room == MusicRoom && header.pages == 4 &&
         (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))

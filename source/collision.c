@@ -85,29 +85,35 @@ static bool loadFloorPlanes(FILE *file, FloorLayout layout)
     return true;
 }
 
-bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles, FloorLayout floorLayout)
+static unsigned legacyEdgeCount(SchoolRoom room, EdgeLayout layout)
+{
+    switch (room) {
+    case Infirmary: return 45;
+    case FirstFloor: return layout == ExpandedEdges ? 51 : 39;
+    case SouthHall: return layout == ExpandedEdges ? 47 : 43;
+    case NorthHall: return 24;
+    case UpperNorthHall: return 32;
+    case ChemistryLab: return 30;
+    case EquipmentRoom: return 32;
+    case EastCorridor: return 43;
+    case SchoolCorridor: return 20;
+    case MusicRoom: return 51;
+    default: return 0;
+    }
+}
+
+bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayout floorLayout)
 {
     cylinderCount = 0;
     floorPlaneCount = 0;
-    switch (room) {
-    case Courtyard: {
-        uint16_t count;
-        if (fread(&count, sizeof count, 1, file) != 1 || !count || count >= sizeof edges/sizeof edges[0])
-            return false;
-        edgeCount = count;
-        break;
+    uint16_t count;
+    if (edgeLayout == CountedEdges) {
+        if (fread(&count, sizeof count, 1, file) != 1) return false;
+    } else {
+        count = legacyEdgeCount(room, edgeLayout);
     }
-    case Infirmary: edgeCount = 45; break;
-    case FirstFloor: edgeCount = fullObstacles ? 51 : 39; break;
-    case SouthHall: edgeCount = fullObstacles ? 47 : 43; break;
-    case NorthHall: edgeCount = 24; break;
-    case UpperNorthHall: edgeCount = 32; break;
-    case ChemistryLab: edgeCount = 30; break;
-    case EquipmentRoom: edgeCount = 32; break;
-    case EastCorridor: edgeCount = 43; break;
-    case SchoolCorridor: edgeCount = 20; break;
-    case MusicRoom: edgeCount = 51; break;
-    }
+    if (!count || count >= sizeof edges/sizeof edges[0]) return false;
+    edgeCount = count;
     int scale = room == MusicRoom ? 1 : 16;
     int originX = roomOriginX(room), originZ = roomOriginZ(room);
     // The first-floor south wall extends 0.21 m into the adjoining chunk.

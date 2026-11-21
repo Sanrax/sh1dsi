@@ -76,6 +76,8 @@ def collision_edges(ipd, room):
             if flags != 1 or py != -147 or not 0 < radius < 256:
                 raise ValueError("unexpected lab obstacle cylinder")
             output.extend(struct.pack("<3h", px-5120, pz-5120, radius))
+    if room in (12, 23, 31):
+        output = struct.pack("<H", len(output)//12) + output
     if room != 23:
         return output
 
@@ -99,7 +101,7 @@ def collision_edges(ipd, room):
             floors.extend(struct.pack("<2h", x-5120, z-5120))
         xref, y, zref, _, sx, sz = struct.unpack_from("<3hH2h", collision, surface+12*plane)
         floors.extend(struct.pack("<5h", xref-5120, y, zref-5120, sx, sz))
-    return struct.pack("<H", len(output)//12) + output + struct.pack("<H", len(floor_planes)) + floors
+    return output + struct.pack("<H", len(floor_planes)) + floors
 
 
 def model_directory(data):
@@ -394,7 +396,7 @@ def school_room(disc, room=39):
             add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-10240, y>>4, (z>>4)-30720), state,
                       item_page=page)
     if room != 39:
-        magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 16: b"SHU1", 23: b"SHY3", 31: b"SHE1",
+        magic = {9: b"SHI3", 12: b"SHF4", 13: b"SHS2", 16: b"SHU1", 23: b"SHY3", 31: b"SHE2",
                  32: b"SHC1", 33: b"SHH1", 34: b"SHL3", 35: b"SHQ2"}[room]
         extra = b""
         if room == 9:
