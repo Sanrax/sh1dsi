@@ -21,6 +21,7 @@ ROOM_NORMALS = 128
 ROOM_LAYOUTS = {
     2: ROOM_BOILER_EVENT,
     3: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES,
+    8: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
     11: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_NORMALS,
     20: ROOM_DOOR_NOTICE,
     21: 0,
@@ -84,7 +85,7 @@ def collision_edges(ipd, room):
     expected = {2: (0, -10240, 35, 9, 43, 0), 3: (10240, -10240, 25, 4, 26, 0),
                 39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
                 31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0),
-                13: (30720, 0, 80, 12, 80, 0), 11: (30720, 0, 33, 7, 35, 0), 9: (10240, 30720, 45, 11, 49, 0),
+                13: (30720, 0, 80, 12, 80, 0), 11: (30720, 0, 33, 7, 35, 0), 9: (10240, 30720, 45, 11, 49, 0), 8: (10240, 0, 34, 6, 34, 0),
                 20: (-30720, -20480, 16, 3, 16, 0), 21: (-40960, -20480, 16, 3, 16, 0),
                 22: (-20480, -20480, 28, 8, 32, 0),
                 23: (-10240, -20480, 204, 61, 236, 0), 24: (-10240, -20480, 172, 31, 175, 0),
@@ -170,6 +171,8 @@ def collision_edges(ipd, room):
         # Keep the inside shell and the desks. The outer shell is beyond
         # the usable classrooms. Shared edges 11 and 13 in room 30 lie outside it.
         if (room == 29 and i < 8) or (room == 30 and (i < 8 or i in (11, 13))):
+            continue
+        if room == 8 and i < 8:
             continue
         if other != 255:
             raise ValueError("unexpected shared collision edge")
@@ -343,10 +346,10 @@ def smoke_atlas(disc):
 
 
 def school_room(disc, room=39):
-    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 11: (3, 0), 9: (1, 3),
+    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 11: (3, 0), 8: (1, 0), 9: (1, 3),
               23: (255, 254), 24: (255, 254), 25: (3, 4), 26: (2, 3), 27: (3, 3), 28: (2, 1), 29: (3, 2), 30: (3, 1), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
               3: (1, 255), 2: (0, 255), 20: (253, 254), 21: (252, 254), 22: (254, 254)}[room]
-    prefix = "SU" if room in (11, 24, 25, 26, 27, 28, 29, 30) else "SC"
+    prefix = "SU" if room in (8, 11, 24, 25, 26, 27, 28, 29, 30) else "SC"
     data = disc.read(f"BG/{prefix}{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -382,6 +385,15 @@ def school_room(disc, room=39):
             regions = ((5, 2, 15, (128, 239, 208, 255)),)
         if room == 26 and name == "SU1FTE1":
             regions = ((6, 2, 0, (32, 159, 160, 255)),)
+        if room == 8 and name == "SU1FL2":
+            # Rekey the two disjoint cutout tiles. The first tile uses
+            # indices 0 through 10, with 10 transparent.
+            for y in range(112, 256):
+                start = y*words*2
+                if any((b & 15) > 10 or b >> 4 > 10 for b in pixels[start:start+48]):
+                    raise ValueError("unexpected reception cutout indices")
+            cluts[1] = cluts[1][:11] + (cluts[1][0],)*5
+            regions = ((1, 10, 0, (0, 95, 112, 255)), (4, 15, 0, (112, 175, 0, 95)))
         for row, key, target, rect in regions:
             if {j for j, value in enumerate(cluts[row]) if not value} != {key}:
                 raise ValueError("unexpected cutout palette")

@@ -96,7 +96,9 @@ static const DoorView doorViews[] = {
     {OtherworldEastHall, SouthClassroom, {448313, -8003, 199475, 425784, -3404, 199220}, 0},
     {SouthClassroom, OtherworldEastHall, {579417, -10936, 231074, 569176, -4096, 223092}, 0},
     {OtherworldSouthHall, OtherworldEastHall, {611334, -8003, 81920, 588805, -3404, 81676}, 0},
-    {OtherworldEastHall, OtherworldSouthHall, {438052, -8003, 201113, 460583, -3404, 201355}, 0}
+    {OtherworldEastHall, OtherworldSouthHall, {438052, -8003, 201113, 460583, -3404, 201355}, 0},
+    {OtherworldReception, OtherworldSouthHall, {245231, -9728, 77312, 232122, -5120, 83159}, 0},
+    {OtherworldSouthHall, OtherworldReception, {538257, -8617, 81784, 539127, -2832, 69512}, 0}
 };
 static const CameraPose *doorView;
 static const CameraPose otherworldArrival = {-72982, -14626, -228551, -77354, -3034, -252059};
@@ -202,6 +204,7 @@ static const ChaseRoad chaseRoads[MusicRoom] = {
     [FirstFloor]    = {1710, 1756,   680, 1169, ChaseAlongZ},
     [SouthHall]     = {2086, 2393,   294,  337, ChaseAlongX},
     [OtherworldSouthHall] = {2086, 2393, 294, 337, ChaseAlongX},
+    [OtherworldReception] = {900, 992, 302, 302, ChaseAlongX},
     [NorthHall]     = {1982, 2289,  3043, 3089, ChaseAlongX},
     [Courtyard]     = {-436, -196, -1096, -848, ChaseArea},
     [OtherworldCourtyard] = {-436, -196, -1096, -848, ChaseArea},
@@ -801,7 +804,8 @@ int playerSetCamera(void)
     // the distance to Harry is below four metres.
     SchoolRoom room = roomCurrent();
     bool classroom = room == NorthClassroom || room == SouthClassroom;
-    bool corridor = classroom || room == SchoolCorridor || room == SouthHall || room == NorthHall ||
+    bool reception = room == OtherworldReception;
+    bool corridor = classroom || reception || room == SchoolCorridor || room == SouthHall || room == NorthHall ||
                     room == UpperNorthHall || room == OtherworldNorthHall || room == OtherworldLobby ||
                     room == OtherworldSideHall || room == OtherworldEastHall || room == OtherworldSouthHall;
     bool equipment = room == EquipmentRoom;
@@ -891,9 +895,10 @@ int playerSetCamera(void)
         int chaseHeight = room == SouthHall ? 27*256 : 8600;
         bool highEye = room == OtherworldLobby || classroom;
         if (highEye) chaseHeight = 43*256;
+        if (reception) chaseHeight = 38*256;
         if (boiler) chaseHeight = (z < -68403 ? 27 : 38)*256;
         eyeHeight = ((rail ? 7987 : chaseHeight)-ground)/2;
-        targetHeight = ((rail ? 3533 : highEye ? 4096 : 2816)-ground)/2;
+        targetHeight = ((rail ? 3533 : highEye ? 4096 : reception ? 5120 : 2816)-ground)/2;
         // The small road limits the camera to 2.5 metres above map origin.
         if (eyeHeight > 5120 && !highEye) eyeHeight = 5120;
     }

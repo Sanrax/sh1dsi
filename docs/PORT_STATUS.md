@@ -17,7 +17,7 @@ The north hall connects to the lobby, where Harry can collect the first-aid
 kit and handgun bullets and inspect the fans. The north hall also connects
 through the side hall to the Otherworld east hall. Harry can take the Picture
 Card from the north classroom and cross the south classroom to get past
-the east hall barrier and enter the Otherworld south hall.
+the east hall barrier and reach reception through the Otherworld south hall.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -1106,9 +1106,38 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - The reproducible unit-code-3 build adds `otherworldsouth.dat`
   (105,887 bytes). The previous 27 data files are byte-identical.
 
+## Otherworld reception
+
+- MAP1_S02 points 50 and 53 link the south hall and reception. The
+  reception room uses the original `SU0100` textures, geometry,
+  normals and wall and desk collision. Both doors use measured
+  arrival views and the original pair 12 sounds.
+- The DLDI diagnostic replay in melonDS 1.1 DSi mode matched both
+  PS1 arrivals in X/Z and heading. The entry and return views differed
+  from PS1 by 7.44 and 6.68 RGB values on average on a 0–255 scale.
+  Harry stopped at the card-slot wall within 15 Q12 units (3.7 mm)
+  of the PS1 stop along its contact axis. The uninstrumented virtual-SD
+  run reached reception from the powered-boiler checkpoint, walked to
+  the slot wall and returned to the south hall with the card.
+- The PS1 walking sample averaged 34.975 ms across 166 intervals,
+  including 16 three-VBlank frames. Native reception averaged 33.379 ms
+  across 972 intervals with a 33.430 ms 95th percentile and 49.970 ms
+  maximum. Peak use was 615 polygons, 2,395 vertices and 4.980 ms of
+  submission time with no overflow. These are emulator results.
+- Two clean BlocksDS builds reproduced the unit-code-3 ROM and 29 data
+  files byte for byte. `reception.dat` is 125,586 bytes. The 28 previous
+  data files matched the south hall build.
+- PS1 replay covers the slot's first and repeat inspections and the
+  original use event. The original keeps one Picture Card after use,
+  sets event flag 1207, and opens the crossing to MAP1_S02 room 11.
+  Slot inspection, use and that crossing remain pending in the port.
+  The two inspection TIMs match more closely with V scaled to 239.
+  The repeat message has 46 glyphs. The use replay records projection
+  376 and both hand-animation poses for the next milestone.
+
 ## Next
 
-1. Connect reception through the south hall and implement the Picture Card slot.
+1. Port the Picture Card slot inspection, use animation and unlock, then connect its destination.
 2. Port the courtyard rain, fan sound and room ambience against the PS1 replay.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 

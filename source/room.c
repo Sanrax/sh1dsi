@@ -80,6 +80,8 @@ const Door schoolDoors[] = {
     {OtherworldEastHall, SouthClassroom, 449740, 199475, -1, 0, 2304},
     {OtherworldEastHall, OtherworldSouthHall, 436633, 201113, 1, 0, 3584},
     {OtherworldSouthHall, OtherworldEastHall, 612761, 81920, -1, 0, 3584},
+    {OtherworldSouthHall, OtherworldReception, 539033, 65536, 0, 1, 2304},
+    {OtherworldReception, OtherworldSouthHall, 234291, 87244, 0, -1, 2304},
     {BasementStair, BoilerRoom, 219545, -70451, 1, 0, 2304},
     {BoilerRoom, BasementStair, 93388, -79872, -1, 0, 2304}
 };
@@ -127,6 +129,7 @@ static RoomOrigin legacyRoomOrigin(SchoolRoom room)
     case OtherworldSideHall:
     case OtherworldEastHall:
     case OtherworldSouthHall:
+    case OtherworldReception:
     case NorthClassroom:
     case SouthClassroom:
     case TowerPassage: break; // These rooms require a stream origin.
@@ -296,7 +299,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     bool pictureCard = room == NorthClassroom;
     bool otherworld = room == OtherworldCourtyard || room == OtherworldNorthHall || lobby ||
                       room == OtherworldSideHall || room == OtherworldEastHall ||
-                      room == OtherworldSouthHall || pictureCard || room == SouthClassroom;
+                      room == OtherworldSouthHall || room == OtherworldReception ||
+                      pictureCard || room == SouthClassroom;
     if (!hasOrigin && (room == BasementStair || room == BoilerRoom ||
                        room == ClockTower || room == FarClockTower || room == TowerPassage ||
                        otherworld))
