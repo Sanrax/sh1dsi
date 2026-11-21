@@ -30,6 +30,15 @@ def courtyard_look_frames(disc):
     return frames
 
 
+def card_slot_frames(disc):
+    # MAP1_S02 event 11 plays keyframes 1017–1037, then reverses their tail.
+    source = disc.read("ANIM/HB_M1S02.ANM")
+    frames = source[(1017-676)*156:(1038-676)*156]
+    if len(frames) != 21*156:
+        raise ValueError("incomplete Picture Card animation")
+    return frames
+
+
 def player_data(disc):
     model = disc.read("CHARA/HERO.ILM")
     _, models, headers, order = struct.unpack_from("<4I", model, 4)

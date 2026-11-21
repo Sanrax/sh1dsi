@@ -82,6 +82,8 @@ const Door schoolDoors[] = {
     {OtherworldSouthHall, OtherworldEastHall, 612761, 81920, -1, 0, 3584},
     {OtherworldSouthHall, OtherworldReception, 539033, 65536, 0, 1, 2304},
     {OtherworldReception, OtherworldSouthHall, 234291, 87244, 0, -1, 2304},
+    {OtherworldReception, OtherworldWestHall, 229376, 79052, 1, 0, 2304},
+    {OtherworldWestHall, OtherworldReception, 255590, 173670, -1, 0, 2304},
     {BasementStair, BoilerRoom, 219545, -70451, 1, 0, 2304},
     {BoilerRoom, BasementStair, 93388, -79872, -1, 0, 2304}
 };
@@ -130,6 +132,7 @@ static RoomOrigin legacyRoomOrigin(SchoolRoom room)
     case OtherworldEastHall:
     case OtherworldSouthHall:
     case OtherworldReception:
+    case OtherworldWestHall:
     case NorthClassroom:
     case SouthClassroom:
     case TowerPassage: break; // These rooms require a stream origin.
@@ -299,7 +302,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     bool pictureCard = room == NorthClassroom;
     bool otherworld = room == OtherworldCourtyard || room == OtherworldNorthHall || lobby ||
                       room == OtherworldSideHall || room == OtherworldEastHall ||
-                      room == OtherworldSouthHall || room == OtherworldReception ||
+                      room == OtherworldSouthHall || room == OtherworldReception || room == OtherworldWestHall ||
                       pictureCard || room == SouthClassroom;
     if (!hasOrigin && (room == BasementStair || room == BoilerRoom ||
                        room == ClockTower || room == FarClockTower || room == TowerPassage ||
@@ -650,12 +653,12 @@ void roomDraw(const Medallion *medal)
     // MAP1_S01 medallion cameras. Local origin (-100, 0, 20), 2 metres/unit.
     // Screen_CutsceneCameraStateUpdate masks the 320x240 picture at y=±96.
     // Shrink the frustum with the viewport to keep the original pixel scale.
-    bool intro = otherworldIntroActive();
-    int border = statueActive() ? (int)statueBorder() : gameplay && !intro ? 6 : 19;
+    bool intro = otherworldIntroActive(), slot = slotActive();
+    int border = statueActive() ? (int)statueBorder() : gameplay && !intro && !slot ? 6 : 19;
     glViewport(0, border, 255, 191-border);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    const int distance = intro ? otherworldIntroProjection() : statueCamera() ? 376 : gameplay ? 224 :
+    const int distance = intro ? otherworldIntroProjection() : statueCamera() || slot ? 376 : gameplay ? 224 :
                          medal->phase == MedalHanging ? 353 : medal->projection;
     const int near = 1024; // 0.25 scene units, Q12.
     int horizontal = 160 * near / distance;

@@ -80,7 +80,10 @@ Pick it up, then use the door at the south end to cross into the next
 classroom. Its southwest door opens onto the far side of the barrier.
 Use the double doors across this section of the east hall to enter the
 south hall. Follow the hall west and use the single door on the south
-wall to enter reception. The same door returns to the hall.
+wall to enter reception. The same door returns to the hall. Face the slot
+in reception's west wall and press A to inspect it. Press Select there
+with the Picture Card in inventory. After the animation and message,
+press A to go through the unlocked door into the west hall.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

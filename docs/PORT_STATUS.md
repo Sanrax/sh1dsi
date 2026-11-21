@@ -18,6 +18,7 @@ kit and handgun bullets and inspect the fans. The north hall also connects
 through the side hall to the Otherworld east hall. Harry can take the Picture
 Card from the north classroom and cross the south classroom to get past
 the east hall barrier and reach reception through the Otherworld south hall.
+Harry can use the Picture Card in reception to open the west hall.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -1080,8 +1081,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   run exercised all eight classroom door directions and matched each
   arrival's PS1 X/Z and heading. A separate DSi test showed and dismissed
   the original first-floor latch notice before using the unlocked door.
-- The Picture Card slot, jammed-door messages, classroom enemies and
-  original ambience remain pending. Physical DSi and Pico-Launcher
+- Jammed-door messages, classroom enemies and original ambience remain pending. Physical DSi and Pico-Launcher
   testing remains pending.
 
 ## Otherworld south hall
@@ -1130,14 +1130,50 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - PS1 replay covers the slot's first and repeat inspections and the
   original use event. The original keeps one Picture Card after use,
   sets event flag 1207, and opens the crossing to MAP1_S02 room 11.
-  Slot inspection, use and that crossing remain pending in the port.
   The two inspection TIMs match more closely with V scaled to 239.
   The repeat message has 46 glyphs. The use replay records projection
   376 and both hand-animation poses for the next milestone.
 
+## Picture Card slot and west hall
+
+- The native slot inspection shows the two original reception views and
+  the first and repeat messages. The first visit blends the two views
+  during the surprise line. The matched frames differed from PS1 by
+  0.17–1.97 RGB values on average on a 0–255 scale.
+- MAP1_S02 event 11 uses the original Harry keyframes from
+  `HB_M1S02.ANM`, the measured camera pose and projection, the card
+  insertion message, and the two original sounds. The original event
+  trace took 266 VBlanks with the scripted message hold. The native
+  animation uses 30 Hz submission, fixed fade lengths, and the port's
+  existing room lighting. The card stays in inventory after use and
+  the open door persists across room changes. The uninstrumented
+  virtual-SD replay started at the powered-boiler checkpoint, collected
+  the card in the classroom, opened the door and returned to reception.
+  A focused DLDI test verified both ARM7 sound-channel allocations and
+  the original item emphasis color in the insertion message.
+- The `SU0101` stream adds the west hallway and retains its original
+  floor planes, barrier and locker geometry. Both door directions in
+  melonDS 1.1 DSi mode over DLDI matched the PS1 X/Z and heading.
+  Harry stopped at z=242692 (Q12) against the barrier, compared with
+  242711 on PS1. This is a 4.6 mm difference along the contact axis.
+- The PS1 west hall held 33.367 ms across 205 gameplay intervals. The
+  instrumented DSi run averaged 33.360 ms across 2,157 intervals with
+  a 33.430 ms 95th percentile and 33.478 ms maximum. Peak use was
+  1,338 polygons and 5,300 vertices, with 6.245 ms peak submission
+  time and no overflow. These are emulator measurements.
+- BlocksDS 1.24.0 and the verified USA 1.1 CUE produce a reproducible
+  unit-code-3 ROM and 31 data files. The new files are
+  `cardslot.dat` (125,228 bytes) and `otherworldwest.dat` (144,357 bytes).
+  `piano.dat` adds the two original effects and keeps previous tones
+  and PCM identical. The other 28 previous data files match.
+- The PS1 reference also confirms the women's restroom crossing at
+  point 81 from MAP1_S02 room 11 to MAP1_S03 room 4. The settled
+  arrival is Q12 (93675, 0, 81510), heading 3072. The port's next
+  crossing starts there.
+
 ## Next
 
-1. Port the Picture Card slot inspection, use animation and unlock, then connect its destination.
+1. Connect the west hall to the women's restroom and trace the MAP1_S03 exits.
 2. Port the courtyard rain, fan sound and room ambience against the PS1 replay.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 

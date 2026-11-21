@@ -83,7 +83,7 @@ def statue_sound(vab):
                        volume, vab[tone+3]) + pcm
 
 
-def school_bank(map_vab, base_vab, first_floor_vab):
+def school_bank(map_vab, base_vab, first_floor_vab, otherworld_vab):
     # MAP1_S01 and g_Vab_InfoTable: SFX_PAIRS[1, 2] use BASE.VAB.
     samples = bytearray()
     notes = [(1, n, 127) for n in (48, 51, 52, 53, 54, 56, 59, 61)]
@@ -115,4 +115,7 @@ def school_bank(map_vab, base_vab, first_floor_vab):
     tones.extend(convert_tones(base_vab, [(2, 50, 127), (2, 51, 127)], samples))
     # The side and east hall doors use pair 12 from the same BASE.VAB.
     tones.extend(convert_tones(base_vab, [(2, 48, 127), (2, 49, 127)], samples))
+    # MAP1_S02 event 11 plays effects 1454 and 1343 at half volume.
+    tones.extend(convert_tones(otherworld_vab, [(0, 39, 64)], samples))
+    tones.extend(convert_tones(base_vab, [(2, 55, 64)], samples))
     return tones + struct.pack("<H", starts[0]) + samples

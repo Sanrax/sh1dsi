@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Adapted from the school inspections and Event_DisplayMapMsgWithBg.
+// Adapted from the school inspections and MAP1_S02 events 10 and 11.
 // Copyright (C) 2026 shdecompilations
 #include <nds.h>
 #include <stddef.h>
@@ -8,6 +8,7 @@
 #include "glyph.h"
 #include "inspection.h"
 #include "checkpoint.h"
+#include "player.h"
 
 typedef struct {
     uint16_t palette[256];
@@ -16,9 +17,9 @@ typedef struct {
 
 typedef struct {
     uint16_t count, length, palette[16];
-    Glyph glyphs[40];
+    Glyph glyphs[48];
 } Message;
-_Static_assert(offsetof(Message, glyphs) == 36, "tower message layout");
+_Static_assert(offsetof(Message, glyphs) == 36, "inspection message layout");
 
 typedef struct {
     Background scene;
@@ -107,33 +108,59 @@ static void waitFrames(unsigned frames)
     for (unsigned i = 0; i < frames; i++) input();
 }
 
-static void showMessage(uint16_t *screen, const Message *text, unsigned interval)
+typedef struct {
+    int bg;
+    uint8_t bank;
+    uint16_t control, alpha;
+    uint16_t *pixels;
+} InspectionOverlay;
+
+static void drawMessageGlyph(uint16_t *screen, const Message *text, unsigned index)
 {
-    unsigned shown = 0, age = 0;
+    const Glyph *g = &text->glyphs[index];
+    for (unsigned y = 0; y < 14; y++) {
+        uint16_t *row = screen+(g->y+y)*256+g->x;
+        for (unsigned x = 0; x < 11; x++) {
+            unsigned ink = g->mask[y][x];
+            if (!ink) continue;
+            uint16_t color = text->palette[ink];
+            if (g->ink == 2) {
+                // MAP_MSG_CODE_COLOR 3 uses RGB modulation 8,184,96.
+                unsigned level = color & 31, green = level*184/128;
+                color = RGB15(level*8/128, green > 31 ? 31 : green, level*96/128);
+            }
+            row[x] = color | BIT(15);
+        }
+    }
+}
+
+static void blendInspection(unsigned step)
+{
+    REG_BLDALPHA = step | ((16-step) << 8);
+}
+
+static void showMessageAcrossViews(uint16_t *screen, const Message *text, unsigned interval,
+                                  const InspectionOverlay *overlay)
+{
+    unsigned shown = 0, age = 0, elapsed = 0;
     for (;;) {
         unsigned keys = input() & (KEY_A | KEY_B);
+        if (overlay && elapsed < 32) blendInspection(++elapsed/2);
         if (shown == text->count && keys) return;
         if (++age < interval && !keys) continue;
         age = 0;
         unsigned goal = keys || shown+2 > text->count ? text->count : shown+2;
         while (shown < goal) {
-            const Glyph *g = &text->glyphs[shown++];
-            for (unsigned y = 0; y < 14; y++) {
-                uint16_t *row = screen+(g->y+y)*256+g->x;
-                for (unsigned x = 0; x < 11; x++) {
-                    unsigned ink = g->mask[y][x];
-                    if (!ink) continue;
-                    uint16_t color = text->palette[ink];
-                    if (g->ink == 2) {
-                        // MAP_MSG_CODE_COLOR 3 uses RGB modulation 8,184,96.
-                        unsigned level = color & 31, green = level*184/128;
-                        color = RGB15(level*8/128, green > 31 ? 31 : green, level*96/128);
-                    }
-                    row[x] = color | BIT(15);
-                }
-            }
+            drawMessageGlyph(screen, text, shown);
+            if (overlay) drawMessageGlyph(overlay->pixels, text, shown);
+            shown++;
         }
     }
+}
+
+static void showMessage(uint16_t *screen, const Message *text, unsigned interval)
+{
+    showMessageAcrossViews(screen, text, interval, NULL);
 }
 
 static void drawBackground(uint16_t *screen, const Background *image)
@@ -154,6 +181,36 @@ static void drawBackground(uint16_t *screen, const Background *image)
             screen[y*256+x] = BIT(15) | (((u^v)&1) ? image->palette[index] : dithered[index]);
         }
     }
+}
+
+static InspectionOverlay openInspectionOverlay(const Background *image)
+{
+    InspectionOverlay overlay = {.bank = VRAM_D_CR, .control = REG_BLDCNT, .alpha = REG_BLDALPHA};
+    vramSetBankD(VRAM_D_MAIN_BG_0x06020000);
+    overlay.bg = bgInitHidden(2, BgType_Bmp16, BgSize_B16_256x256, 8, 0);
+    bgSetPriority(overlay.bg, 0);
+    bgSetPriority(3, 1);
+    overlay.pixels = bgGetGfxPtr(overlay.bg);
+    drawBackground(overlay.pixels, image);
+    return overlay;
+}
+
+static void startInspectionBlend(const InspectionOverlay *overlay)
+{
+    REG_BLDCNT = BLEND_ALPHA | BLEND_SRC_BG2 | BLEND_DST_BG3;
+    blendInspection(0);
+    bgShow(overlay->bg);
+}
+
+static void finishInspectionBlend(const InspectionOverlay *overlay, uint16_t *screen)
+{
+    input();
+    dmaCopy(overlay->pixels, screen, 256*192*2);
+    bgHide(overlay->bg);
+    REG_BLDCNT = overlay->control;
+    REG_BLDALPHA = overlay->alpha;
+    VRAM_D_CR = overlay->bank;
+    bgInitHidden(2, BgType_Bmp8, BgSize_B8_256x256, 4, 0);
 }
 
 static bool readHand(const char *dir, Art *art)
@@ -231,36 +288,21 @@ unsigned towerPlace(const char *dir, TowerPoint point, void (*playSound)(bool ch
     fade(61, true);
     bgHide(0);
     uint16_t *screen = openScreen();
-    uint8_t bank = VRAM_D_CR;
-    vramSetBankD(VRAM_D_MAIN_BG_0x06020000);
-    int overlay = bgInit(2, BgType_Bmp16, BgSize_B16_256x256, 8, 0);
-    bgHide(overlay);
-    bgSetPriority(overlay, 0);
-    bgSetPriority(3, 1);
     drawBackground(screen, &art->scene);
-    drawBackground(bgGetGfxPtr(overlay), filled);
+    InspectionOverlay overlay = openInspectionOverlay(filled);
     free(filled);
     bgShow(3);
     fade(33, false);
     waitFrames(31);
 
-    // The PS1 subtracts a weighted empty view and adds the filled view.
     // Use both bitmap layers so the ARM9 only updates the blend weights.
     playSound(false);
-    uint16_t blend = REG_BLDCNT, alpha = REG_BLDALPHA;
-    REG_BLDCNT = BLEND_ALPHA | BLEND_SRC_BG2 | BLEND_DST_BG3;
-    REG_BLDALPHA = 16 << 8;
-    bgShow(overlay);
+    startInspectionBlend(&overlay);
     for (unsigned step = 1; step <= 16; step++) {
         input();
-        REG_BLDALPHA = step | ((16-step) << 8);
+        blendInspection(step);
     }
-    input();
-    dmaCopy(bgGetGfxPtr(overlay), screen, 256*192*2);
-    bgHide(overlay);
-    REG_BLDCNT = blend;
-    REG_BLDALPHA = alpha;
-    VRAM_D_CR = bank;
+    finishInspectionBlend(&overlay, screen);
 
     playSound(true);
     waitFrames(60);
@@ -279,4 +321,180 @@ unsigned handInspect(const char *dir)
     if (ok) inspect(art, false, 57, 43);
     free(art);
     return ok ? 33 : 0;
+}
+
+enum { SlotFirst, SlotRepeat, SlotSurprise, SlotClose, SlotMessages };
+static bool slotSeen, cardDoorOpen;
+static Message insertMessage;
+static enum { SlotInactive, SlotInsert, SlotMessage, SlotRecover, SlotBlackout } slotPhase;
+static unsigned slotAge, slotShown;
+
+static FILE *openSlot(const char *dir, uint32_t *inspection)
+{
+    char path[64], magic[4];
+    snprintf(path, sizeof path, "%s/cardslot.dat", dir);
+    FILE *file = fopen(path, "rb");
+    if (!file) return NULL;
+    if (fread(magic, sizeof magic, 1, file) == 1 && !memcmp(magic, "SHR1", 4) &&
+        fread(inspection, sizeof *inspection, 1, file) == 1 && *inspection >= 8 && *inspection < 16*1024)
+        return file;
+    fclose(file);
+    return NULL;
+}
+
+unsigned slotInspect(const char *dir)
+{
+    typedef struct {
+        Background view[2];
+        Message text[SlotMessages];
+    } SlotArt;
+    uint32_t offset;
+    SlotArt *art = malloc(sizeof *art);
+    FILE *file = art ? openSlot(dir, &offset) : NULL;
+    bool ok = file && !fseek(file, offset, SEEK_SET) && fread(art->view, sizeof art->view, 1, file) == 1;
+    for (unsigned i = 0; ok && i < SlotMessages; i++) ok = readMessage(file, &art->text[i]);
+    if (file) {
+        ok = ok && fgetc(file) == EOF && !ferror(file);
+        fclose(file);
+    }
+    if (!ok) {
+        free(art);
+        return 0;
+    }
+
+    fade(40, true);
+    bgHide(0);
+    uint16_t *screen = openScreen();
+    drawBackground(screen, &art->view[0]);
+    InspectionOverlay overlay = openInspectionOverlay(&art->view[1]);
+    bgShow(3);
+    fade(19, false);
+    showMessage(screen, &art->text[slotSeen ? SlotRepeat : SlotFirst], 1);
+    drawBackground(screen, &art->view[0]);
+    startInspectionBlend(&overlay);
+    if (!slotSeen) {
+        showMessageAcrossViews(screen, &art->text[SlotSurprise], 1, &overlay);
+        // Finish the authored transition if the player dismissed the line
+        // while the two backgrounds were still blending.
+        for (unsigned step = REG_BLDALPHA & 31; step < 16; step++) {
+            waitFrames(2);
+            blendInspection(step+1);
+        }
+    } else {
+        for (unsigned step = 1; step <= 16; step++) {
+            waitFrames(2);
+            blendInspection(step);
+        }
+    }
+    finishInspectionBlend(&overlay, screen);
+    drawBackground(screen, &art->view[1]);
+    showMessage(screen, &art->text[SlotClose], 1);
+    fade(23, true);
+    closeScreen();
+    free(art);
+    slotSeen = true;
+    return SlotRevealVBlanks;
+}
+
+bool slotUnlocked(void) { return cardDoorOpen; }
+bool slotActive(void) { return slotPhase != SlotInactive; }
+
+bool slotStart(const char *dir)
+{
+    uint32_t offset;
+    FILE *file = openSlot(dir, &offset);
+    if (!file) return false;
+    bool ok = playerLoadSlot(file) && readMessage(file, &insertMessage) && ftell(file) == (long)offset;
+    fclose(file);
+    if (!ok) return false;
+    playerWarpForSlot();
+    setBrightness(1, 0);
+    slotPhase = SlotInsert;
+    slotAge = slotShown = 0;
+    return true;
+}
+
+bool slotTick(unsigned pressed, void (*playSound)(bool unlocked))
+{
+    slotAge++;
+    switch (slotPhase) {
+    case SlotInsert:
+        if (slotAge < 19) break;
+        if (slotAge < 117) {
+            if (slotAge & 1) break;
+            // The PS1 evaluates the cutscene bones at the 30 Hz draw cadence.
+            unsigned age = slotAge-19;
+            unsigned blend = age < 8 ? 4096-age*512 : 0;
+            unsigned frame = age > 8 ? (age-8)*1024 : 0;
+            if (frame > 20*4096) frame = 20*4096;
+            playerSlotFrame(frame, blend);
+            return true;
+        }
+        playerSlotFrame(20*4096, 0);
+        playSound(false);
+        slotPhase = SlotMessage;
+        return true;
+    case SlotMessage:
+        if (pressed & (KEY_A | KEY_B)) {
+            if (slotShown == insertMessage.count) {
+                slotShown = 0;
+                slotPhase = SlotRecover;
+                slotAge = 0;
+                playSound(true);
+            } else slotShown = insertMessage.count;
+        } else if (slotShown < insertMessage.count) {
+            slotShown++;
+        }
+        break;
+    case SlotRecover:
+        if (slotAge >= 46) {
+            playerSlotFrame(15*4096, 0);
+            slotAge = 0;
+            slotPhase = SlotBlackout;
+            return true;
+        } else if (slotAge >= 11 && (slotAge & 1)) {
+            unsigned back = (slotAge-9)*4096*8/60;
+            if (back > 5*4096) back = 5*4096;
+            playerSlotFrame(20*4096-back, 0);
+            return true;
+        }
+        break;
+    case SlotBlackout:
+        if (slotAge < 27) {
+            setBrightness(1, -(int)(16*slotAge/27));
+        } else {
+            setBrightness(1, -16);
+            playerFinishSlot();
+            cardDoorOpen = true;
+            slotPhase = SlotInactive;
+            return true;
+        }
+        break;
+    case SlotInactive:
+        break;
+    }
+    return false;
+}
+
+void slotDrawPrompt(int bg)
+{
+    static unsigned drawn;
+    if (!slotShown) {
+        bgHide(bg);
+        drawn = 0;
+        return;
+    }
+    uint16_t *screen = bgGetGfxPtr(bg);
+    if (!drawn) {
+        dmaFillHalfWords(0, screen, 256*192);
+        for (unsigned i = 1; i < 16; i++) {
+            uint16_t white = insertMessage.palette[i] & 0x7fff;
+            unsigned level = white & 31;
+            BG_PALETTE[i] = white;
+            BG_PALETTE[16+i] = RGB15(level*24/128, level, level*40/128);
+        }
+    }
+    if (slotShown > drawn) glyphsDraw(screen, insertMessage.glyphs+drawn, slotShown-drawn);
+    drawn = slotShown;
+    bgShow(bg);
 }

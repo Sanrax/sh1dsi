@@ -12,4 +12,12 @@ unsigned towerFlags(void);
 void towerRestore(unsigned flags);
 unsigned handInspect(const char *dir);
 
+enum { SlotRevealVBlanks = 24 };
+unsigned slotInspect(const char *dir);
+bool slotStart(const char *dir);
+bool slotActive(void);
+bool slotUnlocked(void);
+bool slotTick(unsigned pressed, void (*playSound)(bool unlocked));
+void slotDrawPrompt(int bg);
+
 #endif

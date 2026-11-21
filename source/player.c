@@ -36,12 +36,12 @@ _Static_assert(sizeof(Bone) == 6 && sizeof(Vertex) == 8 &&
                sizeof(Corner) == 4 && sizeof(Batch) == 4, "player file layout");
 
 static Bone bones[18];
-enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward, Kneel, Rise, Pour, DescendLadder, AscendLadder, LookAround };
-static const unsigned firstFrame[] = {0, 40, 53, 66, 89, 113, 128, 140, 189, 226, 263};
-static const unsigned frameCount[] = {40, 13, 13, 23, 24, 15, 12, 49, 37, 37, 47};
+enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward, Kneel, Rise, Pour, DescendLadder, AscendLadder, LookAround, SlotInsert };
+static const unsigned firstFrame[] = {0, 40, 53, 66, 89, 113, 128, 140, 189, 226, 263, 310};
+static const unsigned frameCount[] = {40, 13, 13, 23, 24, 15, 12, 49, 37, 37, 47, 21};
 static const unsigned frameRate[] = {10, 15, 15, 22, 23, 15, 15, 15, 18, 18, 9};
 static const unsigned blendRate[] = {5, 50, 50, 50, 20, 10, 10, 10, 10, 10, 10};
-static int8_t frames[310][156];
+static int8_t frames[331][156];
 static int ladderAge = -1;
 static int ladderHeight;
 static SchoolRoom ladderTower;
@@ -98,7 +98,9 @@ static const DoorView doorViews[] = {
     {OtherworldSouthHall, OtherworldEastHall, {611334, -8003, 81920, 588805, -3404, 81676}, 0},
     {OtherworldEastHall, OtherworldSouthHall, {438052, -8003, 201113, 460583, -3404, 201355}, 0},
     {OtherworldReception, OtherworldSouthHall, {245231, -9728, 77312, 232122, -5120, 83159}, 0},
-    {OtherworldSouthHall, OtherworldReception, {538257, -8617, 81784, 539127, -2832, 69512}, 0}
+    {OtherworldSouthHall, OtherworldReception, {538257, -8617, 81784, 539127, -2832, 69512}, 0},
+    {OtherworldWestHall, OtherworldReception, {254163, -8003, 173670, 231634, -3404, 173415}, 0},
+    {OtherworldReception, OtherworldWestHall, {246138, -9728, 77312, 233955, -5120, 79183}, 0}
 };
 static const CameraPose *doorView;
 static const CameraPose otherworldArrival = {-72982, -14626, -228551, -77354, -3034, -252059};
@@ -205,6 +207,7 @@ static const ChaseRoad chaseRoads[MusicRoom] = {
     [SouthHall]     = {2086, 2393,   294,  337, ChaseAlongX},
     [OtherworldSouthHall] = {2086, 2393, 294, 337, ChaseAlongX},
     [OtherworldReception] = {900, 992, 302, 302, ChaseAlongX},
+    [OtherworldWestHall] = {947, 993, 646, 952, ChaseAlongZ},
     [NorthHall]     = {1982, 2289,  3043, 3089, ChaseAlongX},
     [Courtyard]     = {-436, -196, -1096, -848, ChaseArea},
     [OtherworldCourtyard] = {-436, -196, -1096, -848, ChaseArea},
@@ -261,6 +264,8 @@ static void advanceRoadCamera(void)
     const ChaseRoad *road = &chaseRoads[room == OtherworldNorthHall ? NorthHall : room];
     if (room == BasementStair && x >= 57*4096) road = &basementRamp;
     if (room == OtherworldEastHall && z < eastLowerHall.maxZ*256) road = &eastLowerHall;
+    static const ChaseRoad westUpperHall = {947, 993, 952, 1236, ChaseAlongZ};
+    if (room == OtherworldWestHall && z >= westUpperHall.minZ*256) road = &westUpperHall;
     int minX = road->minX*256, maxX = road->maxX*256;
     int minZ = road->minZ*256, maxZ = road->maxZ*256;
     sx = limitChaseAxis(sx, minX, maxX);
@@ -381,6 +386,20 @@ bool playerStopped(void)
     return speed == 0;
 }
 
+bool playerLoadSlot(FILE *file)
+{
+    return fread(frames+firstFrame[SlotInsert], sizeof frames[0], frameCount[SlotInsert], file)
+        == frameCount[SlotInsert];
+}
+
+void playerSlotFrame(unsigned frame, unsigned blend)
+{
+    if (clip != SlotInsert) blendFrom = firstFrame[clip] + (frameQ12 >> 12);
+    clip = SlotInsert;
+    frameQ12 = frame;
+    blendQ12 = blend;
+}
+
 bool playerLoadPour(FILE *file)
 {
     return fread(frames+firstFrame[Pour], sizeof frames[0], frameCount[Pour], file) == frameCount[Pour];
@@ -463,6 +482,16 @@ static void warp(int worldX, int worldZ, int heading)
     speed = 0;
     clip = Idle;
     frameQ12 = blendQ12 = 0;
+}
+
+void playerWarpForSlot(void)
+{
+    warp(231424, 79052, 3072);
+}
+
+void playerFinishSlot(void)
+{
+    warp(x, z, yaw);
 }
 
 void playerFinishOtherworld(bool skipped)
@@ -649,7 +678,10 @@ RoomExit playerDestination(bool action)
         return (RoomExit){.room = OtherworldCourtyard};
     for (unsigned i = 0; i < schoolDoorCount; i++) {
         const Door *d = &schoolDoors[i];
-        if (d->room == room && facingEdge(d->x, d->z, d->halfWidth, -d->nx, -d->nz))
+        if (d->room != room) continue;
+        if ((room == OtherworldWestHall || d->other == OtherworldWestHall) && !slotUnlocked())
+            continue;
+        if (facingEdge(d->x, d->z, d->halfWidth, -d->nx, -d->nz))
             return (RoomExit){.room = d->other, .arrival = &schoolDoors[i ^ 1]};
     }
     return (RoomExit){.room = room};
@@ -731,6 +763,12 @@ bool playerFacingCard(void)
            facingEdge(570572, 405504, 1024, 0, 1);
 }
 
+bool playerFacingSlot(void)
+{
+    // MAP1_S02 point 26 is the west wall of reception.
+    return roomCurrent() == OtherworldReception && facingEdge(229376, 79052, 2304, -1, 0);
+}
+
 bool playerFacingScatteredCards(void)
 {
     return facingEdge(569344, 407961, 2304, 1, 0) ||
@@ -807,7 +845,8 @@ int playerSetCamera(void)
     bool reception = room == OtherworldReception;
     bool corridor = classroom || reception || room == SchoolCorridor || room == SouthHall || room == NorthHall ||
                     room == UpperNorthHall || room == OtherworldNorthHall || room == OtherworldLobby ||
-                    room == OtherworldSideHall || room == OtherworldEastHall || room == OtherworldSouthHall;
+                    room == OtherworldSideHall || room == OtherworldEastHall ||
+                    room == OtherworldSouthHall || room == OtherworldWestHall;
     bool equipment = room == EquipmentRoom;
     bool stairwell = room == EastCorridor || room == FirstFloor || room == BasementStair;
     bool boiler = room == BoilerRoom;
@@ -819,6 +858,10 @@ int playerSetCamera(void)
     int origin = roomOffset.x, originZ = roomOffset.z;
     if (otherworldIntroActive()) {
         CameraPose view = otherworldIntroView();
+        return setCameraPose(&view, origin, originZ);
+    }
+    if (slotActive()) {
+        static const CameraPose view = {248176, -3399, 75120, 232529, -5939, 79216};
         return setCameraPose(&view, origin, originZ);
     }
     if (room == ClockTower) {

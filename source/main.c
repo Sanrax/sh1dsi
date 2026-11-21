@@ -33,13 +33,13 @@ typedef struct {
 enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, DoorUnlock,
        PromptMove, PromptCancel, PromptConfirm, InsertMedallion, TowerChime,
        BoilerSwitchSound, BoilerStartSound, BoilerDoorOpen, BoilerDoorClose, BoilerHum, TowerOpening,
-       OtherworldDoorOpen, OtherworldDoorClose, SideHallOpen, SideHallClose, ToneCount };
+       OtherworldDoorOpen, OtherworldDoorClose, SideHallOpen, SideHallClose, CardSlide, CardUnlock, ToneCount };
 static const int pickupSounds[] = {
     [PickupMove] = PromptMove, [PickupCancel] = PromptCancel, [PickupConfirm] = PromptConfirm,
     [PickupBoilerSwitch] = BoilerSwitchSound, [PickupBoilerStart] = BoilerStartSound
 };
 static Tone tones[ToneCount];
-static uint8_t samples[368 * 1024] __attribute__((aligned(32)));
+static uint8_t samples[388 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
 static uint16_t humLoop;
 static const char *assetDir;
@@ -68,6 +68,7 @@ static FILE *openRoom(SchoolRoom room)
     case OtherworldEastHall: name = "otherworldeast"; break;
     case OtherworldSouthHall: name = "otherworldsouth"; break;
     case OtherworldReception: name = "reception"; break;
+    case OtherworldWestHall: name = "otherworldwest"; break;
     case NorthClassroom: name = "classroomnorth"; break;
     case SouthClassroom: name = "classroomsouth"; break;
     case TowerPassage: name = "passage"; break;
@@ -114,14 +115,14 @@ static bool loadPiano(void)
     assetDir = cart ? "fat:/sh1dsi" : "sd:/sh1dsi";
     if (!file)
         return false;
-    static const char versions[] = "123456789ABC";
+    static const char versions[] = "123456789ABCD";
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets &&
                  !memcmp(assets.magic, "SHP", 3) && assets.magic[3];
     const char *version = valid ? strchr(versions, assets.magic[3]) : NULL;
     valid = version != NULL;
     if (valid && version != versions) {
         static const unsigned counts[] = {0, 9, 10, 12, 14, 15, InsertMedallion,
-                                          BoilerSwitchSound, TowerOpening, OtherworldDoorOpen, SideHallOpen, ToneCount};
+                                          BoilerSwitchSound, TowerOpening, OtherworldDoorOpen, SideHallOpen, CardSlide, ToneCount};
         toneCount = counts[version-versions];
         valid = loadTones(file, toneCount);
     }
@@ -151,6 +152,11 @@ static void playTone(int id)
 static void playTowerSound(bool chime)
 {
     playTone(chime ? TowerChime : InsertMedallion);
+}
+
+static void playSlotSound(bool unlocked)
+{
+    playTone(unlocked ? CardUnlock : CardSlide);
 }
 
 static void updateBoilerHum(void)
@@ -186,6 +192,7 @@ static void changeRoom(RoomExit exit)
     bool hall = east || from == Courtyard || next == Courtyard || otherworldHall || pair12 ||
                 (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
     bool towerDoor = (next == ClockTower && from == Courtyard) || otherworldIntro;
+    bool slotDoor = from == OtherworldWestHall || next == OtherworldWestHall;
     bool door = !exit.stairs && next != TowerPassage && from != TowerPassage;
     bool boilerDoor = toneCount > BoilerDoorClose && (next == BoilerRoom || from == BoilerRoom);
     int opening = hall ? HallOpen : DoorOpen, closing = hall ? HallClose : DoorClose;
@@ -195,6 +202,9 @@ static void changeRoom(RoomExit exit)
     } else if (boilerDoor) {
         opening = BoilerDoorOpen;
         closing = BoilerDoorClose;
+    } else if (slotDoor) {
+        opening = HallOpen;
+        closing = HallClose;
     } else if (pair12 && toneCount > SideHallClose) {
         opening = SideHallOpen;
         closing = SideHallClose;
@@ -310,9 +320,12 @@ int main(void)
             int sound = -1;
             if (point.ticks != UINT32_MAX) point.ticks++;
             if (inRoom && roomHasNormals())
-                roomChanged |= lightingTick((pressed & KEY_Y) && !otherworldIntroActive() && !pickupActive());
+                roomChanged |= lightingTick((pressed & KEY_Y) && !otherworldIntroActive() && !pickupActive() && !slotActive());
             if (inRoom && otherworldIntroActive()) {
                 roomChanged |= otherworldTickIntro(pressed & KEY_START);
+            } else if (inRoom && slotActive()) {
+                roomChanged |= slotTick(pressed, playSlotSound);
+                if (!slotActive()) inspectionFadeLength = inspectionFade = SlotRevealVBlanks;
             } else if (inRoom && playerLadderActive()) {
                 SchoolRoom arrival = roomCurrent();
                 roomChanged |= playerLadderTick(pressed & KEY_START, &arrival);
@@ -362,6 +375,13 @@ int main(void)
                     } else if ((pressed & KEY_A) && playerStartAscent()) {
                         inspectionFade = 0;
                         roomChanged = true;
+                    } else if ((pressed & KEY_SELECT) && !slotUnlocked() && (pickupFlags() & PictureCardHeld) &&
+                               playerFacingSlot()) {
+                        if (!slotStart(assetDir)) stop("Missing or invalid cardslot.dat.");
+                        inspectionFade = 0;
+                        roomChanged = true;
+                        previousTime = systemCounterGetTicks();
+                        debt = step;
                     } else if ((pressed & KEY_SELECT) && statueStart()) {
                         inspectionFade = 0;
                         setBrightness(1, 0);
@@ -379,6 +399,13 @@ int main(void)
                                       (latchUnlocked() ? LatchOpen : 0) | (boilerPowered() ? BoilerPowered : 0);
                         if (notebookMenu(assetDir, false, &point) == NotebookMissingArt)
                             stop("Missing notebook.dat");
+                        roomChanged = true;
+                        previousTime = systemCounterGetTicks();
+                        debt = step;
+                    } else if ((pressed & KEY_A) && !slotUnlocked() && playerFacingSlot()) {
+                        lightingScreen(false, false);
+                        inspectionFadeLength = inspectionFade = slotInspect(assetDir);
+                        if (!inspectionFade) stop("Missing or invalid cardslot.dat.");
                         roomChanged = true;
                         previousTime = systemCounterGetTicks();
                         debt = step;
@@ -420,7 +447,7 @@ int main(void)
             debt -= step;
         }
 
-        lightingScreen(inRoom && roomHasNormals(), otherworldIntroActive());
+        lightingScreen(inRoom && roomHasNormals(), otherworldIntroActive() || slotActive());
         int imageIndex = inRoom ? 2 : piano.checking;
         if (inRoom && (previousImage != imageIndex || roomChanged)) {
             roomDraw(&medal);
@@ -434,6 +461,7 @@ int main(void)
         }
         if (inRoom) {
             if (roomCurrent() == OtherworldCourtyard) otherworldDrawSubtitle(bg);
+            else if (slotActive()) slotDrawPrompt(bg);
             else pickupDrawPrompt(bg);
             updateBoilerHum();
         }

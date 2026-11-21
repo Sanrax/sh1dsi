@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 from disc import open_disc
+from harry import card_slot_frames
 from notebook import notebook_data
 from pickup import prompt_data
 from vab import school_bank
@@ -70,17 +71,26 @@ def tower_data(disc):
     return struct.pack("<4s6I", b"SHT2", *offsets) + images + messages
 
 
+def card_slot_data(disc):
+    motion = card_slot_frames(disc) + prompt_data(disc, 30, choices=False,
+                                                 map_bearings=True, otherworld=True)
+    images = b"".join(background(disc.read(f"TIM/RECEPDR{i}.TIM"), uv_height=239) for i in (1, 2))
+    text = b"".join(prompt_data(disc, n, choices=False, map_bearings=True, otherworld=True)
+                    for n in (23, 25, 26, 27))
+    return struct.pack("<4sI", b"SHR1", 8+len(motion)) + motion + images + text
+
+
 def prepare(cue):
     with open_disc(cue) as disc:
         overlay = disc.read("VIN/MAP1_S01.BIN")
         # USA/maps/sym.map1_s01.txt and map1_s01.yaml identify the two tables.
         offset = 0x800DD500 - 0x800C9578
         tables = overlay[offset:offset+11] + overlay[offset+12:offset+17]
-        data = (b"SHPC" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
+        data = (b"SHPD" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
                 + background(disc.read("TIM/PIANO1.TIM"))
                 + background(disc.read("TIM/PIANO2.TIM"))
                 + school_bank(disc.read("SND/MEP101.VAB"), disc.read("1ST/BASE.VAB"),
-                              disc.read("SND/MEP100.VAB")))
+                              disc.read("SND/MEP100.VAB"), disc.read("SND/MEP102.VAB")))
         notebook = notebook_data(disc, background)
         tower = tower_data(disc)
         hand = (b"SHV1" + background(disc.read("TIM/HAND.TIM"), uv_height=239)
@@ -108,6 +118,8 @@ def prepare(cue):
         otherworld_east = school_room(disc, 28)
         otherworld_south = school_room(disc, 11)
         reception = school_room(disc, 8)
+        slot = card_slot_data(disc)
+        otherworld_west = school_room(disc, 10)
         classroom_north = school_room(disc, 29)
         classroom_south = school_room(disc, 30)
     write_asset(OUTPUT.with_name("notebook.dat"), notebook)
@@ -137,6 +149,8 @@ def prepare(cue):
     write_asset(OUTPUT.with_name("otherworldeast.dat"), otherworld_east)
     write_asset(OUTPUT.with_name("otherworldsouth.dat"), otherworld_south)
     write_asset(OUTPUT.with_name("reception.dat"), reception)
+    write_asset(OUTPUT.with_name("cardslot.dat"), slot)
+    write_asset(OUTPUT.with_name("otherworldwest.dat"), otherworld_west)
     write_asset(OUTPUT.with_name("classroomnorth.dat"), classroom_north)
     write_asset(OUTPUT.with_name("classroomsouth.dat"), classroom_south)
 
