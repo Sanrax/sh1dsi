@@ -4,7 +4,8 @@ Harry starts at the Midwich piano. He can solve the keyboard puzzle, watch
 or skip the falling silver medallion, decline or accept it, walk through the
 eastern hallway, descend the stairs, unlatch the first-floor door and enter
 the southern hallway. The first-floor stairs reach the basement and boiler
-room, and Harry can return the same way.
+room, and Harry can return the same way. The switch powers the boiler after
+Harry places the silver medallion, and the infirmary notebook saves that state.
 The courtyard connects the southern and northern halls.
 Harry can inspect the clock tower door and place both medallions.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
@@ -472,8 +473,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   the switch event itself still need measurement.
 - The matched DLDI and PS1 entry and return captures had mean RGB errors
   of 18.62–22.30/255 across four views. Lighting and moving cameras still
-  differ from PS1, and the boiler door uses the standard native door pair.
-  The switch event is pending.
+  differ from PS1.
 
 ### Texture palette conversion
 
@@ -758,10 +758,34 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   364 VBlanks and the moon after 362. Both slots filled while the boiler
   stayed off. The tower door requires the separate boiler switch event.
 
+## Boiler switch
+
+- MAP1_S00 uses silver placement to enable the switch. Before placement,
+  confirming the prompt plays the switch and shows the no-effect notice.
+  The virtual console SD replay declined, then confirmed with the moon
+  slot empty. Power stayed off, matching the PS1 event.
+- In the DLDI replay, a checkpoint with the moon placed enabled startup.
+  The event blinks the green indicator. Power was set at simulation tick
+  279, and control returned at tick 372. The PS1 event used the same
+  intervals from confirmation. The working notice, return to the infirmary,
+  save and cold boot passed. An independent host check rejected a powered
+  checkpoint with the moon slot empty and preserved the earlier valid slot.
+- All 477 bright pixels in the switch question and 266 in the no-effect
+  notice matched the resampled PS1 reference. Boiler effects and door
+  sounds come from MEP100. The hum uses the original repeat point with
+  room-based volume and fixed pan. A separate melonDS DSi fixture verified
+  all five effects against the emulated channel sample rates, lengths and
+  repeat settings and observed nonzero mixer output. Spatial falloff and
+  PS1 lighting remain pending. The tower door still needs its powered route.
+  [melonDS audio state](https://github.com/melonDS-emu/melonDS/blob/1.1/src/SPU.cpp)
+- Two BlocksDS builds reproduced the ROM and all 17 sidecars. The 20
+  pre-existing sounds from the medallion build matched byte for byte.
+  A DLDI smoke test also loaded a checkpoint with the older SHP7 data.
+
 ## Next
 
-1. Finish medallion placement and implement the boiler switch and door sounds.
-2. Connect the powered clock tower door and verify its arrival.
+1. Connect the powered clock tower door and verify its arrival and return.
+2. Verify the next school transition and compare the boiler’s light and sound falloff.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

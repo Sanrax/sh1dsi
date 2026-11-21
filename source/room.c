@@ -19,7 +19,7 @@ typedef struct {
 } Batch;
 
 enum { StaticBatch, HangingSilverBatch, FallenSilverBatch, DrinkBatch, KitBatch, ChemicalBatch,
-       IntactHandBatch, OpenHandBatch, GoldAtHandBatch };
+       IntactHandBatch, OpenHandBatch, GoldAtHandBatch, BoilerUnwiredBatch, BoilerReadyBatch, BoilerGlowBatch };
 
 typedef struct {
     int16_t x, y, z;
@@ -34,7 +34,7 @@ static struct {
     uint32_t textureBytes, paletteBytes;
 } header;
 static Page pages[4], skin;
-enum { RoomEdgeHeights = 1, RoomFloorPlanes = 2, RoomWideVertices = 4, RoomGroundPlanes = 8 };
+enum { RoomEdgeHeights = 1, RoomFloorPlanes = 2, RoomWideVertices = 4, RoomGroundPlanes = 8, RoomBoilerEvent = 16 };
 static SchoolRoom current = MusicRoom;
 static RoomOrigin currentOrigin = {-100*4096, 20*4096};
 static bool handPresent, handPuzzle, wideGeometry;
@@ -217,7 +217,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     struct { uint8_t room, flags; uint16_t reserved; } layout = {0};
     if (streamed && (!corridor || fread(&layout, sizeof layout, 1, file) != 1 ||
                      layout.room != room || layout.reserved ||
-                     (layout.flags & ~(RoomEdgeHeights | RoomFloorPlanes | RoomWideVertices | RoomGroundPlanes)) ||
+                     (layout.flags & ~(RoomEdgeHeights | RoomFloorPlanes | RoomWideVertices | RoomGroundPlanes | RoomBoilerEvent)) ||
+                     ((layout.flags & RoomBoilerEvent) && (!hasOrigin || room != BoilerRoom)) ||
                      ((layout.flags & RoomGroundPlanes) && (!hasOrigin || !(layout.flags & RoomFloorPlanes)))))
         return false;
     RoomOrigin origin;
@@ -261,6 +262,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
             floorLayout = LegacyCourtyardFloors;
         }
     }
+    bool boiler = (layout.flags & RoomBoilerEvent) != 0;
     bool latchText = countedFirstFloor || firstFloorObstacles ||
                      (room == FirstFloor && !memcmp(header.magic, "SHF2", 4));
     bool medical = room == Infirmary && !memcmp(header.magic, "SHI3", 4);
@@ -340,6 +342,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if ((corridor || header.magic[3] >= '4') &&
         !collisionLoad(file, room, edgeLayout, floorLayout, origin)) return false;
     if (latchText && !latchLoad(file)) return false;
+    if (boiler && !boilerLoad(file)) return false;
     if (room == MusicRoom && header.pages == 4 &&
         (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))
         return false;
@@ -378,7 +381,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     free(geometry);
     geometry = malloc(geometryBytes);
     if (!geometry) return false;
-    unsigned maxState = pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
+    unsigned maxState = boiler ? BoilerGlowBatch : pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
                         corridor ? StaticBatch : FallenSilverBatch;
     uint32_t *end = geometry;
     GeometryChunk *chunk = chunks;
@@ -542,6 +545,9 @@ void roomDraw(const Medallion *medal)
         [IntactHandBatch] = !statueOpened(),
         [OpenHandBatch] = statueOpened(),
         [GoldAtHandBatch] = statueOpened() && !pickupHidden(GoldMedallion),
+        [BoilerUnwiredBatch] = !(towerFlags() & MoonPlaced),
+        [BoilerReadyBatch] = (towerFlags() & MoonPlaced) != 0,
+        [BoilerGlowBatch] = boilerGlow(),
     };
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];

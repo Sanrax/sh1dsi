@@ -95,5 +95,18 @@ def school_bank(map_vab, base_vab, first_floor_vab):
                                          (1, 54, 57), (1, 55, 57), (2, 54, 64),
                                          (0, 49, 59), (0, 50, 59), (0, 51, 64)], samples))
     # MAP1_S00 plays Sfx 1416 at the start of the placement and 1419 after it.
-    tones.extend(convert_tones(first_floor_vab, [(0, 51, 127), (0, 54, 117)], samples))
-    return tones + samples
+    tones.extend(convert_tones(first_floor_vab, [(0, 51, 127), (0, 54, 117),
+                                                 (0, 55, 64), (0, 38, 64),
+                                                 (1, 82, 107), (1, 83, 107)], samples))
+    # Sfx 1430 is the boiler hum. Preserve the VAG repeat point for ARM7.
+    tone = tone_row(first_floor_vab, 0, 56)
+    raw = sample_data(first_floor_vab, struct.unpack_from("<H", first_floor_vab, tone+22)[0])
+    pcm = decode_vag(raw, looping=True)
+    starts = [i*28 for i, flags in enumerate(raw[1:len(pcm)//56*16:16]) if flags & 4]
+    if len(starts) != 1 or not 0 < 2*starts[0] < len(pcm):
+        raise ValueError("unexpected boiler loop")
+    volume = first_floor_vab[tone+2] * first_floor_vab[33] // 127
+    tones.extend(struct.pack("<IIHBB", len(samples), len(pcm), tone_rate(first_floor_vab, tone, 56),
+                             volume, first_floor_vab[tone+3]))
+    samples.extend(pcm)
+    return tones + struct.pack("<H", starts[0]) + samples

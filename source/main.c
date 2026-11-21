@@ -30,13 +30,16 @@ typedef struct {
 } Tone;
 
 enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, DoorUnlock,
-       PromptMove, PromptCancel, PromptConfirm, InsertMedallion, TowerChime, ToneCount };
+       PromptMove, PromptCancel, PromptConfirm, InsertMedallion, TowerChime,
+       BoilerSwitchSound, BoilerStartSound, BoilerDoorOpen, BoilerDoorClose, BoilerHum, ToneCount };
 static const int pickupSounds[] = {
-    [PickupMove] = PromptMove, [PickupCancel] = PromptCancel, [PickupConfirm] = PromptConfirm
+    [PickupMove] = PromptMove, [PickupCancel] = PromptCancel, [PickupConfirm] = PromptConfirm,
+    [PickupBoilerSwitch] = BoilerSwitchSound, [PickupBoilerStart] = BoilerStartSound
 };
 static Tone tones[ToneCount];
-static uint8_t samples[176 * 1024] __attribute__((aligned(32)));
+static uint8_t samples[288 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
+static uint16_t humLoop;
 static const char *assetDir;
 
 static FILE *openRoom(SchoolRoom room)
@@ -69,6 +72,8 @@ static bool loadTones(FILE *file, unsigned count)
 {
     if (fread(tones, sizeof(Tone), count, file) != count)
         return false;
+    if (count == ToneCount && (fread(&humLoop, sizeof humLoop, 1, file) != 1 ||
+                               (humLoop & 1) || 2u*humLoop >= tones[BoilerHum].bytes)) return false;
     size_t size = fread(samples, 1, sizeof samples, file);
     for (unsigned i = 0; i < count; i++) {
         const Tone *tone = &tones[i];
@@ -97,9 +102,9 @@ static bool loadPiano(void)
         return false;
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets
                  && memcmp(assets.magic, "SHP", 3) == 0 &&
-                 assets.magic[3] >= '1' && assets.magic[3] <= '8';
+                 assets.magic[3] >= '1' && assets.magic[3] <= '9';
     if (valid && assets.magic[3] != '1') {
-        static const unsigned counts[] = {0, 9, 10, 12, 14, 15, InsertMedallion, ToneCount};
+        static const unsigned counts[] = {0, 9, 10, 12, 14, 15, InsertMedallion, BoilerSwitchSound, ToneCount};
         toneCount = counts[assets.magic[3]-'1'];
         valid = loadTones(file, toneCount);
     }
@@ -131,15 +136,35 @@ static void playTowerSound(bool chime)
     playTone(chime ? TowerChime : InsertMedallion);
 }
 
+static void updateBoilerHum(void)
+{
+    static int channel = -1;
+    static unsigned previousVolume;
+    if (toneCount != ToneCount) return;
+    unsigned volume = boilerVolume()*tones[BoilerHum].volume/127;
+    if (!volume) {
+        if (channel >= 0) soundKill(channel);
+        channel = -1;
+    } else if (channel < 0) {
+        const Tone *tone = &tones[BoilerHum];
+        channel = soundPlaySample(samples + tone->offset, SoundFormat_16Bit, tone->bytes-2u*humLoop,
+                                  tone->rate, volume, tone->pan, true, humLoop/2);
+    } else if (previousVolume != volume) {
+        soundSetVolume(channel, volume);
+    }
+    previousVolume = volume;
+}
+
 static void changeRoom(RoomExit exit)
 {
     SchoolRoom from = roomCurrent(), next = exit.room;
     bool east = next == EastCorridor || from == EastCorridor;
     bool hall = east || from == Courtyard || next == Courtyard ||
                 (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
+    bool boilerDoor = toneCount == ToneCount && (next == BoilerRoom || from == BoilerRoom);
     FILE *file = openRoom(next);
     if (!file) stop("Missing room data.\nRun the asset converter.");
-    if (!exit.stairs) playTone(hall ? HallOpen : DoorOpen);
+    if (!exit.stairs) playTone(boilerDoor ? BoilerDoorOpen : hall ? HallOpen : DoorOpen);
     uint32_t start = systemCounterGetTicks();
     // Let the last geometry submission retire before remapping texture VRAM.
     setBrightness(1, -16);
@@ -152,11 +177,12 @@ static void changeRoom(RoomExit exit)
         stop("Invalid school room data.");
     }
     playerEnterRoom(from, exit.stairs);
+    updateBoilerHum();
     // GameBoot_InGameStartup step 11 keeps the load screen for at least
     // one second, including time already spent on disc or card reads.
     while ((uint32_t)(systemCounterGetTicks()-start) < systemCounterUsecsToTicks(1000000))
         swiWaitForVBlank();
-    if (!exit.stairs) playTone(hall ? HallClose : DoorClose);
+    if (!exit.stairs) playTone(boilerDoor ? BoilerDoorClose : hall ? HallClose : DoorClose);
 }
 
 int main(void)
@@ -285,7 +311,8 @@ int main(void)
                     } else if ((pressed & KEY_A) && playerFacingNotebook()) {
                         playerSavePose(&point);
                         point.flags = (point.flags & NotebookRead) | (piano.solved ? PianoSolved : 0) |
-                                      pickupFlags() | statueFlags() | towerFlags() | (latchUnlocked() ? LatchOpen : 0);
+                                      pickupFlags() | statueFlags() | towerFlags() |
+                                      (latchUnlocked() ? LatchOpen : 0) | (boilerPowered() ? BoilerPowered : 0);
                         if (notebookMenu(assetDir, false, &point) == NotebookMissingArt)
                             stop("Missing notebook.dat");
                         roomChanged = true;
@@ -299,7 +326,9 @@ int main(void)
                             roomChanged = true;
                             previousTime = systemCounterGetTicks();
                             debt = step;
-                        } else if (roomCurrent() == MusicRoom && !piano.solved && playerFacingPiano())
+                        } else if (playerFacingBoiler())
+                            boilerStart();
+                        else if (roomCurrent() == MusicRoom && !piano.solved && playerFacingPiano())
                             inRoom = false;
                         else if (roomCurrent() != MusicRoom || phase == MedalFinished)
                             pickupStart();
@@ -334,7 +363,10 @@ int main(void)
             memcpy(bgGetGfxPtr(bg), image->pixels, sizeof image->pixels);
             memcpy(BG_PALETTE, image->palette, sizeof image->palette);
         }
-        if (inRoom) pickupDrawPrompt(bg);
+        if (inRoom) {
+            pickupDrawPrompt(bg);
+            updateBoilerHum();
+        }
         previousImage = imageIndex;
         oamSetXY(&oamMain, 0, ((piano.x >> 12) + 160) * 4 / 5,
                               ((piano.y >> 12) + 120) * 4 / 5);

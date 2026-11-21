@@ -3,9 +3,15 @@
 #include "player.h"
 
 typedef enum { SilverMedallion, HealthDrink, FirstAidKit, Chemical, GoldMedallion } PickupItem;
-typedef enum { PickupQuiet, PickupMove, PickupCancel, PickupConfirm } PickupSound;
+typedef enum { PickupQuiet, PickupMove, PickupCancel, PickupConfirm,
+               PickupBoilerSwitch, PickupBoilerStart } PickupSound;
 
 bool latchLoad(FILE *file);
+bool boilerLoad(FILE *file);
+void boilerStart(void);
+bool boilerPowered(void);
+bool boilerGlow(void);
+unsigned boilerVolume(void);
 bool pickupLoadEmptyShelf(FILE *file);
 bool pickupLoadEmptyHand(FILE *file);
 bool latchStart(void);

@@ -12,9 +12,10 @@ ROOM_EDGE_HEIGHTS = 1
 ROOM_FLOOR_PLANES = 2
 ROOM_WIDE_VERTICES = 4
 ROOM_GROUND_PLANES = 8
+ROOM_BOILER_EVENT = 16
 
 ROOM_LAYOUTS = {
-    2: 0,
+    2: ROOM_BOILER_EVENT,
     3: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES,
     23: ROOM_FLOOR_PLANES,
     31: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES,
@@ -478,7 +479,19 @@ def school_room(disc, room=39):
             33: b"SHH1", 34: b"SHL3", 35: b"SHQ2"
         }[room]
         extra = b""
-        if room == 9:
+        if room == 2:
+            # MAP1_S00 places the two switch models and the green indicator.
+            chunk_x, chunk_z = struct.unpack_from("<ii", data, 0x54)
+            identity = (4096,0,0,0,4096,0,0,0,4096)
+            for state, (name, x, y, z) in enumerate((
+                    (b"REDX_HID", 20.4568, -0.8345, -17.97),
+                    (b"R_HIDE_I", 19.5799, 0, -18.3),
+                    (b"G_HIDE_I", 19.5799, 0, -18.3)), 9):
+                position = ((int(x*4096)>>4)-chunk_x, int(y*4096)>>4, (int(z*4096)>>4)-chunk_z)
+                add_model(name, identity, position, state)
+            extra = b"".join(prompt_data(disc, n, first_floor=True, choices=n==29, map_bearings=True)
+                             for n in (29, 30, 31))
+        elif room == 9:
             extra = medical_pickups(disc)
         elif room == 12:
             extra = prompt_data(disc, 13, first_floor=True, choices=False)

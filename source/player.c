@@ -511,6 +511,12 @@ bool playerFacingPiano(void)
     return roomVersion < 3 || facingEdge(-408371, 81510, 3072, 1, 0);
 }
 
+bool playerFacingBoiler(void)
+{
+    // MAP1_S00 point 30 faces west across a six-sixteenths-of-a-metre edge.
+    return roomCurrent() == BoilerRoom && facingEdge(84377, -71680, 1536, -1, 0);
+}
+
 bool playerFacingNotebook(void)
 {
     // MAP1_S00 point 89, facing east, triggerParam1 = 4 sixteenths of a metre.

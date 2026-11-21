@@ -7,6 +7,7 @@ enum { SaveSlots = 11, PianoSolved = 1, SilverHeld = 2, LatchOpen = 4, NotebookR
 enum { DrinkHeld = 16, KitHeld = 32, ChemicalTaken = 64 };
 enum { HandOpened = 128, GoldHeld = 256 };
 enum { SunPlaced = 512, MoonPlaced = 1024, TowerFlags = SunPlaced | MoonPlaced };
+enum { BoilerPowered = 2048 };
 enum { PickupFlags = SilverHeld | DrinkHeld | KitHeld | ChemicalTaken | GoldHeld };
 typedef struct {
     int32_t x, z;

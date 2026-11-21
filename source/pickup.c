@@ -38,14 +38,19 @@ static const struct {
 static Model models[sizeof pickups/sizeof pickups[0]];
 static uint16_t fontPalette[16];
 static enum { Inactive, Stopping, Kneeling, Preparing, Inspecting, Rising, LatchNotice,
-              EmptyShelfNotice, EmptyHandNotice } phase;
+              EmptyShelfNotice, EmptyHandNotice, BoilerStopping, BoilerPrompt,
+              BoilerStarting, BoilerNoEffect, BoilerRunning } phase;
 static PickupItem activeItem;
 static unsigned ticks, selected, flash, shown;
 static unsigned collected;
 
 static Glyph latchGlyphs[24], emptyShelfGlyphs[24], emptyHandGlyphs[48];
 static uint16_t latchCount, emptyShelfCount, emptyHandCount;
-static bool unlocked;
+static bool unlocked, powered;
+static Glyph boilerQuestion[48], boilerNoEffect[24], boilerRunning[24];
+static uint16_t boilerCount, boilerLength, boilerNoEffectCount, boilerRunningCount;
+// MAP1_S00 callbacks 18 and 19, measured from switch confirmation.
+enum { BoilerBlinkAge = 63, BoilerStartAge = 276, BoilerPowerAge = 279, BoilerFinishAge = 372 };
 
 bool pickupLoad(FILE *file, PickupItem item, unsigned textureOffset, unsigned palette)
 {
@@ -64,16 +69,60 @@ bool pickupLoad(FILE *file, PickupItem item, unsigned textureOffset, unsigned pa
     return true;
 }
 
-static bool loadNotice(FILE *file, Glyph *glyphs, unsigned capacity, uint16_t *glyphCount)
+static bool loadMessage(FILE *file, Glyph *glyphs, unsigned capacity,
+                        uint16_t *glyphCount, uint16_t *messageLength)
 {
     uint16_t count, length, palette[16];
     if (fread(&count, 2, 1, file) != 1 || !count || count > capacity ||
-        fread(&length, 2, 1, file) != 1 || count != length ||
+        fread(&length, 2, 1, file) != 1 || !length || length > count ||
         fread(palette, sizeof palette, 1, file) != 1 ||
         memcmp(palette, fontPalette, sizeof palette) || !glyphsRead(file, glyphs, count))
         return false;
     *glyphCount = count;
+    *messageLength = length;
     return true;
+}
+
+static bool loadNotice(FILE *file, Glyph *glyphs, unsigned capacity, uint16_t *glyphCount)
+{
+    uint16_t count, length;
+    if (!loadMessage(file, glyphs, capacity, &count, &length) || count != length) return false;
+    *glyphCount = count;
+    return true;
+}
+
+bool boilerLoad(FILE *file)
+{
+    return loadMessage(file, boilerQuestion, 48, &boilerCount, &boilerLength) && boilerLength < boilerCount &&
+           loadNotice(file, boilerNoEffect, 24, &boilerNoEffectCount) &&
+           loadNotice(file, boilerRunning, 24, &boilerRunningCount);
+}
+
+void boilerStart(void)
+{
+    if (!boilerCount || pickupActive()) return;
+    ticks = selected = flash = shown = 0;
+    phase = BoilerStopping;
+}
+
+bool boilerPowered(void) { return powered; }
+
+bool boilerGlow(void)
+{
+    if (powered) return true;
+    return phase == BoilerStarting && (towerFlags() & MoonPlaced) &&
+           ticks >= BoilerBlinkAge && (ticks-BoilerBlinkAge)%51 < 27;
+}
+
+unsigned boilerVolume(void)
+{
+    if (roomCurrent() == BasementStair) return powered ? 25 : 0;
+    if (roomCurrent() != BoilerRoom || !(towerFlags() & MoonPlaced)) return 0;
+    if (phase == BoilerStarting) {
+        unsigned volume = 12 + ticks*8/25;
+        return volume < 127 ? volume : 127;
+    }
+    return powered ? 127 : 12;
 }
 
 bool latchLoad(FILE *file) { return loadNotice(file, latchGlyphs, 24, &latchCount); }
@@ -101,6 +150,7 @@ void pickupRestore(unsigned flags)
 {
     collected = flags & PickupFlags;
     unlocked = (flags & LatchOpen) != 0;
+    powered = (flags & BoilerPowered) != 0;
 }
 
 bool pickupActive(void)
@@ -175,10 +225,14 @@ PickupSound pickupTick(unsigned pressed)
     switch (phase) {
     case LatchNotice:
     case EmptyShelfNotice:
-    case EmptyHandNotice: {
+    case EmptyHandNotice:
+    case BoilerNoEffect:
+    case BoilerRunning: {
         // Event_DisplayMapMsgWithSfx delays the first latch glyph by 0.2 s.
         bool latch = phase == LatchNotice;
-        unsigned count = latch ? latchCount : phase == EmptyHandNotice ? emptyHandCount : emptyShelfCount;
+        unsigned count = latch ? latchCount : phase == EmptyHandNotice ? emptyHandCount :
+                         phase == BoilerNoEffect ? boilerNoEffectCount :
+                         phase == BoilerRunning ? boilerRunningCount : emptyShelfCount;
         bool advance = pressed & (KEY_A | KEY_B);
         if (latch && ++ticks < 12) break;
         if (shown < count) {
@@ -189,6 +243,41 @@ PickupSound pickupTick(unsigned pressed)
         }
         break;
     }
+    case BoilerStopping:
+        if (playerStopped()) phase = powered ? BoilerRunning : BoilerPrompt;
+        break;
+    case BoilerPrompt:
+        if (shown < boilerCount) {
+            shown = pressed & (KEY_A | KEY_B) ? boilerCount : shown+1;
+            if (shown >= boilerLength) shown = boilerCount;
+            break;
+        }
+        flash++;
+        if ((pressed & KEY_A) && !(pressed & KEY_B) && !selected) {
+            phase = BoilerStarting;
+            ticks = shown = 0;
+            return PickupBoilerSwitch;
+        }
+        if (pressed & (KEY_A | KEY_B)) {
+            phase = Inactive;
+            return PickupCancel;
+        }
+        if ((pressed & KEY_UP && selected) || (pressed & KEY_DOWN && !selected)) {
+            selected = !selected;
+            flash = 0;
+            return PickupMove;
+        }
+        break;
+    case BoilerStarting:
+        ticks++;
+        if (!(towerFlags() & MoonPlaced)) {
+            if (ticks >= 31) phase = BoilerNoEffect;
+        } else {
+            if (ticks == BoilerStartAge) return PickupBoilerStart;
+            if (ticks == BoilerPowerAge) powered = true;
+            if (ticks >= BoilerFinishAge) phase = Inactive;
+        }
+        break;
     case Stopping:
         if (playerStopped()) phase = Kneeling;
         break;
@@ -287,7 +376,9 @@ void pickupDrawPrompt(int bg)
     unsigned visible = phase >= LatchNotice || phase == Inspecting ? shown : 0;
     const Glyph *text = phase == LatchNotice ? latchGlyphs :
                         phase == EmptyShelfNotice ? emptyShelfGlyphs :
-                        phase == EmptyHandNotice ? emptyHandGlyphs : models[activeItem].glyphs;
+                        phase == EmptyHandNotice ? emptyHandGlyphs : phase == BoilerPrompt ? boilerQuestion :
+                        phase == BoilerNoEffect ? boilerNoEffect :
+                        phase == BoilerRunning ? boilerRunning : models[activeItem].glyphs;
     if (!visible) {
         bgHide(bg);
         lastShown = 0;

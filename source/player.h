@@ -17,6 +17,7 @@ void playerWarpForPour(void);
 bool playerLoadPour(FILE *file);
 bool playerFacingPiano(void);
 bool playerFacingNotebook(void);
+bool playerFacingBoiler(void);
 bool playerFacingChemical(void);
 bool playerFacingHand(void);
 TowerPoint playerFacingTower(void);
