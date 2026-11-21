@@ -58,16 +58,16 @@ def piano_cursor(data):
 def tower_data(disc):
     # Screen_BackgroundImgDrawBlackFadeIn maps V=239 to the edge at Y=240.
     images = b"".join(background(disc.read(f"TIM/{name}.TIM"), uv_height=239)
-                      for name in ("CLOCK", "GOLD1", "SILVER1"))
+                      for name in ("CLOCK", "GOLD1", "SILVER1", "GOLD2", "SILVER2", "CLOCK12", "CLOCK5"))
     offsets = []
     messages = bytearray()
-    for number in (15, 16, 19, 20):
+    for number in (15, 16, 19, 20, 17, 18):
         text = prompt_data(disc, number, first_floor=True, choices=False, map_bearings=True)
         if not 0 < struct.unpack_from("<H", text)[0] <= 40:
             raise ValueError("invalid clock tower message length")
-        offsets.append(20+len(images)+len(messages))
+        offsets.append(28+len(images)+len(messages))
         messages.extend(text)
-    return struct.pack("<4s4I", b"SHT1", *offsets) + images + messages
+    return struct.pack("<4s6I", b"SHT2", *offsets) + images + messages
 
 
 def prepare(cue):
@@ -76,10 +76,11 @@ def prepare(cue):
         # USA/maps/sym.map1_s01.txt and map1_s01.yaml identify the two tables.
         offset = 0x800DD500 - 0x800C9578
         tables = overlay[offset:offset+11] + overlay[offset+12:offset+17]
-        data = (b"SHP7" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
+        data = (b"SHP8" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
                 + background(disc.read("TIM/PIANO1.TIM"))
                 + background(disc.read("TIM/PIANO2.TIM"))
-                + school_bank(disc.read("SND/MEP101.VAB"), disc.read("1ST/BASE.VAB")))
+                + school_bank(disc.read("SND/MEP101.VAB"), disc.read("1ST/BASE.VAB"),
+                              disc.read("SND/MEP100.VAB")))
         notebook = notebook_data(disc, background)
         tower = tower_data(disc)
         hand = (b"SHV1" + background(disc.read("TIM/HAND.TIM"), uv_height=239)

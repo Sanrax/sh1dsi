@@ -56,13 +56,16 @@ press B to leave it. The double doors on the other side of the southern
 hallway lead to the courtyard. Turn around and face those doors to return.
 Cross the courtyard and use the opposite double doors to reach the north hall.
 Face the clock tower door or either medallion slot and press A to inspect it.
+With a medallion in inventory, face its matching slot and press Select to
+place it. Inspect the clock again to see the new reading.
 Rerun the asset converter when updating an existing installation to get the
-statue puzzle, Chemical pickup, wall poster, courtyard plaque and stair fixes.
+placement views, statue puzzle, wall poster, courtyard plaque and stair fixes.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left
 or Right changes the confirmation choice. After saving, B returns to the room.
 On a fresh boot, A loads the highlighted checkpoint and B starts at the piano.
 The game keeps up to eleven slots in `/sh1dsi/` on the card containing the game
-data. The notebook remembers the Chemical, the statue, the medallions and
-the medical supplies. Keep the `note*.sav` files when updating the port.
+data. The notebook remembers the Chemical, the statue, the filled tower
+slots, the medallions and the medical supplies. Keep the `note*.sav` files
+when updating the port.

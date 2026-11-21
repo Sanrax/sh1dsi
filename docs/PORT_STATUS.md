@@ -6,7 +6,7 @@ eastern hallway, descend the stairs, unlatch the first-floor door and enter
 the southern hallway. The first-floor stairs reach the basement and boiler
 room, and Harry can return the same way.
 The courtyard connects the southern and northern halls.
-Harry can inspect the clock tower door and both medallion slots.
+Harry can inspect the clock tower door and place both medallions.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -742,9 +742,21 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   finished the event and stopped the sound during the active hiss. The host
   fixture kept the older SHC1 slot readable across all 36 partial writes.
 
-The original medallion placement replays filled each slot and retained both
-items. The boiler remained off. The clock tower door requires the separate
-boiler switch event.
+## Medallion placement
+
+- Both placement events use the original empty and filled images, placement
+  sounds and messages. A 17-step transition blends two native bitmap layers.
+  The filled views remain available to inspect, and Select places each item
+  once. Both medallions remain in inventory in PS1 and native replays.
+- In the DLDI release, Harry walked from the infirmary to both slots. Mean
+  RGB error was 0.22/255 for the filled sun and 0.24/255 for the filled moon
+  against the resampled PS1 captures. The best sampled transition frames
+  measured 1.45/255 and 1.77/255. The original 12:00 and 5:00 clock views
+  measured 0.31/255 and 0.37/255. The locked-door check matched all 259
+  sampled bright text pixels with each clock reading.
+- The PS1 runs with the owner's SCPH-7001 completed the sun placement after
+  364 VBlanks and the moon after 362. Both slots filled while the boiler
+  stayed off. The tower door requires the separate boiler switch event.
 
 ## Next
 

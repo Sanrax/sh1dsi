@@ -83,7 +83,7 @@ def statue_sound(vab):
                        volume, vab[tone+3]) + pcm
 
 
-def school_bank(map_vab, base_vab):
+def school_bank(map_vab, base_vab, first_floor_vab):
     # MAP1_S01 and g_Vab_InfoTable: SFX_PAIRS[1, 2] use BASE.VAB.
     samples = bytearray()
     notes = [(1, n, 127) for n in (48, 51, 52, 53, 54, 56, 59, 61)]
@@ -94,4 +94,6 @@ def school_bank(map_vab, base_vab):
     tones.extend(convert_tones(base_vab, [(0, 53, 127), (0, 54, 107),
                                          (1, 54, 57), (1, 55, 57), (2, 54, 64),
                                          (0, 49, 59), (0, 50, 59), (0, 51, 64)], samples))
+    # MAP1_S00 plays Sfx 1416 at the start of the placement and 1419 after it.
+    tones.extend(convert_tones(first_floor_vab, [(0, 51, 127), (0, 54, 117)], samples))
     return tones + samples

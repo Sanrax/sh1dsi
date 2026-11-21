@@ -30,12 +30,12 @@ typedef struct {
 } Tone;
 
 enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, DoorUnlock,
-       PromptMove, PromptCancel, PromptConfirm, ToneCount };
+       PromptMove, PromptCancel, PromptConfirm, InsertMedallion, TowerChime, ToneCount };
 static const int pickupSounds[] = {
     [PickupMove] = PromptMove, [PickupCancel] = PromptCancel, [PickupConfirm] = PromptConfirm
 };
 static Tone tones[ToneCount];
-static uint8_t samples[144 * 1024] __attribute__((aligned(32)));
+static uint8_t samples[176 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
 static const char *assetDir;
 
@@ -97,9 +97,9 @@ static bool loadPiano(void)
         return false;
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets
                  && memcmp(assets.magic, "SHP", 3) == 0 &&
-                 assets.magic[3] >= '1' && assets.magic[3] <= '7';
+                 assets.magic[3] >= '1' && assets.magic[3] <= '8';
     if (valid && assets.magic[3] != '1') {
-        static const unsigned counts[] = {0, 9, 10, 12, 14, 15, ToneCount};
+        static const unsigned counts[] = {0, 9, 10, 12, 14, 15, InsertMedallion, ToneCount};
         toneCount = counts[assets.magic[3]-'1'];
         valid = loadTones(file, toneCount);
     }
@@ -124,6 +124,11 @@ static void playTone(int id)
     const Tone *tone = &tones[id];
     soundPlaySample(samples + tone->offset, SoundFormat_16Bit, tone->bytes,
                     tone->rate, tone->volume, tone->pan, false, 0);
+}
+
+static void playTowerSound(bool chime)
+{
+    playTone(chime ? TowerChime : InsertMedallion);
 }
 
 static void changeRoom(RoomExit exit)
@@ -207,6 +212,7 @@ int main(void)
         medal.phase = piano.solved ? MedalFinished : MedalHanging;
         pickupRestore(point.flags);
         statueRestore(point.flags);
+        towerRestore(point.flags);
     }
     bool inRoom = hasRoom;
     int previousImage = -1;
@@ -257,6 +263,7 @@ int main(void)
                 if (!wasActive && phase == medal.phase && (phase == MedalHanging || phase == MedalFinished)) {
                     RoomExit exit = playerDestination(pressed & KEY_A);
                     SchoolRoom next = exit.room;
+                    TowerPoint tower = pressed & (KEY_A | KEY_SELECT) ? playerFacingTower() : NoTowerPoint;
                     if (next == SouthHall && roomCurrent() == FirstFloor && !latchUnlocked()) {
                         if (latchStart()) sound = DoorUnlock;
                     } else if (next != roomCurrent()) {
@@ -269,17 +276,22 @@ int main(void)
                         inspectionFade = 0;
                         setBrightness(1, 0);
                         roomChanged = true;
+                    } else if ((pressed & KEY_SELECT) && towerCanPlace(tower, pickupFlags())) {
+                        inspectionFadeLength = inspectionFade = towerPlace(assetDir, tower, playTowerSound);
+                        if (!inspectionFade) stop("Missing or invalid tower.dat.\nRun the asset converter.");
+                        roomChanged = true;
+                        previousTime = systemCounterGetTicks();
+                        debt = step;
                     } else if ((pressed & KEY_A) && playerFacingNotebook()) {
                         playerSavePose(&point);
                         point.flags = (point.flags & NotebookRead) | (piano.solved ? PianoSolved : 0) |
-                                      pickupFlags() | statueFlags() | (latchUnlocked() ? LatchOpen : 0);
+                                      pickupFlags() | statueFlags() | towerFlags() | (latchUnlocked() ? LatchOpen : 0);
                         if (notebookMenu(assetDir, false, &point) == NotebookMissingArt)
                             stop("Missing notebook.dat");
                         roomChanged = true;
                         previousTime = systemCounterGetTicks();
                         debt = step;
                     } else if (pressed & KEY_A) {
-                        TowerPoint tower = playerFacingTower();
                         bool hand = playerFacingHand() && !(roomCanDissolveHand() && statueOpened());
                         if (tower != NoTowerPoint || hand) {
                             inspectionFadeLength = inspectionFade = hand ? handInspect(assetDir) : towerInspect(assetDir, tower);

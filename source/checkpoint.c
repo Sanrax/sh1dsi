@@ -37,10 +37,12 @@ static Checkpoint decode(const Record *r)
 static bool valid(const Checkpoint *p)
 {
     return p->room == Infirmary && p->yaw < 4096 && p->saves &&
-           !(p->flags & ~(PianoSolved | PickupFlags | LatchOpen | NotebookRead | HandOpened)) &&
+           !(p->flags & ~(PianoSolved | PickupFlags | LatchOpen | NotebookRead | HandOpened | TowerFlags)) &&
            (!(p->flags & SilverHeld) || (p->flags & PianoSolved)) &&
            (!(p->flags & HandOpened) || (p->flags & ChemicalTaken)) &&
            (!(p->flags & GoldHeld) || (p->flags & HandOpened)) &&
+           (!(p->flags & SunPlaced) || (p->flags & GoldHeld)) &&
+           (!(p->flags & MoonPlaced) || (p->flags & SilverHeld)) &&
            p->x >= 52*4096 && p->x <= 66*4096 && p->z >= 133*4096 && p->z <= 147*4096;
 }
 
