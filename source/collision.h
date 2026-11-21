@@ -3,7 +3,8 @@
 #include "room.h"
 #include <stdio.h>
 
-bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles);
+typedef enum { NoFloorData, LegacyWalkways, LegacyCourtyardFloors, CountedFloorPlanes } FloorLayout;
+bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles, FloorLayout floorLayout);
 typedef struct { int height, slopeX, slopeZ; } Floor;
 Floor collisionFloor(int x, int z);
 void collisionMove(int *worldX, int *worldZ, int dx, int dz);

@@ -208,11 +208,21 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (room == ChemistryLab) magic = "SHL1";
     if (room == EquipmentRoom) magic = "SHQ1";
     if (room == Infirmary) magic = "SHI1";
-    if (room == Courtyard) magic = "SHY1";
     if (fread(&header, sizeof header, 1, file) != 1) return false;
     bool firstFloorObstacles = room == FirstFloor && !memcmp(header.magic, "SHF3", 4);
     bool southHallObstacles = room == SouthHall && !memcmp(header.magic, "SHS2", 4);
-    bool towerFloors = room == Courtyard && !memcmp(header.magic, "SHY2", 4);
+    FloorLayout floorLayout = NoFloorData;
+    if (room == Courtyard) {
+        magic = "SHY1";
+        floorLayout = LegacyWalkways;
+        if (!memcmp(header.magic, "SHY3", 4)) {
+            magic = "SHY3";
+            floorLayout = CountedFloorPlanes;
+        } else if (!memcmp(header.magic, "SHY2", 4)) {
+            magic = "SHY2";
+            floorLayout = LegacyCourtyardFloors;
+        }
+    }
     bool latchText = firstFloorObstacles || (room == FirstFloor && !memcmp(header.magic, "SHF2", 4));
     bool medical = room == Infirmary && !memcmp(header.magic, "SHI3", 4);
     bool chemical = room == EquipmentRoom && !memcmp(header.magic, "SHQ2", 4);
@@ -229,7 +239,6 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     unsigned scenePages = room == SchoolCorridor || room == UpperNorthHall || room == ChemistryLab ? 2 : 3;
     if (latchText) magic = firstFloorObstacles ? "SHF3" : "SHF2";
     if (southHallObstacles) magic = "SHS2";
-    if (towerFloors) magic = "SHY2";
     if (infirmaryItems) magic = medical ? "SHI3" : "SHI2";
     if (chemical) magic = "SHQ2";
     if (hand) magic = "SHL2";
@@ -285,7 +294,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     vramSetBankC(VRAM_C_TEXTURE_SLOT0);
     vramSetBankE(VRAM_E_TEX_PALETTE);
     if ((corridor || header.magic[3] >= '4') &&
-        !collisionLoad(file, room, firstFloorObstacles || southHallObstacles || towerFloors)) return false;
+        !collisionLoad(file, room, firstFloorObstacles || southHallObstacles, floorLayout)) return false;
     if (latchText && !latchLoad(file)) return false;
     if (room == MusicRoom && header.pages == 4 &&
         (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))

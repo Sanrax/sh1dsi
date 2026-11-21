@@ -42,6 +42,8 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 | PS1 silver pickup and first corridor view | 47 intervals on each of two prompts and 67 in room 32 | All 2 VBlanks, 33.37 ms |
 | PS1 crossing room 32 after pickup | 474 buffer-change intervals | 442 at 33.37 ms and 32 at 50.05 ms |
 | PS1 eastern hallway through stair descent | 357 buffer-change intervals | All 33.37 ms |
+| PS1 basement stair descent and return | 490 buffer-change intervals | All 33.37 ms |
+| PS1 boiler room approach and return | 316 buffer-change intervals | 1 at 16.68 ms, 292 at 33.37 ms and 23 at 50.05 ms |
 | PS1 crossing the southern hallway | 176 buffer-change intervals | 70 at 33.37 ms and 106 at 50.05 ms |
 | PS1 infirmary from entrance to save interaction | 255 buffer-change intervals | 1 at 16.68 ms, 247 at 33.37 ms and 7 at 50.05 ms |
 | PS1 health drink and first-aid kit events | 130 drink and 126 kit buffer-change intervals | Drink had 9 at 33.37 ms and 121 at 50.05 ms. Kit intervals were all 50.05 ms |
@@ -325,8 +327,27 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - The basement stair and boiler room each need 80 KiB of scenery textures,
   which fits before the resident player texture. The boiler props use index
   zero for transparency. The conflicting index belongs to an unused row.
-  The basement stair IPD includes a sloped floor plane. The next route
-  check needs the landing height and slope on both crossings.
+  The PS1 replay matched the authored stair planes at both arrivals
+  (−3600 Q12 Y in the basement and 3552 on the first floor). Across 276
+  interior slope samples, the basement plane was within 1.5 cm of the
+  PS1 player's Y. The basement ramp has four corners and its upper
+  landing has five.
+
+### Room floor planes
+
+- Courtyard sidecars now carry a floor plane count and a corner count
+  per plane. The loader supports convex footprints with three to eight
+  corners and reads both older courtyard layouts. It uses 14 planes
+  in the courtyard and clears them on exit.
+- The host check matched the old height and slope at 1,640,961 courtyard
+  positions for each of the two legacy layouts and the counted layout.
+  A five-corner fixture checked the slope and clipped corner. Malformed
+  counts and truncated records were rejected.
+- In melonDS DSi mode, the counted sidecar passed the courtyard ramp
+  round trip over DLDI and virtual console SD. The DLDI replay also
+  matched both arrivals on the upper stair round trip. The courtyard
+  stream grew by 16 bytes and the floor plane array by 252 bytes.
+  The counted floor data is ready for the basement stream.
 
 ### Texture palette conversion
 

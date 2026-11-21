@@ -80,22 +80,26 @@ def collision_edges(ipd, room):
         return output
 
     floors = bytearray()
-    for plane in (*range(37, 41), *range(50, 60)):
+    floor_planes = (*range(37, 41), *range(50, 60))
+    for plane in floor_planes:
         corners = set()
         for i in range(count):
             a, b, left, right = struct.unpack_from("4B", collision, polygon+10*i+6)
             if plane in (left, right):
                 corners.update(struct.unpack_from("<3h", collision, vert+6*k)[::2] for k in (a, b))
-        if len(corners) != 4:
-            raise ValueError("unexpected courtyard floor boundary")
+        corner_count = len(corners)
+        if not 3 <= corner_count <= 8:
+            raise ValueError("unsupported floor boundary size")
         center_x = sum(x for x, _ in corners)
         center_z = sum(z for _, z in corners)
         # Store the convex floor's corners in winding order for the ARM9 test.
-        for x, z in sorted(corners, key=lambda p: math.atan2(4*p[1]-center_z, 4*p[0]-center_x)):
+        floors.append(corner_count)
+        for x, z in sorted(corners, key=lambda p: math.atan2(corner_count*p[1]-center_z,
+                                                           corner_count*p[0]-center_x)):
             floors.extend(struct.pack("<2h", x-5120, z-5120))
         xref, y, zref, _, sx, sz = struct.unpack_from("<3hH2h", collision, surface+12*plane)
         floors.extend(struct.pack("<5h", xref-5120, y, zref-5120, sx, sz))
-    return struct.pack("<H", len(output)//12) + output + floors
+    return struct.pack("<H", len(output)//12) + output + struct.pack("<H", len(floor_planes)) + floors
 
 
 def model_directory(data):
@@ -390,7 +394,7 @@ def school_room(disc, room=39):
             add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-10240, y>>4, (z>>4)-30720), state,
                       item_page=page)
     if room != 39:
-        magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 16: b"SHU1", 23: b"SHY2", 31: b"SHE1",
+        magic = {9: b"SHI3", 12: b"SHF3", 13: b"SHS2", 16: b"SHU1", 23: b"SHY3", 31: b"SHE1",
                  32: b"SHC1", 33: b"SHH1", 34: b"SHL3", 35: b"SHQ2"}[room]
         extra = b""
         if room == 9:

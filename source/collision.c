@@ -12,56 +12,83 @@ static unsigned edgeCount;
 typedef struct { int x, z, radius; } ObstacleCylinder;
 static ObstacleCylinder cylinders[15];
 static unsigned cylinderCount;
+typedef struct { int16_t x, z; } FloorCorner;
+typedef struct { int16_t refX, height, refZ, slopeX, slopeZ; } FloorEquation;
 typedef struct {
-    struct { int16_t x, z; } corner[4];
-    int16_t refX, height, refZ, slopeX, slopeZ;
-} Ramp;
-_Static_assert(sizeof(Ramp) == 26, "courtyard floor layout");
-static Ramp courtyardRamps[14];
-static unsigned courtyardRampCount;
+    FloorCorner corner[8];
+    FloorEquation equation;
+    uint8_t corners;
+} FloorPlane;
+_Static_assert(sizeof(FloorCorner) == 4 && sizeof(FloorEquation) == 10, "floor plane layout");
+static FloorPlane floorPlanes[14];
+static unsigned floorPlaneCount;
+static SchoolRoom floorPlaneRoom;
 enum { Radius = 1228 }; // Harry's 0.3-metre outer cylinder, Q12.
 
-static int crossEdge(const Ramp *r, unsigned a, int x, int z)
+static int crossEdge(FloorCorner a, FloorCorner b, int x, int z)
 {
-    unsigned b = (a+1)&3;
-    int ax = r->corner[a].x, az = r->corner[a].z;
-    return (r->corner[b].x-ax)*(z-az) - (r->corner[b].z-az)*(x-ax);
+    return (b.x-a.x)*(z-a.z) - (b.z-a.z)*(x-a.x);
 }
 
-static bool loadCourtyardFloors(FILE *file, bool towerFloors)
+static bool loadFloorPlanes(FILE *file, FloorLayout layout)
 {
-    if (towerFloors) {
-        courtyardRampCount = sizeof courtyardRamps/sizeof courtyardRamps[0];
-        if (fread(courtyardRamps, sizeof courtyardRamps, 1, file) != 1) return false;
-    } else {
+    enum { Capacity = sizeof floorPlanes/sizeof floorPlanes[0] };
+    uint16_t count = 14; // SHY2 stores a fixed number of records.
+    if (layout == LegacyWalkways) {
         // SHY1 stores only the rectangular or trapezoidal entrance walkways.
         struct { int16_t low0, high0, low1, high1, minZ, maxZ, y, z, slope; } old[4];
         if (fread(old, sizeof old, 1, file) != 1) return false;
-        courtyardRampCount = sizeof old/sizeof old[0];
-        for (unsigned i = 0; i < courtyardRampCount; i++) {
-            courtyardRamps[i] = (Ramp){
+        count = sizeof old/sizeof old[0];
+        for (unsigned i = 0; i < count; i++) {
+            floorPlanes[i] = (FloorPlane){
                 .corner = {{old[i].low0, old[i].minZ}, {old[i].high0, old[i].minZ},
                            {old[i].high1, old[i].maxZ}, {old[i].low1, old[i].maxZ}},
-                .height = old[i].y, .refZ = old[i].z, .slopeZ = old[i].slope
+                .equation = {.height = old[i].y, .refZ = old[i].z, .slopeZ = old[i].slope},
+                .corners = 4
             };
         }
-    }
-    for (unsigned i = 0; i < courtyardRampCount; i++) {
-        const Ramp *r = &courtyardRamps[i];
-        if (abs(r->refX) > 5120 || abs(r->refZ) > 5120 || abs(r->height) > 256 ||
-            abs(r->slopeX) > 4096 || abs(r->slopeZ) > 4096) return false;
-        for (unsigned j = 0; j < 4; j++) {
-            unsigned k = (j+2)&3;
-            if (abs(r->corner[j].x) > 5120 || abs(r->corner[j].z) > 5120 ||
-                crossEdge(r, j, r->corner[k].x, r->corner[k].z) <= 0) return false;
+    } else {
+        if (layout == CountedFloorPlanes && fread(&count, sizeof count, 1, file) != 1) return false;
+        if (!count || count > Capacity) return false;
+        for (unsigned i = 0; i < count; i++) {
+            FloorPlane *plane = &floorPlanes[i];
+            plane->corners = 4;
+            if (layout == CountedFloorPlanes && fread(&plane->corners, 1, 1, file) != 1)
+                return false;
+            if (plane->corners < 3 || plane->corners > sizeof plane->corner/sizeof plane->corner[0] ||
+                fread(plane->corner, sizeof(FloorCorner), plane->corners, file) != plane->corners ||
+                fread(&plane->equation, sizeof(FloorEquation), 1, file) != 1)
+                return false;
         }
     }
+    for (unsigned i = 0; i < count; i++) {
+        const FloorPlane *plane = &floorPlanes[i];
+        const FloorEquation *eq = &plane->equation;
+        if (abs(eq->refX) > 5120 || abs(eq->refZ) > 5120 ||
+            (layout != CountedFloorPlanes && abs(eq->height) > 256) ||
+            abs(eq->slopeX) > 4096 || abs(eq->slopeZ) > 4096) return false;
+        for (unsigned j = 0; j < plane->corners; j++) {
+            if (abs(plane->corner[j].x) > 5120 || abs(plane->corner[j].z) > 5120)
+                return false;
+        }
+        for (unsigned j = 0; j < plane->corners; j++) {
+            const FloorCorner a = plane->corner[j];
+            const unsigned end = (j+1 == plane->corners) ? 0 : j+1;
+            for (unsigned k = 0; k < plane->corners; k++) {
+                if (k != j && k != end &&
+                    crossEdge(a, plane->corner[end], plane->corner[k].x, plane->corner[k].z) <= 0)
+                    return false;
+            }
+        }
+    }
+    floorPlaneCount = count;
     return true;
 }
 
-bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles)
+bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles, FloorLayout floorLayout)
 {
     cylinderCount = 0;
+    floorPlaneCount = 0;
     switch (room) {
     case Courtyard: {
         uint16_t count;
@@ -110,7 +137,8 @@ bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles)
             cylinders[i] = (ObstacleCylinder){originX+16*in[0], originZ+16*in[1], Radius+16*in[2]};
         }
     }
-    if (room == Courtyard && !loadCourtyardFloors(file, fullObstacles)) return false;
+    if (floorLayout != NoFloorData && !loadFloorPlanes(file, floorLayout)) return false;
+    floorPlaneRoom = room;
     // Actor collision stops at the closed leaves. The facing ray can still
     // cross the threshold, and a room transition spawns beyond the radius.
     for (unsigned i = 0; i < schoolDoorCount; i++) {
@@ -125,23 +153,35 @@ bool collisionLoad(FILE *file, SchoolRoom room, bool fullObstacles)
     return true;
 }
 
+static bool floorContains(const FloorPlane *plane, int x, int z)
+{
+    FloorCorner previous = plane->corner[plane->corners-1];
+    for (unsigned i = 0; i < plane->corners; i++) {
+        FloorCorner next = plane->corner[i];
+        if (crossEdge(previous, next, x, z) < 0) return false;
+        previous = next;
+    }
+    return true;
+}
+
 Floor collisionFloor(int x, int z)
 {
-    if (roomCurrent() == Courtyard) {
-        int localX = (x-roomOriginX(Courtyard)) >> 4, localZ = (z-roomOriginZ(Courtyard)) >> 4;
+    SchoolRoom room = roomCurrent();
+    if (floorPlaneCount && room == floorPlaneRoom) {
+        int localX = (x-roomOriginX(room)) >> 4, localZ = (z-roomOriginZ(room)) >> 4;
         Floor floor = {0};
-        for (unsigned i = 0; i < courtyardRampCount; i++) {
-            const Ramp *r = &courtyardRamps[i];
-            if (crossEdge(r, 0, localX, localZ) < 0 || crossEdge(r, 1, localX, localZ) < 0 ||
-                crossEdge(r, 2, localX, localZ) < 0 || crossEdge(r, 3, localX, localZ) < 0) continue;
-            int height = r->height + ((r->slopeX*(localX-r->refX)) >> 12) +
-                         ((r->slopeZ*(localZ-r->refZ)) >> 12);
+        for (unsigned i = 0; i < floorPlaneCount; i++) {
+            const FloorPlane *plane = &floorPlanes[i];
+            if (!floorContains(plane, localX, localZ)) continue;
+            const FloorEquation *eq = &plane->equation;
+            int height = eq->height + ((eq->slopeX*(localX-eq->refX)) >> 12) +
+                         ((eq->slopeZ*(localZ-eq->refZ)) >> 12);
             if (height*16 < floor.height)
-                floor = (Floor){.height = height*16, .slopeX = r->slopeX, .slopeZ = r->slopeZ};
+                floor = (Floor){.height = height*16, .slopeX = eq->slopeX, .slopeZ = eq->slopeZ};
         }
         return floor;
     }
-    if (roomCurrent() == FirstFloor) {
+    if (room == FirstFloor) {
         // SC0201 surfaces 8/9 lead upstairs, while 4/7 descend south of
         // the dividing wall. Both slopes use the original Q8 reference point.
         int localX = (x >> 4) - 20480, localZ = (z >> 4) - 10240;
@@ -156,10 +196,10 @@ Floor collisionFloor(int x, int z)
         }
         return (Floor){.height = -16};
     }
-    if (roomCurrent() == Infirmary) return (Floor){.height = -48};
-    if (roomCurrent() == NorthHall) return (Floor){.height = -16};
-    if (roomCurrent() != EastCorridor)
-        return (Floor){.height = roomCurrent() == SchoolCorridor ? 48 : 0};
+    if (room == Infirmary) return (Floor){.height = -48};
+    if (room == NorthHall) return (Floor){.height = -16};
+    if (room != EastCorridor)
+        return (Floor){.height = room == SchoolCorridor ? 48 : 0};
     // SCFE01 surfaces 11 and 12. The walls confine Harry to the stair
     // footprint. Evaluate the ramp in the same Q8 chunk space as the IPD.
     if (z >= 168000 && z <= 184720 && x >= -188240) return (Floor){.height = 6560};
