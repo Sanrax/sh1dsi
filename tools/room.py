@@ -24,6 +24,8 @@ ROOM_LAYOUTS = {
     8: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
     10: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES | ROOM_NORMALS,
     11: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_NORMALS,
+    14: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
+    17: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES | ROOM_NORMALS,
     20: ROOM_DOOR_NOTICE,
     21: 0,
     22: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES | ROOM_LADDER_ASCENT,
@@ -88,6 +90,7 @@ def collision_edges(ipd, room):
                 31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0),
                 13: (30720, 0, 80, 12, 80, 0), 11: (30720, 0, 33, 7, 35, 0), 9: (10240, 30720, 45, 11, 49, 0), 8: (10240, 0, 34, 6, 34, 0),
                 10: (10240, 10240, 40, 9, 42, 0),
+                14: (0, 0, 35, 6, 36, 0), 17: (-30720, 10240, 54, 14, 56, 0),
                 20: (-30720, -20480, 16, 3, 16, 0), 21: (-40960, -20480, 16, 3, 16, 0),
                 22: (-20480, -20480, 28, 8, 32, 0),
                 23: (-10240, -20480, 204, 61, 236, 0), 24: (-10240, -20480, 172, 31, 175, 0),
@@ -174,6 +177,12 @@ def collision_edges(ipd, room):
         # the usable classrooms. Shared edges 11 and 13 in room 30 lie outside it.
         if (room == 29 and i < 8) or (room == 30 and (i < 8 or i in (11, 13))):
             continue
+        # SU0000 shares an outer shell with the stall partition.
+        if room == 14 and (i < 4 or 8 <= i <= 11 or i == 19):
+            continue
+        # Keep SUFD01's corridor walls, two barriers and the lockers.
+        if room == 17 and not (5 <= i <= 10 or i in (26, 27) or i >= 32):
+            continue
         # SU0101's inside shell, cross-hall barrier and locker banks.
         if room == 10 and not (6 <= i <= 11 or i in (13, 14) or i >= 30):
             continue
@@ -210,7 +219,7 @@ def collision_edges(ipd, room):
         return output
 
     floors = bytearray()
-    floor_planes = {10: (2, 3, 4, 5), 11: (3,), 3: (0, 1), 22: range(3, 8), 31: (11, 12), 23: (*range(37, 41), *range(50, 60)),
+    floor_planes = {17: range(1, 8), 10: (2, 3, 4, 5), 11: (3,), 3: (0, 1), 22: range(3, 8), 31: (11, 12), 23: (*range(37, 41), *range(50, 60)),
                     24: (15, 16, 17, 18, 28, 29), 25: (1,), 26: (2,), 28: range(1, 8)}[room]
     floor_count = 0
     for plane in floor_planes:
@@ -231,7 +240,7 @@ def collision_edges(ipd, room):
             if start[1] != -54 or end[1] != -54:
                 raise ValueError("unexpected east hall floor seam")
             edges.append((end, start))
-        if room == 10 and plane == 4:
+        if (room == 10 and plane == 4) or (room == 17 and plane in (2, 4, 5)):
             # Close the flat floor where the source joins the northern chunk.
             starts = {a for a, _ in edges}
             ends = {b for _, b in edges}
@@ -360,10 +369,10 @@ def smoke_atlas(disc):
 
 
 def school_room(disc, room=39):
-    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 11: (3, 0), 8: (1, 0), 10: (1, 1), 9: (1, 3),
+    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 11: (3, 0), 8: (1, 0), 10: (1, 1), 14: (0, 0), 17: (253, 1), 9: (1, 3),
               23: (255, 254), 24: (255, 254), 25: (3, 4), 26: (2, 3), 27: (3, 3), 28: (2, 1), 29: (3, 2), 30: (3, 1), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
               3: (1, 255), 2: (0, 255), 20: (253, 254), 21: (252, 254), 22: (254, 254)}[room]
-    prefix = "SU" if room in (8, 10, 11, 24, 25, 26, 27, 28, 29, 30) else "SC"
+    prefix = "SU" if room in (8, 10, 11, 14, 17, 24, 25, 26, 27, 28, 29, 30) else "SC"
     data = disc.read(f"BG/{prefix}{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -408,6 +417,16 @@ def school_room(disc, room=39):
                     raise ValueError("unexpected reception cutout indices")
             cluts[1] = cluts[1][:11] + (cluts[1][0],)*5
             regions = ((1, 10, 0, (0, 95, 112, 255)), (4, 15, 0, (112, 175, 0, 95)))
+        if room == 14 and name == "SU1FWW1":
+            # The stall tile uses 10 as its key and stops before index 11.
+            for y in range(128, 176):
+                start = y*words*2+40
+                if any((b & 15) > 10 or b >> 4 > 10 for b in pixels[start:start+24]):
+                    raise ValueError("unexpected restroom cutout indices")
+            cluts[1] = cluts[1][:11] + (cluts[1][0],)*5
+            regions = ((1, 10, 0, (80, 127, 128, 175)),)
+        if room == 14 and name == "SU1FWW2":
+            regions = ((6, 15, 0, (96, 191, 128, 255)),)
         for row, key, target, rect in regions:
             if {j for j, value in enumerate(cluts[row]) if not value} != {key}:
                 raise ValueError("unexpected cutout palette")
@@ -736,7 +755,7 @@ def school_room(disc, room=39):
     # so convert the texels and CLUTs together after all textured batches are known.
     for page, (name, size, cluts) in enumerate(scene_textures):
         row_keys = [{idx for idx, color in enumerate(clut) if color == 0} for clut in cluts]
-        if room in (10, 11, 25, 28) and name == "SU1FT1":
+        if room in (10, 11, 17, 25, 28) and name == "SU1FT1":
             # CLUT 4 has unused zero entries after index 10. Its tile and
             # CLUT 0 both use index 1 for transparency.
             offset, width, _, _ = page_info[page]

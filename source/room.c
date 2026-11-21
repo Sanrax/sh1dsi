@@ -43,7 +43,7 @@ static unsigned fanAngle[2];
 
 // MAP1_S00–S02 door points. Each adjacent pair links two doors.
 // Normals point into the room.
-const Door schoolDoors[] = {
+static const Door schoolDoors[] = {
     {MusicRoom, SchoolCorridor, -417792, 97075, 0, -1, 2304},
     {SchoolCorridor, MusicRoom, -116326, 75366, 0, 1, 2304},
     {SchoolCorridor, EastCorridor, -42598, 81920, -1, 0, 3584},
@@ -88,7 +88,30 @@ const Door schoolDoors[] = {
     {BoilerRoom, BasementStair, 93388, -79872, -1, 0, 2304}
 };
 _Static_assert((sizeof schoolDoors/sizeof schoolDoors[0]) % 2 == 0, "paired room doors");
-const unsigned schoolDoorCount = sizeof schoolDoors/sizeof schoolDoors[0];
+enum { PairedDoorCount = sizeof schoolDoors/sizeof schoolDoors[0] };
+
+// MAP1_S02 and MAP1_S03 points 81, 9, 58 and 10 form a directed
+// route. The restroom uses one chunk on both overlays, but its exit
+// depends on which hall Harry entered from. Each arrival uses the next door.
+static const Door restroomDoors[] = {
+    {OtherworldWestHall, OtherworldUpperRestroom, 242483, 170393, 1, 0, 2304},
+    {OtherworldUpperRestroom, OtherworldUpperWestHall, 95313, 81510, -1, 0, 2304},
+    {OtherworldUpperWestHall, OtherworldRestroom, -408780, 168755, 1, 0, 2304},
+    {OtherworldRestroom, OtherworldWestHall, 95313, 81510, -1, 0, 2304}
+};
+enum { RestroomDoorCount = sizeof restroomDoors/sizeof restroomDoors[0] };
+const unsigned roomDoorCount = PairedDoorCount + RestroomDoorCount;
+
+const Door *roomDoor(unsigned index)
+{
+    return index < PairedDoorCount ? &schoolDoors[index] : &restroomDoors[index-PairedDoorCount];
+}
+
+const Door *roomDoorArrival(unsigned index)
+{
+    return index < PairedDoorCount ? &schoolDoors[index ^ 1] :
+           &restroomDoors[(index-PairedDoorCount+1)%RestroomDoorCount];
+}
 
 SchoolRoom roomCurrent(void) { return current; }
 bool roomHasHand(void) { return current == ChemistryLab && handPresent; }
@@ -133,6 +156,9 @@ static RoomOrigin legacyRoomOrigin(SchoolRoom room)
     case OtherworldSouthHall:
     case OtherworldReception:
     case OtherworldWestHall:
+    case OtherworldRestroom:
+    case OtherworldUpperRestroom:
+    case OtherworldUpperWestHall:
     case NorthClassroom:
     case SouthClassroom:
     case TowerPassage: break; // These rooms require a stream origin.
@@ -303,14 +329,17 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     bool otherworld = room == OtherworldCourtyard || room == OtherworldNorthHall || lobby ||
                       room == OtherworldSideHall || room == OtherworldEastHall ||
                       room == OtherworldSouthHall || room == OtherworldReception || room == OtherworldWestHall ||
-                      pictureCard || room == SouthClassroom;
+                      pictureCard || room == SouthClassroom || roomIsRestroom(room) ||
+                      room == OtherworldUpperWestHall;
     if (!hasOrigin && (room == BasementStair || room == BoilerRoom ||
                        room == ClockTower || room == FarClockTower || room == TowerPassage ||
                        otherworld))
         return false;
+    // The two overlays load the same physical restroom geometry.
+    SchoolRoom streamRoom = roomIsRestroom(room) ? OtherworldRestroom : room;
     struct { uint8_t room, flags; uint16_t reserved; } layout = {0};
     if (streamed && (!corridor || fread(&layout, sizeof layout, 1, file) != 1 ||
-                     layout.room != room || layout.reserved ||
+                     layout.room != streamRoom || layout.reserved ||
                      (layout.flags & ~(RoomEdgeHeights | RoomFloorPlanes | RoomWideVertices | RoomGroundPlanes | RoomBoilerEvent | RoomDoorNotice | RoomLadderAscent | RoomNormals)) ||
                      ((layout.flags & RoomNormals) && (!hasOrigin || !otherworld)) ||
                      ((layout.flags & RoomLadderAscent) && (!hasOrigin || room != TowerPassage)) ||

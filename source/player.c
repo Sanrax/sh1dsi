@@ -100,7 +100,9 @@ static const DoorView doorViews[] = {
     {OtherworldReception, OtherworldSouthHall, {245231, -9728, 77312, 232122, -5120, 83159}, 0},
     {OtherworldSouthHall, OtherworldReception, {538257, -8617, 81784, 539127, -2832, 69512}, 0},
     {OtherworldWestHall, OtherworldReception, {254163, -8003, 173670, 231634, -3404, 173415}, 0},
-    {OtherworldReception, OtherworldWestHall, {246138, -9728, 77312, 233955, -5120, 79183}, 0}
+    {OtherworldReception, OtherworldWestHall, {246138, -9728, 77312, 233955, -5120, 79183}, 0},
+    {OtherworldUpperWestHall, OtherworldUpperRestroom, {-407361, -8003, 168755, -384830, -3404, 169008}, 0},
+    {OtherworldWestHall, OtherworldRestroom, {243902, -8003, 170393, 266433, -3404, 170646}, 0}
 };
 static const CameraPose *doorView;
 static const CameraPose otherworldArrival = {-72982, -14626, -228551, -77354, -3034, -252059};
@@ -208,6 +210,7 @@ static const ChaseRoad chaseRoads[MusicRoom] = {
     [OtherworldSouthHall] = {2086, 2393, 294, 337, ChaseAlongX},
     [OtherworldReception] = {900, 992, 302, 302, ChaseAlongX},
     [OtherworldWestHall] = {947, 993, 646, 952, ChaseAlongZ},
+    [OtherworldUpperWestHall] = {-1596, -1545, 646, 748, ChaseAlongZ},
     [NorthHall]     = {1982, 2289,  3043, 3089, ChaseAlongX},
     [Courtyard]     = {-436, -196, -1096, -848, ChaseArea},
     [OtherworldCourtyard] = {-436, -196, -1096, -848, ChaseArea},
@@ -249,7 +252,8 @@ static void advanceRoadCamera(void)
         roadEyeZ += limitToRoad((target-roadEyeZ)/7, -288, 288);
         return;
     }
-    if (room == MusicRoom || room == ClockTower || room == FarClockTower || otherworldIntroActive()) return;
+    if (room == MusicRoom || room == ClockTower || room == FarClockTower ||
+        roomIsRestroom(room) || otherworldIntroActive()) return;
     // Leave the entry view as Harry walks out along the road. The small
     // chase road places the ideal eye two metres away, twelve degrees to
     // one side of the heading opposite Harry (vcMakeIdealCamPosUseVC_ROAD_DATA).
@@ -266,6 +270,10 @@ static void advanceRoadCamera(void)
     if (room == OtherworldEastHall && z < eastLowerHall.maxZ*256) road = &eastLowerHall;
     static const ChaseRoad westUpperHall = {947, 993, 952, 1236, ChaseAlongZ};
     if (room == OtherworldWestHall && z >= westUpperHall.minZ*256) road = &westUpperHall;
+    static const ChaseRoad upperWestMiddle = {-1596, -1545, 750, 952, ChaseAlongZ};
+    static const ChaseRoad upperWestNorth = {-1596, -1545, 953, 1235, ChaseAlongZ};
+    if (room == OtherworldUpperWestHall && z >= upperWestMiddle.minZ*256)
+        road = z >= upperWestNorth.minZ*256 ? &upperWestNorth : &upperWestMiddle;
     int minX = road->minX*256, maxX = road->maxX*256;
     int minZ = road->minZ*256, maxZ = road->maxZ*256;
     sx = limitChaseAxis(sx, minX, maxX);
@@ -676,13 +684,12 @@ RoomExit playerDestination(bool action)
         return (RoomExit){.room = TowerPassage};
     if (room == FarClockTower && facingEdge(-573440, -249036, 1536, 0, -1))
         return (RoomExit){.room = OtherworldCourtyard};
-    for (unsigned i = 0; i < schoolDoorCount; i++) {
-        const Door *d = &schoolDoors[i];
+    for (unsigned i = 0; i < roomDoorCount; i++) {
+        const Door *d = roomDoor(i);
         if (d->room != room) continue;
-        if ((room == OtherworldWestHall || d->other == OtherworldWestHall) && !slotUnlocked())
-            continue;
+        if (roomUsesCardDoor(room, d->other) && !slotUnlocked()) continue;
         if (facingEdge(d->x, d->z, d->halfWidth, -d->nx, -d->nz))
-            return (RoomExit){.room = d->other, .arrival = &schoolDoors[i ^ 1]};
+            return (RoomExit){.room = d->other, .arrival = roomDoorArrival(i)};
     }
     return (RoomExit){.room = room};
 }
@@ -846,7 +853,8 @@ int playerSetCamera(void)
     bool corridor = classroom || reception || room == SchoolCorridor || room == SouthHall || room == NorthHall ||
                     room == UpperNorthHall || room == OtherworldNorthHall || room == OtherworldLobby ||
                     room == OtherworldSideHall || room == OtherworldEastHall ||
-                    room == OtherworldSouthHall || room == OtherworldWestHall;
+                    room == OtherworldSouthHall || room == OtherworldWestHall ||
+                    room == OtherworldUpperWestHall;
     bool equipment = room == EquipmentRoom;
     bool stairwell = room == EastCorridor || room == FirstFloor || room == BasementStair;
     bool boiler = room == BoilerRoom;
@@ -863,6 +871,14 @@ int playerSetCamera(void)
     if (slotActive()) {
         static const CameraPose view = {248176, -3399, 75120, 232529, -5939, 79216};
         return setCameraPose(&view, origin, originZ);
+    }
+    if (roomIsRestroom(room)) {
+        // The fixed-angle roads show opposite sides of the stall partition.
+        static const CameraPose views[] = {
+            {78592, -5888, 88832, 94576, -4288, 85648},
+            {96512, -8448, 87040, 81296, -2560, 85536}
+        };
+        return setCameraPose(&views[x < 89856], origin, originZ);
     }
     if (room == ClockTower) {
         // Fixed road at (-99.9, -2.7, -60.3) in MAP1_S00.

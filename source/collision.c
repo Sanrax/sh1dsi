@@ -125,8 +125,9 @@ bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayo
     unsigned wordsPerEdge = heightEdgeCount ? 8 : 6;
     int scale = room == MusicRoom ? 1 : 16;
     // These streams include seams just beyond the chunk boundary.
-    int maxZ = room == FirstFloor || room == OtherworldEastHall || room == OtherworldWestHall
-             ? 21*4096 : 20*4096;
+    bool hallSeam = room == OtherworldEastHall || room == OtherworldWestHall ||
+                    room == OtherworldUpperWestHall;
+    int maxZ = room == FirstFloor || hallSeam ? 21*4096 : 20*4096;
     int maxX = room == NorthHall || room == OtherworldNorthHall ? 17*4096 : 16*4096;
     for (unsigned i = 0; i < edgeCount; i++) {
         int16_t in[8] = {0};
@@ -154,14 +155,13 @@ bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayo
             cylinders[i] = (ObstacleCylinder){origin.x+16*in[0], origin.z+16*in[1], Radius+16*in[2]};
         }
     }
-    // Both Otherworld hall streams carry floor planes across their seams.
-    int floorZ = room == OtherworldEastHall || room == OtherworldWestHall ? 21*256 : 20*256;
+    int floorZ = hallSeam ? 21*256 : 20*256;
     if (floorLayout != NoFloorData && !loadFloorPlanes(file, floorLayout, floorZ)) return false;
     floorPlaneRoom = room;
     // Actor collision stops at the closed leaves. The facing ray can still
     // cross the threshold, and a room transition spawns beyond the radius.
-    for (unsigned i = 0; i < schoolDoorCount; i++) {
-        const Door *d = &schoolDoors[i];
+    for (unsigned i = 0; i < roomDoorCount; i++) {
+        const Door *d = roomDoor(i);
         if (d->room != room) continue;
         if (edgeCount == sizeof edges/sizeof edges[0]) return false;
         int tx = d->nz, tz = -d->nx;

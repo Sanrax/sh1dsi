@@ -69,6 +69,9 @@ static FILE *openRoom(SchoolRoom room)
     case OtherworldSouthHall: name = "otherworldsouth"; break;
     case OtherworldReception: name = "reception"; break;
     case OtherworldWestHall: name = "otherworldwest"; break;
+    case OtherworldRestroom:
+    case OtherworldUpperRestroom: name = "restroom"; break;
+    case OtherworldUpperWestHall: name = "otherworldupperwest"; break;
     case NorthClassroom: name = "classroomnorth"; break;
     case SouthClassroom: name = "classroomsouth"; break;
     case TowerPassage: name = "passage"; break;
@@ -188,11 +191,12 @@ static void changeRoom(RoomExit exit)
     bool pair12 = from == OtherworldSideHall || next == OtherworldSideHall ||
                   from == NorthClassroom || next == NorthClassroom ||
                   from == SouthClassroom || next == SouthClassroom ||
-                  from == OtherworldReception || next == OtherworldReception;
+                  from == OtherworldReception || next == OtherworldReception ||
+                  roomIsRestroom(from) || roomIsRestroom(next);
     bool hall = east || from == Courtyard || next == Courtyard || otherworldHall || pair12 ||
                 (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
     bool towerDoor = (next == ClockTower && from == Courtyard) || otherworldIntro;
-    bool slotDoor = from == OtherworldWestHall || next == OtherworldWestHall;
+    bool slotDoor = roomUsesCardDoor(from, next);
     bool door = !exit.stairs && next != TowerPassage && from != TowerPassage;
     bool boilerDoor = toneCount > BoilerDoorClose && (next == BoilerRoom || from == BoilerRoom);
     int opening = hall ? HallOpen : DoorOpen, closing = hall ? HallClose : DoorClose;

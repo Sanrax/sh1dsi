@@ -83,7 +83,10 @@ south hall. Follow the hall west and use the single door on the south
 wall to enter reception. The same door returns to the hall. Face the slot
 in reception's west wall and press A to inspect it. Press Select there
 with the Picture Card in inventory. After the animation and message,
-press A to go through the unlocked door into the west hall.
+press A to go through the unlocked door into the west hall. Face the
+nearby west-wall door and press A to enter the women's restroom. Leave the
+restroom to reach the upstairs west hall. Returning through the same doors
+takes Harry back to the first-floor west hall.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

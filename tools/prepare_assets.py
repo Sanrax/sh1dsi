@@ -120,6 +120,8 @@ def prepare(cue):
         reception = school_room(disc, 8)
         slot = card_slot_data(disc)
         otherworld_west = school_room(disc, 10)
+        restroom = school_room(disc, 14)
+        otherworld_upper_west = school_room(disc, 17)
         classroom_north = school_room(disc, 29)
         classroom_south = school_room(disc, 30)
     write_asset(OUTPUT.with_name("notebook.dat"), notebook)
@@ -151,6 +153,8 @@ def prepare(cue):
     write_asset(OUTPUT.with_name("reception.dat"), reception)
     write_asset(OUTPUT.with_name("cardslot.dat"), slot)
     write_asset(OUTPUT.with_name("otherworldwest.dat"), otherworld_west)
+    write_asset(OUTPUT.with_name("restroom.dat"), restroom)
+    write_asset(OUTPUT.with_name("otherworldupperwest.dat"), otherworld_upper_west)
     write_asset(OUTPUT.with_name("classroomnorth.dat"), classroom_north)
     write_asset(OUTPUT.with_name("classroomsouth.dat"), classroom_south)
 

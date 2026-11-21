@@ -19,6 +19,8 @@ through the side hall to the Otherworld east hall. Harry can take the Picture
 Card from the north classroom and cross the south classroom to get past
 the east hall barrier and reach reception through the Otherworld south hall.
 Harry can use the Picture Card in reception to open the west hall.
+The women's restroom takes Harry from there to the upstairs west hall
+and back.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -1168,12 +1170,46 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   and PCM identical. The other 28 previous data files match.
 - The PS1 reference also confirms the women's restroom crossing at
   point 81 from MAP1_S02 room 11 to MAP1_S03 room 4. The settled
-  arrival is Q12 (93675, 0, 81510), heading 3072. The port's next
-  crossing starts there.
+  arrival is Q12 (93675, 0, 81510), heading 3072.
+
+## Otherworld women's restroom and upstairs west hall
+
+- Points 81, 9, 58 and 10 use the restroom to change floors. The two
+  restroom visits share the original `SU0000` stream and use their own
+  exits. The upstairs hall adds `SUFD01`, including its lockers,
+  barriers and floor planes. Door transitions use the original pair 12
+  sounds. The reception door still requires the Picture Card.
+- All four arrivals matched the USA 1.1 PS1 replay in X/Z and heading.
+  The flashlight and the card survived both overlay crossings. With
+  the flashlight off, the four entry views differed from PS1 by
+  1.73–2.30 RGB values on average on a 0–255 scale. The restroom uses
+  the two measured fixed cameras with a native switch at the stall
+  partition. Moving chase and lighting behavior remain approximations.
+- The uninstrumented DSi virtual-SD replay started at the powered-boiler
+  checkpoint and resumed from the north hall after a missed waypoint in
+  the test harness. It collected the card in the classroom, opened the
+  west hall and completed all four crossings with the flashlight on.
+  With the beam on, the same four entry views differed from the PS1 by
+  8.63–10.17 RGB values on average.
+- In melonDS 1.1 DSi mode over DLDI, the restroom stall stopped Harry
+  7 Q12 units (1.7 mm) from the PS1 result on X. The upstairs barrier
+  stopped him 25 Q12 units (6.1 mm) from the PS1 result on Z.
+- The PS1 motion samples averaged 35.268 ms in the restroom (193
+  intervals) and 35.078 ms in the upstairs hall (195 intervals).
+  The instrumented DSi runs averaged 33.354 ms (1,091 intervals) and
+  33.356 ms (1,130 intervals). The 95th percentile was 33.430 ms and
+  33.432 ms. Peak geometry use was 965 polygons and 3,803 vertices in
+  the restroom, and 1,394 and 5,528 in the hall, with no overflow.
+  Peak submission time was 5.576 and 6.703 ms respectively. These
+  are emulator measurements.
+- BlocksDS 1.24.0 produced two identical unit-code-3 ROMs from the
+  verified USA 1.1 CUE. The 33 local data files include
+  `restroom.dat` (133,158 bytes) and `otherworldupperwest.dat`
+  (132,936 bytes). The previous 31 data files are byte-identical.
 
 ## Next
 
-1. Connect the west hall to the women's restroom and trace the MAP1_S03 exits.
+1. Connect the first-floor teachers' rooms around the west-hall barrier and port the phone call.
 2. Port the courtyard rain, fan sound and room ambience against the PS1 replay.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 
