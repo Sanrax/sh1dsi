@@ -64,8 +64,9 @@ the passage. Face either ladder and press A to climb to its tower. Start skips
 a climb once Harry starts moving. The far tower's outer door opens onto the
 Otherworld courtyard. The arrival scene uses the original dialogue, and Start
 skips it. Harry can walk the courtyard after the scene. Press Y to switch the
-flashlight on or off. Rerun the converter and copy the new
-`otherworld.dat` to enable courtyard lighting on an existing installation.
+flashlight on or off. Cross the courtyard and face the north double doors.
+Press A to enter the Otherworld north hall. Turn around and use the same
+doors to return. The flashlight keeps its setting across both crossings.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

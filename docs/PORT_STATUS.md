@@ -12,6 +12,7 @@ boiler powered he can enter the tower and cross the underground passage.
 Both ladders work in both directions. Harry can use the far tower's outer
 door, watch or skip the Otherworld arrival scene and walk the courtyard.
 Y switches the flashlight after the scene, changing the light and fog.
+The north doors reach the Otherworld north hall and lead back to the courtyard.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -929,11 +930,48 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   The updated `otherworld.dat` is 1,156,622 bytes. The other 20 data
   files are byte-identical. The previous courtyard data still loads
   with its static lighting.
-- The courtyard exits, rain and original music remain pending.
+- The rain and original music remain pending.
+
+## Otherworld north hall
+
+- MAP1_S02 points 7 and 9 link the courtyard and the north hall.
+  The original `SU0304` chunk supplies 951 quads, two texture pages,
+  1,947 shared lighting points, 16 collision edges and a floor plane.
+  The native door, wall and both locker contacts match the PS1 stops
+  within 7 mm in the four sampled approaches.
+- Both crossings match the PS1 arrival poses at Q12 X/Z
+  (546816, 772914), yaw 0, and (−80691, −216678), yaw 2048. The
+  flashlight state survives the load, and returning to the courtyard
+  skips the intro and its dialogue buffer. The uninstrumented
+  melonDS replays passed from the infirmary checkpoint on DLDI with
+  the beam on and virtual console SD with the beam off. Both toggled
+  it inside the hall and sampled a black lower screen.
+- The matched entry, walking and return views had mean RGB errors of
+  4.28–9.47/255 with the flashlight on and 0.39–0.71/255 with it off.
+  Native highlights are brighter in the lit views. The PS1 replay used
+  Beetle PSX with the owner's SCPH7001 BIOS, which the core reported
+  differs from its expected SCPH5501 hash.
+- The pair 13 open and close effects come from the original
+  `BASE.VAB` at 11,370 and 9,022 Hz. A melonDS DSi test recorded both
+  mixer outputs on each crossing. The converted sound bank preserves
+  all 26 earlier tones and their PCM.
+- The PS1 hall replay measured 198 intervals at 33.37 ms and one at
+  16.68 ms. In melonDS 1.1 DSi mode, the instrumented hall run averaged
+  32.776 ms across 460 intervals (16.702–33.472 ms). Mean and maximum
+  ARM9 submission took 4.470 and 5.735 ms. The peak was 647 polygons
+  and 2,531 vertices, with no geometry overflow. The DLDI load reads
+  and setup took 47.26 ms into the hall and 81.48 ms back to the
+  courtyard, including one VBlank before each read.
+- Two fresh BlocksDS builds reproduced the TWL ROM and all 22 data files.
+  The new `otherworldnorth.dat` is 101,059 bytes. Twenty previous
+  sidecars match byte for byte. The expanded `piano.dat` carries
+  the two original door sounds.
+- The hall's other doors, its original ambience and the courtyard's
+  south exit remain pending.
 
 ## Next
 
-1. Connect the courtyard doors and verify the first Otherworld hall route.
+1. Connect hall point 59 to the north lobby and verify the route toward the stairs.
 2. Port the courtyard rain and ambience and compare them with the PS1 replay.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 

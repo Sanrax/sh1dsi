@@ -124,7 +124,7 @@ bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayo
     int scale = room == MusicRoom ? 1 : 16;
     // The first-floor south wall extends 0.21 m into the adjoining chunk.
     int maxZ = room == FirstFloor ? 21*4096 : 20*4096;
-    int maxX = room == NorthHall ? 17*4096 : 16*4096;
+    int maxX = room == NorthHall || room == OtherworldNorthHall ? 17*4096 : 16*4096;
     for (unsigned i = 0; i < edgeCount; i++) {
         int16_t in[8] = {0};
         if (fread(in, sizeof in[0], wordsPerEdge, file) != wordsPerEdge) return false;

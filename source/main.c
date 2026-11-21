@@ -32,13 +32,14 @@ typedef struct {
 
 enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, DoorUnlock,
        PromptMove, PromptCancel, PromptConfirm, InsertMedallion, TowerChime,
-       BoilerSwitchSound, BoilerStartSound, BoilerDoorOpen, BoilerDoorClose, BoilerHum, TowerOpening, ToneCount };
+       BoilerSwitchSound, BoilerStartSound, BoilerDoorOpen, BoilerDoorClose, BoilerHum, TowerOpening,
+       OtherworldDoorOpen, OtherworldDoorClose, ToneCount };
 static const int pickupSounds[] = {
     [PickupMove] = PromptMove, [PickupCancel] = PromptCancel, [PickupConfirm] = PromptConfirm,
     [PickupBoilerSwitch] = BoilerSwitchSound, [PickupBoilerStart] = BoilerStartSound
 };
 static Tone tones[ToneCount];
-static uint8_t samples[320 * 1024] __attribute__((aligned(32)));
+static uint8_t samples[352 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
 static uint16_t humLoop;
 static const char *assetDir;
@@ -61,6 +62,7 @@ static FILE *openRoom(SchoolRoom room)
     case ClockTower: name = "clockroom"; break;
     case FarClockTower: name = "fartower"; break;
     case OtherworldCourtyard: name = "otherworld"; break;
+    case OtherworldNorthHall: name = "otherworldnorth"; break;
     case TowerPassage: name = "passage"; break;
     case BasementStair: name = "basement"; break;
     case BoilerRoom: name = "boiler"; break;
@@ -105,14 +107,14 @@ static bool loadPiano(void)
     assetDir = cart ? "fat:/sh1dsi" : "sd:/sh1dsi";
     if (!file)
         return false;
-    static const char versions[] = "123456789A";
+    static const char versions[] = "123456789AB";
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets &&
                  !memcmp(assets.magic, "SHP", 3) && assets.magic[3];
     const char *version = valid ? strchr(versions, assets.magic[3]) : NULL;
     valid = version != NULL;
     if (valid && version != versions) {
         static const unsigned counts[] = {0, 9, 10, 12, 14, 15, InsertMedallion,
-                                          BoilerSwitchSound, TowerOpening, ToneCount};
+                                          BoilerSwitchSound, TowerOpening, OtherworldDoorOpen, ToneCount};
         toneCount = counts[version-versions];
         valid = loadTones(file, toneCount);
     }
@@ -167,14 +169,18 @@ static void changeRoom(RoomExit exit)
 {
     SchoolRoom from = roomCurrent(), next = exit.room;
     bool east = next == EastCorridor || from == EastCorridor;
-    bool hall = east || from == Courtyard || next == Courtyard ||
+    bool otherworldIntro = from == FarClockTower && next == OtherworldCourtyard;
+    bool otherworldHall = from == OtherworldNorthHall || next == OtherworldNorthHall;
+    bool hall = east || from == Courtyard || next == Courtyard || otherworldHall ||
                 (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
-    bool towerDoor = (next == ClockTower && from == Courtyard) || next == OtherworldCourtyard;
+    bool towerDoor = (next == ClockTower && from == Courtyard) || otherworldIntro;
     bool door = !exit.stairs && next != TowerPassage && from != TowerPassage;
     bool boilerDoor = toneCount > BoilerDoorClose && (next == BoilerRoom || from == BoilerRoom);
+    bool otherworldSound = otherworldHall && toneCount > OtherworldDoorClose;
     FILE *file = openRoom(next);
     if (!file) stop("Missing room data.\nRun the asset converter.");
-    if (door) playTone(towerDoor ? TowerOpening : boilerDoor ? BoilerDoorOpen : hall ? HallOpen : DoorOpen);
+    if (door) playTone(towerDoor ? TowerOpening : boilerDoor ? BoilerDoorOpen :
+                       otherworldSound ? OtherworldDoorOpen : hall ? HallOpen : DoorOpen);
     uint32_t start = systemCounterGetTicks();
     // Let the last geometry submission retire before remapping texture VRAM.
     setBrightness(1, -16);
@@ -187,13 +193,14 @@ static void changeRoom(RoomExit exit)
         stop("Invalid school room data.");
     }
     playerEnterRoom(from, exit.stairs);
-    if (next == OtherworldCourtyard) otherworldStartIntro();
+    if (otherworldIntro) otherworldStartIntro();
     updateBoilerHum();
     // GameBoot_InGameStartup step 11 keeps the load screen for at least
     // one second, including time already spent on disc or card reads.
     while ((uint32_t)(systemCounterGetTicks()-start) < systemCounterUsecsToTicks(1000000))
         swiWaitForVBlank();
-    if (door && !towerDoor) playTone(boilerDoor ? BoilerDoorClose : hall ? HallClose : DoorClose);
+    if (door && !towerDoor) playTone(boilerDoor ? BoilerDoorClose :
+                                     otherworldSound ? OtherworldDoorClose : hall ? HallClose : DoorClose);
 }
 
 int main(void)

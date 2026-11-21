@@ -9,14 +9,16 @@ enum { FullBeam = 15 };
 static uint32_t projection[512];
 static uint16_t shading[256];
 static int beam = FullBeam, previousBeam = -1;
-static bool enabled;
+static bool enabled = true;
 static int intensity, ambient, shadedBeam;
 static Flashlight shadedLamp;
 
-void lightingReset(void)
+void lightingLoadRoom(bool newMap)
 {
-    beam = FullBeam;
-    enabled = true;
+    if (newMap) {
+        beam = FullBeam;
+        enabled = true;
+    }
     previousBeam = shadedBeam = -1;
     if (!projection[8]) {
         // H=16 in the PS1 lighting projection. The divide caps at 2.0.
@@ -119,11 +121,12 @@ static inline int screenCue(int dot, unsigned perspective)
     return cue < 2047 ? cue : 2047;
 }
 
-static inline uint16_t vertexColor(const LitPoint *v, const Flashlight *lamp)
+static inline uint16_t vertexColor(const LitPoint *v, const Flashlight *lamp,
+                                   unsigned positionShift)
 {
-    int x = (v->x >> 3)-lamp->x;
-    int y = -(v->y >> 3)-lamp->y;
-    int z = -(v->z >> 3)-lamp->z;
+    int x = (v->x >> positionShift)-lamp->x;
+    int y = -(v->y >> positionShift)-lamp->y;
+    int z = -(v->z >> positionShift)-lamp->z;
     unsigned depth = (x*x + y*y + z*z) >> 12;
     unsigned shift = depth >= 512 ? 23-__builtin_clz(depth) : 0;
     unsigned perspective = projection[depth >> shift] >> shift;
@@ -137,14 +140,14 @@ static inline uint16_t vertexColor(const LitPoint *v, const Flashlight *lamp)
 }
 
 ARM_CODE void lightingShade(const LitPoint *points, uint16_t *colors, unsigned count,
-                            const Flashlight *lamp)
+                            const Flashlight *lamp, unsigned positionShift)
 {
     if (shadedBeam == beam && (!intensity || !memcmp(&shadedLamp, lamp, sizeof *lamp)))
         return;
     shadedBeam = beam;
     shadedLamp = *lamp;
     if (intensity) {
-        for (unsigned i = 0; i < count; i++) colors[i] = vertexColor(&points[i], lamp);
+        for (unsigned i = 0; i < count; i++) colors[i] = vertexColor(&points[i], lamp, positionShift);
     } else {
         uint16_t color = shading[ambient];
         for (unsigned i = 0; i < count; i++) colors[i] = color;

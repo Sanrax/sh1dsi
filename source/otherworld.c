@@ -19,7 +19,7 @@ static struct {
 static int channels[2] = {-1, -1};
 static int16_t *voiceSamples;
 
-bool otherworldLoadIntro(FILE *file)
+bool otherworldLoadIntro(FILE *file, bool loadVoices)
 {
     if (!playerLoadCourtyardLook(file)) return false;
     for (unsigned i = 0; i < 3; i++) {
@@ -38,6 +38,8 @@ bool otherworldLoadIntro(FILE *file)
         if (lengths[i] != sectors[i]*4032u) return false;
         bytes += 2*lengths[i];
     }
+    // The courtyard return uses the same sidecar without replaying the intro.
+    if (!loadVoices) return fseek(file, bytes, SEEK_CUR) == 0;
     int16_t *samples = malloc(bytes);
     if (!samples) return false;
     if (fread(samples, 1, bytes, file) != bytes) {

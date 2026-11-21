@@ -69,6 +69,8 @@ static const DoorView doorViews[] = {
     {Courtyard, SouthHall, {-80691, -10451, -280786, -80899, -6046, -258222}},
     {Courtyard, NorthHall, {-80691, -10451, -216468, -80449, -5852, -238997}},
     {NorthHall, Courtyard, {546816, -8003, 772695, 546561, -3404, 795226}},
+    {OtherworldCourtyard, OtherworldNorthHall, {-80691, -10451, -216468, -80438, -5852, -238997}},
+    {OtherworldNorthHall, OtherworldCourtyard, {546816, -8003, 772695, 546561, -3404, 795226}},
     {UpperNorthHall, EastCorridor, {-62457, -7987, 784384, -84986, -3388, 784129}},
     {UpperNorthHall, ChemistryLab, {-118374, -7987, 789511, -118145, -3388, 766982}},
     {EastCorridor, UpperNorthHall, {-209115, -7987, 292864, -186584, -3388, 293117}},
@@ -229,7 +231,8 @@ static void advanceRoadCamera(void)
     int angle = (yaw + 2048 - 136)*8;
     int sx = x + 2*sinLerp(angle), sz = z + 2*cosLerp(angle);
     static const ChaseRoad basementRamp = {913, 913, -331, -284, ChaseAlongZ};
-    const ChaseRoad *road = room == BasementStair && x >= 57*4096 ? &basementRamp : &chaseRoads[room];
+    const ChaseRoad *road = room == BasementStair && x >= 57*4096 ? &basementRamp :
+                            &chaseRoads[room == OtherworldNorthHall ? NorthHall : room];
     int minX = road->minX*256, maxX = road->maxX*256;
     int minZ = road->minZ*256, maxZ = road->maxZ*256;
     sx = limitChaseAxis(sx, minX, maxX);
@@ -526,7 +529,7 @@ void playerEnterRoom(SchoolRoom from, const StairExit *stairs)
 {
     doorView = NULL;
     SchoolRoom to = roomCurrent();
-    if (to == OtherworldCourtyard) {
+    if (to == OtherworldCourtyard && from == FarClockTower) {
         warp(-54556, -278859, 3584);
         return;
     }
@@ -760,7 +763,8 @@ int playerSetCamera(void)
     // Its one-metre watch circle extends away from the room camera whenever
     // the distance to Harry is below four metres.
     SchoolRoom room = roomCurrent();
-    bool corridor = room == SchoolCorridor || room == SouthHall || room == NorthHall || room == UpperNorthHall;
+    bool corridor = room == SchoolCorridor || room == SouthHall || room == NorthHall ||
+                    room == UpperNorthHall || room == OtherworldNorthHall;
     bool equipment = room == EquipmentRoom;
     bool stairwell = room == EastCorridor || room == FirstFloor || room == BasementStair;
     bool boiler = room == BoilerRoom;

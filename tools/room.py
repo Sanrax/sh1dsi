@@ -26,6 +26,7 @@ ROOM_LAYOUTS = {
     22: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES | ROOM_LADDER_ASCENT,
     23: ROOM_FLOOR_PLANES,
     24: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_NORMALS,
+    25: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES | ROOM_NORMALS,
     31: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES,
 }
 
@@ -81,7 +82,7 @@ def collision_edges(ipd, room):
                 20: (-30720, -20480, 16, 3, 16, 0), 21: (-40960, -20480, 16, 3, 16, 0),
                 22: (-20480, -20480, 28, 8, 32, 0),
                 23: (-10240, -20480, 204, 61, 236, 0), 24: (-10240, -20480, 172, 31, 175, 0),
-                16: (30720, 40960, 33, 6, 34, 0),
+                16: (30720, 40960, 33, 6, 34, 0), 25: (30720, 40960, 24, 4, 24, 0),
                 33: (-10240, 40960, 40, 8, 40, 0), 34: (-20480, 20480, 38, 5, 38, 15),
                 35: (-30720, 20480, 40, 7, 40, 0)}[room]
     if (x, z, vertices, surfaces, count, cylinders) != expected:
@@ -120,6 +121,10 @@ def collision_edges(ipd, room):
             continue
         # SC0304's inner shell follows the usable hallway around its alcove.
         if room == 16 and (floor == 1 or (floor == 0 and not 5 <= i <= 12)):
+            continue
+        # SU0304 has an inner hallway shell and two locker banks. The
+        # outer shells belong to the roof and the full ground plane.
+        if room == 25 and (i < 4 or floor == 1):
             continue
         # Use the inner shell and the furniture silhouettes on both floors.
         if room == 33 and 24 <= i < 32:
@@ -172,7 +177,7 @@ def collision_edges(ipd, room):
 
     floors = bytearray()
     floor_planes = {3: (0, 1), 22: range(3, 8), 31: (11, 12), 23: (*range(37, 41), *range(50, 60)),
-                    24: (15, 16, 17, 18, 28, 29)}[room]
+                    24: (15, 16, 17, 18, 28, 29), 25: (1,)}[room]
     floor_count = 0
     for plane in floor_planes:
         edges = []
@@ -303,9 +308,9 @@ def smoke_atlas(disc):
 
 def school_room(disc, room=39):
     cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3),
-              23: (255, 254), 24: (255, 254), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
+              23: (255, 254), 24: (255, 254), 25: (3, 4), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
               3: (1, 255), 2: (0, 255), 20: (253, 254), 21: (252, 254), 22: (254, 254)}[room]
-    prefix = "SU" if room == 24 else "SC"
+    prefix = "SU" if room in (24, 25) else "SC"
     data = disc.read(f"BG/{prefix}{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -598,6 +603,23 @@ def school_room(disc, room=39):
     # so convert the texels and CLUTs together after all textured batches are known.
     for page, (name, size, cluts) in enumerate(scene_textures):
         row_keys = [{idx for idx, color in enumerate(clut) if color == 0} for clut in cluts]
+        if room == 25 and name == "SU1FT1":
+            # CLUT 4 has unused zero entries after index 10. Its tile and
+            # CLUT 0 both use index 1 for transparency.
+            offset, width, _, _ = page_info[page]
+            for (_, mat, row, flags), quads in groups.items():
+                if mat != page or row != 4 or flags & 4:
+                    continue
+                if any(not (32 <= u < 64 and 192 <= v < 224)
+                       for u, v in zip(quads[6::8], quads[7::8], strict=True)):
+                    raise ValueError("unexpected SU1FT1 transparent tile coordinates")
+            for y in range(192, 224):
+                start = offset+y*width//2+16
+                if any((b & 15) > 10 or (b >> 4) > 10 for b in pages[start:start+16]):
+                    raise ValueError("unexpected SU1FT1 transparent tile indices")
+            if row_keys[4] != {1, 11, 12, 13, 14, 15}:
+                raise ValueError("unexpected SU1FT1 tile CLUT")
+            row_keys[4] = {1}
         indices = set().union(*row_keys)
         if len(indices) > 1:
             indices = set().union(*(row_keys[row] for _, mat, row, flags in groups

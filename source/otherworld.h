@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include "player.h"
 
-bool otherworldLoadIntro(FILE *file);
+bool otherworldLoadIntro(FILE *file, bool loadVoices);
 void otherworldStartIntro(void);
 bool otherworldIntroActive(void);
 bool otherworldTickIntro(bool skip);

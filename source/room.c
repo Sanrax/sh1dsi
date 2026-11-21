@@ -39,7 +39,7 @@ static SchoolRoom current = MusicRoom;
 static RoomOrigin currentOrigin = {-100*4096, 20*4096};
 static bool handPresent, handPuzzle, wideGeometry;
 
-// MAP1_S00 and MAP1_S01 door points. Normals point into the room.
+// MAP1_S00–S02 door points. Normals point into the room.
 const Door schoolDoors[] = {
     {MusicRoom, SchoolCorridor, -417792, 97075, 0, -1, 2304},
     {SchoolCorridor, MusicRoom, -116326, 75366, 0, 1, 2304},
@@ -59,6 +59,8 @@ const Door schoolDoors[] = {
     {Courtyard, SouthHall, -80691, -282214, 0, 1, 4864},
     {Courtyard, NorthHall, -80691, -215040, 0, -1, 4864},
     {NorthHall, Courtyard, 546816, 771276, 0, 1, 4864},
+    {OtherworldCourtyard, OtherworldNorthHall, -80691, -215040, 0, -1, 4864},
+    {OtherworldNorthHall, OtherworldCourtyard, 546816, 771276, 0, 1, 4864},
     {BasementStair, BoilerRoom, 219545, -70451, 1, 0, 2304},
     {BoilerRoom, BasementStair, 93388, -79872, -1, 0, 2304}
 };
@@ -87,6 +89,7 @@ static RoomOrigin legacyRoomOrigin(SchoolRoom room)
     case ClockTower:
     case FarClockTower:
     case OtherworldCourtyard:
+    case OtherworldNorthHall:
     case TowerPassage: break; // These rooms require a stream origin.
     case SouthHall: return (RoomOrigin){140*4096, 20*4096};
     }
@@ -250,15 +253,16 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (fread(&header, sizeof header, 1, file) != 1) return false;
     bool hasOrigin = !memcmp(header.magic, "SHM2", 4);
     bool streamed = hasOrigin || !memcmp(header.magic, "SHM1", 4);
+    bool otherworld = room == OtherworldCourtyard || room == OtherworldNorthHall;
     if (!hasOrigin && (room == BasementStair || room == BoilerRoom ||
                        room == ClockTower || room == FarClockTower || room == TowerPassage ||
-                       room == OtherworldCourtyard))
+                       otherworld))
         return false;
     struct { uint8_t room, flags; uint16_t reserved; } layout = {0};
     if (streamed && (!corridor || fread(&layout, sizeof layout, 1, file) != 1 ||
                      layout.room != room || layout.reserved ||
                      (layout.flags & ~(RoomEdgeHeights | RoomFloorPlanes | RoomWideVertices | RoomGroundPlanes | RoomBoilerEvent | RoomDoorNotice | RoomLadderAscent | RoomNormals)) ||
-                     ((layout.flags & RoomNormals) && (!hasOrigin || room != OtherworldCourtyard)) ||
+                     ((layout.flags & RoomNormals) && (!hasOrigin || !otherworld)) ||
                      ((layout.flags & RoomLadderAscent) && (!hasOrigin || room != TowerPassage)) ||
                      ((layout.flags & RoomDoorNotice) && (!hasOrigin || room != ClockTower)) ||
                      ((layout.flags & RoomBoilerEvent) && (!hasOrigin || room != BoilerRoom)) ||
@@ -388,7 +392,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (boiler && !boilerLoad(file)) return false;
     if ((layout.flags & RoomDoorNotice) && !towerDoorLoad(file)) return false;
     if (room == TowerPassage && !playerLoadLadder(file, layout.flags & RoomLadderAscent)) return false;
-    if (room == OtherworldCourtyard && !otherworldLoadIntro(file)) return false;
+    if (room == OtherworldCourtyard && !otherworldLoadIntro(file, current == FarClockTower))
+        return false;
     if (room == MusicRoom && header.pages == 4 &&
         (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))
         return false;
@@ -475,7 +480,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     }
     if (pos != total) return false;
     if (lit) {
-        lightingReset();
+        lightingLoadRoom(current == FarClockTower);
     } else {
         geometryBytes = (end-geometry)*sizeof(*geometry);
         uint32_t *compact = realloc(geometry, geometryBytes);
@@ -636,7 +641,7 @@ void roomDraw(const Medallion *medal)
                          | (TEXTURE_SIZE_256 << 23) | (GL_RGB16 << 26);
         playerDraw(skin.firstPalette, fog, lit ? &lamp : NULL);
     }
-    if (lit) lightingShade(lightPoints, lightColors, lightCount, &lamp);
+    if (lit) lightingShade(lightPoints, lightColors, lightCount, &lamp, wideGeometry ? 2 : 3);
     if (wideGeometry) glScalef32(8192, 8192, 8192);
     bool visible[] = {
         [StaticBatch] = true,

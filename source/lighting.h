@@ -24,11 +24,12 @@ typedef struct {
     int dx, dy, dz;    // Q12 beam direction.
 } Flashlight;
 
-void lightingReset(void);
+void lightingLoadRoom(bool newMap);
 bool lightingTick(bool toggle);
 void lightingScreen(bool enabled, bool cinematic);
 unsigned lightingFog(void);
 uint16_t lightingActorColor(void);
-void lightingShade(const LitPoint *points, uint16_t *colors, unsigned count, const Flashlight *lamp);
+void lightingShade(const LitPoint *points, uint16_t *colors, unsigned count,
+                   const Flashlight *lamp, unsigned positionShift);
 
 #endif
