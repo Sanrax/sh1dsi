@@ -90,7 +90,10 @@ takes Harry back to the first-floor west hall. The next two doors on the
 west wall lead into the southern teachers' room. Cross that room and use
 its north door to reach the northern teachers' room. Keep to the east of
 the desk and chairs and leave by the east door near the far end to get
-past the west-hall barrier. The phone call scene is still pending.
+past the west-hall barrier. Facing the exit triggers the phone call
+automatically. A or B advances Harry's final replies. Start skips the
+scene. Run the current asset converter to get `phone.dat` and the
+updated room stream.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

@@ -48,7 +48,7 @@ def prompt_data(disc, number, *, first_floor=False, choices=True, map_bearings=F
     x = row = color = 0
     text = message(number)
     if subtitle:
-        text = re.sub(r"^~J0\([0-9.]+\)", "", text)
+        text = re.sub(r"~D|~J[01]\([0-9.]+\)", "", text)
     for token in re.findall(r"~[A-Z][0-9]?|[^\s]", text):
         if token == "~N":
             widths.append(x)
@@ -65,6 +65,8 @@ def prompt_data(disc, number, *, first_floor=False, choices=True, map_bearings=F
         elif token == "_":
             x += 6
         else:
+            # Gfx_MapMsg_StringDraw maps these punctuation marks to atlas slots.
+            token = {"!": chr(92), "&": "^"}.get(token, token)
             mask = glyph(token)
             commands.append((x, row, color, mask))
             x += advance(token, mask)

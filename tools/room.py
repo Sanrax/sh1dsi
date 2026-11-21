@@ -4,6 +4,7 @@ import math
 import struct
 
 from harry import courtyard_look_frames, ladder_frames, player_data, pour_frames
+from phone import receiver_texture
 from pickup import chemical_pickup, gold_pickup, lobby_pickups, medical_pickups, picture_card, prompt_data, silver_pickup
 from vab import statue_sound
 from xa import courtyard_voices
@@ -635,7 +636,11 @@ def school_room(disc, room=39):
         c, s = round(math.cos(angle)*4096), round(math.sin(angle)*4096)
         x, y, z = (int(v*4096)>>4 for v in (18.974, -0.9, 143.515))
         for name in (b"PHONE3_H", b"PHONE2_H"):
-            add_model(name, (c,0,s,0,4096,0,-s,0,c), (x,y,z-30720))
+            add_model(name, (c,0,s,0,4096,0,-s,0,c), (x,y,z-30720), 17)
+        receiver, clut = receiver_texture(disc)
+        page_info.append((len(pages), 64, len(palettes)//32, 1))
+        pages.extend(receiver)
+        palettes.extend(clut)
 
     if room == 26:
         tim = disc.read("ITEM/TIM00.TIM")

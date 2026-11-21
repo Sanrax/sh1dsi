@@ -8,7 +8,8 @@
 
 bool playerLoad(FILE *file, unsigned version);
 bool playerReady(void);
-typedef enum { PlayerMove, PlayerKneel, PlayerRise, PlayerPour, PlayerLookAround, PlayerScriptedWalk } PlayerAction;
+typedef enum { PlayerMove, PlayerKneel, PlayerRise, PlayerPour, PlayerLookAround, PlayerScriptedWalk,
+               PlayerScriptedTurnLeft, PlayerScriptedTurnRight } PlayerAction;
 typedef struct {
     int x, y, z, watchX, watchY, watchZ;
 } CameraPose;
@@ -40,6 +41,10 @@ bool playerLoadSlot(FILE *file);
 void playerWarpForSlot(void);
 void playerSlotFrame(unsigned frame, unsigned blend);
 void playerFinishSlot(void);
+bool playerFacingPhone(void);
+bool playerLoadPhoneAnimation(FILE *file);
+void playerPhoneFrame(bool hang, unsigned frame, unsigned blend);
+void playerFinishPhone(bool skipped);
 bool playerFacingScatteredCards(void);
 TowerPoint playerFacingTower(void);
 void playerSavePose(Checkpoint *point);
@@ -53,6 +58,7 @@ typedef struct {
 RoomExit playerDestination(bool action);
 void playerEnterRoom(SchoolRoom from, RoomExit exit);
 int playerSetCamera(void);
-void playerDraw(unsigned firstPalette, unsigned fog, Flashlight *lamp);
+void playerDraw(unsigned firstPalette, unsigned fog, Flashlight *lamp,
+                unsigned receiverTexture, unsigned receiverPalette);
 
 #endif

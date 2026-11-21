@@ -26,7 +26,8 @@ typedef struct {
 
 void lightingLoadRoom(bool newMap);
 bool lightingTick(bool toggle);
-void lightingScreen(bool enabled, bool cinematic);
+void lightingEnableFlashlight(void);
+void lightingScreen(bool enabled, int border);
 unsigned lightingFog(void);
 uint16_t lightingActorColor(void);
 void lightingShade(const LitPoint *points, uint16_t *colors, unsigned count,

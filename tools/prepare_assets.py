@@ -8,6 +8,7 @@ from pathlib import Path
 from disc import open_disc
 from harry import card_slot_frames
 from notebook import notebook_data
+from phone import phone_data
 from pickup import prompt_data
 from vab import school_bank
 from room import school_room
@@ -124,6 +125,7 @@ def prepare(cue):
         otherworld_upper_west = school_room(disc, 17)
         teachers_south = school_room(disc, 6)
         teachers_north = school_room(disc, 7)
+        phone = phone_data(disc)
         classroom_north = school_room(disc, 29)
         classroom_south = school_room(disc, 30)
     write_asset(OUTPUT.with_name("notebook.dat"), notebook)
@@ -159,6 +161,7 @@ def prepare(cue):
     write_asset(OUTPUT.with_name("otherworldupperwest.dat"), otherworld_upper_west)
     write_asset(OUTPUT.with_name("teacherssouth.dat"), teachers_south)
     write_asset(OUTPUT.with_name("teachersnorth.dat"), teachers_north)
+    write_asset(OUTPUT.with_name("phone.dat"), phone)
     write_asset(OUTPUT.with_name("classroomnorth.dat"), classroom_north)
     write_asset(OUTPUT.with_name("classroomsouth.dat"), classroom_south)
 

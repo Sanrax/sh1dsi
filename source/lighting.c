@@ -36,7 +36,12 @@ bool lightingTick(bool toggle)
     return true;
 }
 
-void lightingScreen(bool active, bool cinematic)
+void lightingEnableFlashlight(void)
+{
+    enabled = true;
+}
+
+void lightingScreen(bool active, int border)
 {
     static int backdrop = -1, previousBorder = -1;
     if (!active) {
@@ -48,7 +53,6 @@ void lightingScreen(bool active, bool cinematic)
         }
         return;
     }
-    int border = cinematic ? 19 : 6;
     if (border == previousBorder) return;
     if (backdrop < 0)
         backdrop = bgInitHidden(2, BgType_Bmp8, BgSize_B8_256x256, 4, 0);

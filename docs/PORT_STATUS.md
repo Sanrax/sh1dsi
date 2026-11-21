@@ -21,7 +21,8 @@ the east hall barrier and reach reception through the Otherworld south hall.
 Harry can use the Picture Card in reception to open the west hall.
 The women's restroom takes Harry from there to the upstairs west hall
 and back. The two first-floor teachers' rooms provide a route around
-the west-hall barrier. The original phone call remains to be ported.
+the west-hall barrier. Facing the north room's exit triggers the
+original phone call. Start skips it and returns control to Harry.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -1238,16 +1239,52 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   local data files include `teacherssouth.dat` (105,940 bytes) and
   `teachersnorth.dat` (128,100 bytes). The other 33 files match the
   previous build byte for byte.
-- The phone props are visible. The PS1 event at point 91 triggers
-  automatically, plays two original stereo XA streams, and returns
-  control with flags 98 and 122 set. The original replay measured
-  1,980 VBlanks including the scripted message hold and 155 VBlanks
-  with Start pressed early. The native event is pending.
+## Teachers' room phone call
+
+- MAP1_S02 event 14 starts automatically at point 91. The event uses
+  the original animation clips, left-hand receiver, measured camera
+  shots, timed subtitles, two stereo XA tracks and two VAB effects.
+  The native approach and fades approximate the PS1 timing. The
+  render path uses the existing DSi room lighting.
+- A focused melonDS 1.1 DSi-mode DLDI run played through both completion
+  paths. The settled X/Z and heading matched PS1 after the call and
+  after early Start skip. An early skip preserved the off flashlight
+  state. The full call turned it on. Returning through the exit did
+  not trigger the call again in either run. The event state lasts
+  for the current play session.
+- The production virtual-SD replay started at the powered-boiler
+  checkpoint. The harness resumed the same ROM at the classroom card
+  prompt and during the northern room load after reading the wrong
+  dialog counter and checking the arrival pose before loading finished. The build completed the call over virtual SD and
+  crossed into the far side of the west hall with the Picture Card
+  and reception unlock intact.
+- The original replay completed in 1,980 VBlanks with the scripted
+  reply dismissal and 155 VBlanks with early Start. The eight paired
+  DSi shots differed by 6.66–9.88 RGB values on average on a 0–255
+  scale. Audio captured from melonDS contained both stereo tracks
+  and both handset effects. The tracks' 10 ms amplitude envelopes
+  correlated 0.93–0.94 with the locally decoded PCM.
+- The DSi profiling run took 1,968 VBlanks with an earlier reply
+  dismissal. It averaged 33.126 ms across 990 render intervals,
+  with a 33.430 ms 95th percentile and a 34.920 ms maximum.
+  The PS1 replay averaged 41.373 ms across 796 intervals with
+  a 50.050 ms 95th percentile and an 83.417 ms maximum.
+  The native peak geometry was 607 polygons and 2,375 vertices,
+  with no overflow and 7.026 ms peak submission time. The DLDI
+  read and validation of the phone assets took 1.509 seconds.
+  These are emulator measurements.
+- BlocksDS 1.24.0 produced two identical unit-code-3 ROMs with 36
+  local data files. The `phone.dat` sidecar is 5,437,094 bytes and
+  the updated `teachersnorth.dat` is 130,200 bytes. The 34 other
+  data files are byte-identical. The sidecar preloads on entry until
+  the event is complete and is released on departure. It holds
+  eleven seconds of the ring that the scene cuts after 10.4 seconds,
+  plus the full dialogue track.
 
 ## Next
 
-1. Port the teachers' room phone event with the original camera, animation, audio and skip behavior.
-2. Follow the next school routes toward the Rubber Ball and rooftop puzzle.
+1. Connect the west hall to the north hall through points 80 and 56 with the original one-way latch.
+2. Follow the school route to the Rubber Ball and rooftop drain.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

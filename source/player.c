@@ -7,6 +7,7 @@
 #include "room.h"
 #include "statue.h"
 #include "otherworld.h"
+#include "phone.h"
 
 typedef struct {
     int8_t parent, rotation, translation, offset[3];
@@ -36,12 +37,12 @@ _Static_assert(sizeof(Bone) == 6 && sizeof(Vertex) == 8 &&
                sizeof(Corner) == 4 && sizeof(Batch) == 4, "player file layout");
 
 static Bone bones[18];
-enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward, Kneel, Rise, Pour, DescendLadder, AscendLadder, LookAround, SlotInsert };
-static const unsigned firstFrame[] = {0, 40, 53, 66, 89, 113, 128, 140, 189, 226, 263, 310};
-static const unsigned frameCount[] = {40, 13, 13, 23, 24, 15, 12, 49, 37, 37, 47, 21};
+enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward, Kneel, Rise, Pour, DescendLadder, AscendLadder, LookAround, SlotInsert, PhoneReach, PhoneHang };
+static const unsigned firstFrame[] = {0, 40, 53, 66, 89, 113, 128, 140, 189, 226, 263, 310, 331, 380};
+static const unsigned frameCount[] = {40, 13, 13, 23, 24, 15, 12, 49, 37, 37, 47, 21, 49, 29};
 static const unsigned frameRate[] = {10, 15, 15, 22, 23, 15, 15, 15, 18, 18, 9};
 static const unsigned blendRate[] = {5, 50, 50, 50, 20, 10, 10, 10, 10, 10, 10};
-static int8_t frames[331][156];
+static int8_t frames[409][156];
 static int ladderAge = -1;
 static int ladderHeight;
 static SchoolRoom ladderTower;
@@ -418,6 +419,21 @@ void playerSlotFrame(unsigned frame, unsigned blend)
     blendQ12 = blend;
 }
 
+bool playerLoadPhoneAnimation(FILE *file)
+{
+    unsigned count = frameCount[PhoneReach]+frameCount[PhoneHang];
+    return fread(frames+firstFrame[PhoneReach], sizeof frames[0], count, file) == count;
+}
+
+void playerPhoneFrame(bool hang, unsigned frame, unsigned blend)
+{
+    unsigned next = hang ? PhoneHang : PhoneReach;
+    if (clip != next) blendFrom = firstFrame[clip] + (frameQ12 >> 12);
+    clip = next;
+    frameQ12 = frame;
+    blendQ12 = blend;
+}
+
 bool playerLoadPour(FILE *file)
 {
     return fread(frames+firstFrame[Pour], sizeof frames[0], frameCount[Pour], file) == frameCount[Pour];
@@ -463,7 +479,8 @@ bool playerTick(int turn, int walk, PlayerAction action)
     tickFraction %= 1000000;
     static const unsigned scripted[] = {
         [PlayerKneel] = Kneel, [PlayerRise] = Rise, [PlayerPour] = Pour,
-        [PlayerLookAround] = LookAround, [PlayerScriptedWalk] = WalkForward
+        [PlayerLookAround] = LookAround, [PlayerScriptedWalk] = WalkForward,
+        [PlayerScriptedTurnLeft] = TurnLeft, [PlayerScriptedTurnRight] = TurnRight
     };
     unsigned next = action == PlayerMove ?
         locomotion(roomVersion >= 3 ? turn : 0, roomVersion >= 4 ? walk : 0, dt) : scripted[action];
@@ -510,6 +527,21 @@ void playerWarpForSlot(void)
 void playerFinishSlot(void)
 {
     warp(x, z, yaw);
+}
+
+void playerFinishPhone(bool skipped)
+{
+    static const CameraPose views[] = {
+        {88944, -8601, 589088, 68813, -2816, 585695},
+        {88798, -8601, 586579, 68667, -2816, 589973}
+    };
+    warp(skipped ? 83148 : 83294, skipped ? 587776 : 587893, 3072);
+    doorView = &views[skipped];
+    entryX = x;
+    entryZ = z;
+    roadEyeX = doorView->x;
+    roadEyeZ = doorView->z;
+    followingRoad = doorRail = false;
 }
 
 void playerFinishOtherworld(bool skipped)
@@ -717,6 +749,12 @@ static bool facingEdge(int edgeX, int edgeZ, int halfWidth, int nx, int nz)
     return abs(along) <= halfWidth * reach;
 }
 
+bool playerFacingPhone(void)
+{
+    // MAP1_S02 point 91 has an exclusive facing trigger before the door.
+    return roomCurrent() == TeachersNorth && facingEdge(95027, 595558, 2304, 1, 0);
+}
+
 bool playerStartAscent(void)
 {
     if (roomCurrent() != TowerPassage || !ladderAscentReady) return false;
@@ -883,6 +921,8 @@ int playerSetCamera(void)
         static const CameraPose view = {248176, -3399, 75120, 232529, -5939, 79216};
         return setCameraPose(&view, origin, originZ);
     }
+    CameraPose phone;
+    if (phoneView(&phone)) return setCameraPose(&phone, origin, originZ);
     if (roomIsRestroom(room)) {
         // The fixed-angle roads show opposite sides of the stall partition.
         static const CameraPose views[] = {
@@ -1040,7 +1080,9 @@ typedef struct {
     int32_t z;
 } PackedPosition;
 
-ARM_CODE void playerDraw(unsigned firstPalette, unsigned fog, Flashlight *lamp)
+
+ARM_CODE void playerDraw(unsigned firstPalette, unsigned fog, Flashlight *lamp,
+                         unsigned receiverTexture, unsigned receiverPalette)
 {
     Matrix world[18];
     static PackedPosition positions[384];
@@ -1111,6 +1153,19 @@ ARM_CODE void playerDraw(unsigned firstPalette, unsigned fog, Flashlight *lamp)
             c++;
         }
         glEnd();
+    }
+    if (receiverTexture) {
+        // WorldGfx_HeldItemDraw attaches the receiver to HarryBone_LeftHand.
+        const Matrix *hand = &world[6];
+        const int16_t (*r)[3] = hand->r;
+        m4x3 transform = {.m = {
+             r[0][0], -r[1][0], -r[2][0],
+            -r[0][1],  r[1][1],  r[2][1],
+            -r[0][2],  r[1][2],  r[2][2],
+             hand->t[0]*8, -hand->t[1]*8, -hand->t[2]*8
+        }};
+        glMultMatrix4x3(&transform);
+        phoneDrawReceiver(receiverTexture, receiverPalette, fog);
     }
     glPopMatrix(1);
 }

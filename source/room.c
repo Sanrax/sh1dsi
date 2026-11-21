@@ -8,6 +8,7 @@
 #include "statue.h"
 #include "otherworld.h"
 #include "lighting.h"
+#include "phone.h"
 
 typedef struct {
     uint32_t offset;
@@ -22,7 +23,7 @@ typedef struct {
 
 enum { StaticBatch, HangingSilverBatch, FallenSilverBatch, DrinkBatch, KitBatch, ChemicalBatch,
        IntactHandBatch, OpenHandBatch, GoldAtHandBatch, BoilerUnwiredBatch, BoilerReadyBatch, BoilerGlowBatch,
-       LobbyKitBatch, LobbyBulletsBatch, LobbyNearFanBatch, LobbyFarFanBatch, PictureCardBatch };
+       LobbyKitBatch, LobbyBulletsBatch, LobbyNearFanBatch, LobbyFarFanBatch, PictureCardBatch, PhoneDeskBatch };
 
 typedef RoomVertex Vertex;
 _Static_assert(sizeof(LitPoint) == 10 && sizeof(LitCorner) == 4, "lit room vertex layout");
@@ -408,8 +409,9 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     bool pour = room == ChemistryLab && !memcmp(header.magic, "SHL3", 4);
     bool infirmaryItems = medical || (room == Infirmary && !memcmp(header.magic, "SHI2", 4));
     enum { KeyTileBytes = 64*64/2, SmokeTileBytes = 32*128, SupplyTileBytes = 64*128/2 };
-    unsigned itemPages = pour ? 2 : chemical || infirmaryItems || lobby || pictureCard ? 1 : 0;
-    unsigned itemBytes = pour ? KeyTileBytes+SmokeTileBytes : (chemical || pictureCard) ? KeyTileBytes :
+    bool phoneRoom = room == TeachersNorth;
+    unsigned itemPages = pour ? 2 : chemical || infirmaryItems || lobby || pictureCard || phoneRoom ? 1 : 0;
+    unsigned itemBytes = pour ? KeyTileBytes+SmokeTileBytes : (chemical || pictureCard || phoneRoom) ? KeyTileBytes :
                          infirmaryItems ? 64*256/2 : lobby ? SupplyTileBytes : 0;
     unsigned itemOffset = 128*1024-itemBytes;
     if (header.textureBytes < itemBytes) return false;
@@ -554,7 +556,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     geometry = lit ? NULL : malloc(geometryBytes);
     litGeometry = lit ? malloc(total*sizeof *litGeometry) : NULL;
     if (!geometry && !litGeometry) return false;
-    unsigned maxState = pictureCard ? PictureCardBatch : lobby ? LobbyFarFanBatch : boiler ? BoilerGlowBatch : pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
+    unsigned maxState = phoneRoom ? PhoneDeskBatch : pictureCard ? PictureCardBatch : lobby ? LobbyFarFanBatch : boiler ? BoilerGlowBatch : pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
                         corridor ? StaticBatch : FallenSilverBatch;
     uint32_t *end = geometry;
     GeometryChunk *chunk = chunks;
@@ -563,7 +565,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
         if (fread(b, sizeof *b, 1, file) != 1 || b->page >= header.pages ||
             b->state > maxState || b->flags > (streamed || room == Courtyard ? 7 : 3) ||
             b->palette >= pages[b->page].palettes ||
-            ((chemical || pour) && b->page >= scenePages) ||
+            ((chemical || pour || phoneRoom) && b->page >= scenePages) ||
+            (phoneRoom && b->state != StaticBatch && b->state != PhoneDeskBatch) ||
             b->quads > (total-pos)/4)
             return false;
         if (lit) {
@@ -693,12 +696,14 @@ void roomDraw(const Medallion *medal)
     // MAP1_S01 medallion cameras. Local origin (-100, 0, 20), 2 metres/unit.
     // Screen_CutsceneCameraStateUpdate masks the 320x240 picture at y=±96.
     // Shrink the frustum with the viewport to keep the original pixel scale.
-    bool intro = otherworldIntroActive(), slot = slotActive();
-    int border = statueActive() ? (int)statueBorder() : gameplay && !intro && !slot ? 6 : 19;
+    bool intro = otherworldIntroActive(), slot = slotActive(), phone = phoneActive();
+    int border = statueActive() ? (int)statueBorder() : phone ? phoneBorder() :
+                 gameplay && !intro && !slot ? 6 : 19;
     glViewport(0, border, 255, 191-border);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    const int distance = intro ? otherworldIntroProjection() : statueCamera() || slot ? 376 : gameplay ? 224 :
+    const int distance = intro ? otherworldIntroProjection() : phone ? phoneProjection() :
+                         statueCamera() || slot ? 376 : gameplay ? 224 :
                          medal->phase == MedalHanging ? 353 : medal->projection;
     const int near = 1024; // 0.25 scene units, Q12.
     int horizontal = 160 * near / distance;
@@ -738,7 +743,14 @@ void roomDraw(const Medallion *medal)
     if (playerReady()) {
         GFX_TEX_FORMAT = (skin.offset >> 3) | (TEXTURE_SIZE_256 << 20)
                          | (TEXTURE_SIZE_256 << 23) | (GL_RGB16 << 26);
-        playerDraw(skin.firstPalette, fog, lit ? &lamp : NULL);
+        unsigned receiverTexture = 0, receiverPalette = 0;
+        if (phoneHolding()) {
+            const Page *receiver = &pages[header.pages-1];
+            receiverTexture = (receiver->offset >> 3) | (TEXTURE_SIZE_64 << 20) |
+                              (TEXTURE_SIZE_64 << 23) | (GL_RGB16 << 26);
+            receiverPalette = receiver->firstPalette;
+        }
+        playerDraw(skin.firstPalette, fog, lit ? &lamp : NULL, receiverTexture, receiverPalette);
     }
     if (lit) lightingShade(lightPoints, lightColors, lightCount, &lamp, wideGeometry ? 2 : 3);
     if (wideGeometry) glScalef32(8192, 8192, 8192);
@@ -760,6 +772,7 @@ void roomDraw(const Medallion *medal)
         [LobbyNearFanBatch] = true,
         [LobbyFarFanBatch] = true,
         [PictureCardBatch] = !pickupHidden(PictureCard),
+        [PhoneDeskBatch] = phoneDeskVisible(),
     };
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];

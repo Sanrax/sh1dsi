@@ -9,6 +9,7 @@
 #include "notebook.h"
 #include "statue.h"
 #include "otherworld.h"
+#include "phone.h"
 
 typedef struct {
     uint16_t palette[256];
@@ -233,6 +234,9 @@ static void changeRoom(RoomExit exit)
         setBrightness(1, 0);
         stop("Invalid school room data.");
     }
+    if (from == TeachersNorth) phoneUnload();
+    if (next == TeachersNorth && !phoneComplete() && !phoneLoad(assetDir))
+        stop("Missing or invalid phone.dat.\nRun the asset converter.");
     playerEnterRoom(from, exit);
     if (otherworldIntro) otherworldStartIntro();
     updateBoilerHum();
@@ -327,9 +331,15 @@ int main(void)
             int sound = -1;
             if (point.ticks != UINT32_MAX) point.ticks++;
             if (inRoom && roomHasNormals())
-                roomChanged |= lightingTick((pressed & KEY_Y) && !otherworldIntroActive() && !pickupActive() && !slotActive());
+                roomChanged |= lightingTick((pressed & KEY_Y) && !otherworldIntroActive() && !pickupActive() && !slotActive() && !phoneActive());
             if (inRoom && otherworldIntroActive()) {
                 roomChanged |= otherworldTickIntro(pressed & KEY_START);
+            } else if (inRoom && phoneActive()) {
+                roomChanged |= phoneTick(pressed);
+                if (!phoneActive()) {
+                    inspectionFadeLength = inspectionFade = PhoneReveal;
+                    setBrightness(1, -16);
+                }
             } else if (inRoom && slotActive()) {
                 roomChanged |= slotTick(pressed, playSlotSound);
                 if (!slotActive()) inspectionFadeLength = inspectionFade = SlotRevealVBlanks;
@@ -364,7 +374,11 @@ int main(void)
                 if (pickupSound != PickupQuiet) sound = pickupSounds[pickupSound];
                 if (phase == MedalDrop && medal.phase == MedalImpact)
                     sound = 9;
-                if (!wasActive && phase == medal.phase && (phase == MedalHanging || phase == MedalFinished)) {
+                bool canInteract = !wasActive && phase == medal.phase &&
+                                   (phase == MedalHanging || phase == MedalFinished);
+                if (canInteract && phoneStart()) {
+                    roomChanged = true;
+                } else if (canInteract) {
                     RoomExit exit = playerDestination(pressed & KEY_A);
                     TowerPoint tower = pressed & (KEY_A | KEY_SELECT) ? playerFacingTower() : NoTowerPoint;
                     if ((pressed & KEY_A) && tower == TowerDoor && boilerPowered())
@@ -410,7 +424,7 @@ int main(void)
                         previousTime = systemCounterGetTicks();
                         debt = step;
                     } else if ((pressed & KEY_A) && !slotUnlocked() && playerFacingSlot()) {
-                        lightingScreen(false, false);
+                        lightingScreen(false, 0);
                         inspectionFadeLength = inspectionFade = slotInspect(assetDir);
                         if (!inspectionFade) stop("Missing or invalid cardslot.dat.");
                         roomChanged = true;
@@ -454,7 +468,7 @@ int main(void)
             debt -= step;
         }
 
-        lightingScreen(inRoom && roomHasNormals(), otherworldIntroActive() || slotActive());
+        lightingScreen(inRoom && roomHasNormals(), otherworldIntroActive() || slotActive() ? 19 : phoneBorder());
         int imageIndex = inRoom ? 2 : piano.checking;
         if (inRoom && (previousImage != imageIndex || roomChanged)) {
             roomDraw(&medal);
@@ -468,6 +482,7 @@ int main(void)
         }
         if (inRoom) {
             if (roomCurrent() == OtherworldCourtyard) otherworldDrawSubtitle(bg);
+            else if (roomCurrent() == TeachersNorth) phoneDrawText(bg);
             else if (slotActive()) slotDrawPrompt(bg);
             else pickupDrawPrompt(bg);
             updateBoilerHum();
