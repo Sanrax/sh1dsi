@@ -65,6 +65,10 @@ const Door schoolDoors[] = {
     {OtherworldNorthHall, OtherworldCourtyard, 546816, 771276, 0, 1, 4864},
     {OtherworldNorthHall, OtherworldLobby, 546816, 790937, 0, -1, 4864},
     {OtherworldLobby, OtherworldNorthHall, 409600, 560332, 0, 1, 4864},
+    {OtherworldNorthHall, OtherworldSideHall, 564838, 790937, 0, -1, 2304},
+    {OtherworldSideHall, OtherworldNorthHall, 543948, 560332, 0, 1, 2304},
+    {OtherworldSideHall, OtherworldEastHall, 570163, 560332, 0, 1, 2304},
+    {OtherworldEastHall, OtherworldSideHall, 441548, 299417, 0, -1, 2304},
     {BasementStair, BoilerRoom, 219545, -70451, 1, 0, 2304},
     {BoilerRoom, BasementStair, 93388, -79872, -1, 0, 2304}
 };
@@ -108,6 +112,8 @@ static RoomOrigin legacyRoomOrigin(SchoolRoom room)
     case OtherworldCourtyard:
     case OtherworldNorthHall:
     case OtherworldLobby:
+    case OtherworldSideHall:
+    case OtherworldEastHall:
     case TowerPassage: break; // These rooms require a stream origin.
     case SouthHall: return (RoomOrigin){140*4096, 20*4096};
     }
@@ -272,7 +278,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     bool hasOrigin = !memcmp(header.magic, "SHM2", 4);
     bool streamed = hasOrigin || !memcmp(header.magic, "SHM1", 4);
     bool lobby = room == OtherworldLobby;
-    bool otherworld = room == OtherworldCourtyard || room == OtherworldNorthHall || lobby;
+    bool otherworld = room == OtherworldCourtyard || room == OtherworldNorthHall || lobby ||
+                      room == OtherworldSideHall || room == OtherworldEastHall;
     if (!hasOrigin && (room == BasementStair || room == BoilerRoom ||
                        room == ClockTower || room == FarClockTower || room == TowerPassage ||
                        otherworld))

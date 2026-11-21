@@ -14,7 +14,8 @@ door, watch or skip the Otherworld arrival scene and walk the courtyard.
 Y switches the flashlight after the scene, changing the light and fog.
 The north doors reach the Otherworld north hall and lead back to the courtyard.
 The north hall connects to the lobby, where Harry can collect the first-aid
-kit and handgun bullets and inspect the fans.
+kit and handgun bullets and inspect the fans. The north hall also connects
+through the side hall to the Otherworld east hall's barrier.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -1004,9 +1005,44 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   files. `otherworldlobby.dat` is 149,817 bytes. All 22 earlier sidecars
   are byte-identical.
 
+## Otherworld side and east halls
+
+- MAP1_S02 points 60 and 72 connect the north and side halls.
+  Points 71 and 70 connect the side and east halls. The room streams
+  use `SU0303` and `SU0201`, with original normals and collision.
+  The four arrival poses match PS1, and the flashlight state persists.
+  The uninstrumented round trips passed from the infirmary checkpoint
+  in melonDS DSi mode over DLDI with the beam on and virtual console SD
+  with it off. The lower screen stayed black in the sampled views.
+- The side hall uses the measured door cameras. In the east hall, the
+  barrier stopped Harry at Q12 Z 248412, about 2 mm from PS1. The
+  loader preserves the floor and stair planes along the adjoining
+  southern chunk. The native play route currently reaches the barrier.
+- The pair 12 opening and closing sounds use the original `BASE.VAB`
+  samples at 11,370 Hz. The instrumented melonDS replay recorded both
+  sounds on all four crossings. All 28 earlier tones remain byte-identical.
+- The PS1 measured 193 intervals at 33.37 ms and one at 16.68 ms
+  in the side hall. The east hall had 689 at 33.37 ms, 12 at 50.05 ms
+  and one at 16.68 ms. In melonDS 1.1 DSi mode the respective averages
+  were 33.356 ms across 1,123 intervals and 33.362 ms across 735.
+  Mean submission took 3.604 and 7.890 ms. The east hall peaked at
+  1,288 polygons and 5,104 vertices without overflow. DLDI setup and
+  reads took 45.01 and 55.24 ms, each including a VBlank.
+- The matched entry, barrier and return views had mean RGB errors
+  of 4.64–8.20/255. The native east hall is brighter in the sampled
+  lit views, and the chase camera remains an approximation.
+- Two fresh BlocksDS builds reproduced the TWL ROM and all 25
+  sidecars. `otherworldside.dat` is 107,150 bytes and
+  `otherworldeast.dat` is 122,135 bytes. The sound bank adds pair 12.
+  The other 22 existing files match byte for byte.
+- Three separate PS1 replay fixtures verify the classroom detour
+  through points 69, 78 and 73. The last door reaches the far side
+  of the east hall barrier. Point 29 in the first classroom starts
+  the original Picture Card event.
+
 ## Next
 
-1. Connect north hall point 60 to side hall point 72, then follow the route toward the stairs.
+1. Connect both classrooms around the east hall barrier and port the Picture Card pickup.
 2. Port the courtyard rain, fan sound and room ambience against the PS1 replay.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 

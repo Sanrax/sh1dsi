@@ -73,6 +73,10 @@ static const DoorView doorViews[] = {
     {OtherworldNorthHall, OtherworldCourtyard, {546816, -8003, 772695, 546561, -3404, 795226}},
     {OtherworldLobby, OtherworldNorthHall, {409600, -7987, 561752, 409356, -3388, 584283}},
     {OtherworldNorthHall, OtherworldLobby, {546816, -8003, 789510, 547058, -3404, 766981}},
+    {OtherworldSideHall, OtherworldNorthHall, {543744, -8601, 576307, 543976, -2816, 564018}},
+    {OtherworldNorthHall, OtherworldSideHall, {564838, -8003, 789510, 565091, -3404, 766981}},
+    {OtherworldEastHall, OtherworldSideHall, {441548, -8003, 297991, 441777, -3404, 275462}},
+    {OtherworldSideHall, OtherworldEastHall, {560912, -8601, 572802, 571566, -2816, 564423}},
     {UpperNorthHall, EastCorridor, {-62457, -7987, 784384, -84986, -3388, 784129}},
     {UpperNorthHall, ChemistryLab, {-118374, -7987, 789511, -118145, -3388, 766982}},
     {EastCorridor, UpperNorthHall, {-209115, -7987, 292864, -186584, -3388, 293117}},
@@ -190,6 +194,8 @@ static const ChaseRoad chaseRoads[MusicRoom] = {
     [Courtyard]     = {-436, -196, -1096, -848, ChaseArea},
     [OtherworldCourtyard] = {-436, -196, -1096, -848, ChaseArea},
     [OtherworldLobby] = {1572, 1572, 2188, 2272, ChaseAlongZ},
+    [OtherworldSideHall] = {2108, 2364, 2187, 2291, ChaseAlongX},
+    [OtherworldEastHall] = {1710, 1756, 964, 1169, ChaseAlongZ},
     [EastCorridor]  = {-814, -771,   684, 1168, ChaseAlongZ},
     [SchoolCorridor] = {-473, -166,   294,  345, ChaseAlongX},
     [UpperNorthHall] = {-545, -238,  3038, 3081, ChaseAlongX},
@@ -773,7 +779,8 @@ int playerSetCamera(void)
     // the distance to Harry is below four metres.
     SchoolRoom room = roomCurrent();
     bool corridor = room == SchoolCorridor || room == SouthHall || room == NorthHall ||
-                    room == UpperNorthHall || room == OtherworldNorthHall || room == OtherworldLobby;
+                    room == UpperNorthHall || room == OtherworldNorthHall || room == OtherworldLobby ||
+                    room == OtherworldSideHall || room == OtherworldEastHall;
     bool equipment = room == EquipmentRoom;
     bool stairwell = room == EastCorridor || room == FirstFloor || room == BasementStair;
     bool boiler = room == BoilerRoom;

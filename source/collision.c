@@ -23,6 +23,7 @@ typedef struct {
 _Static_assert(sizeof(FloorCorner) == 4 && sizeof(FloorEquation) == 10, "floor plane layout");
 static FloorPlane floorPlanes[14];
 static unsigned floorPlaneCount;
+static int floorMaxZ;
 static bool groundPlanes;
 static SchoolRoom floorPlaneRoom;
 enum { Radius = 1228 }; // Harry's 0.3-metre outer cylinder, Q12.
@@ -32,7 +33,7 @@ static int crossEdge(FloorCorner a, FloorCorner b, int x, int z)
     return (b.x-a.x)*(z-a.z) - (b.z-a.z)*(x-a.x);
 }
 
-static bool loadFloorPlanes(FILE *file, FloorLayout layout)
+static bool loadFloorPlanes(FILE *file, FloorLayout layout, int maxZ)
 {
     enum { Capacity = sizeof floorPlanes/sizeof floorPlanes[0] };
     bool counted = layout == CountedFloorPlanes || layout == CountedGroundPlanes;
@@ -67,11 +68,11 @@ static bool loadFloorPlanes(FILE *file, FloorLayout layout)
     for (unsigned i = 0; i < count; i++) {
         const FloorPlane *plane = &floorPlanes[i];
         const FloorEquation *eq = &plane->equation;
-        if (abs(eq->refX) > 5120 || abs(eq->refZ) > 5120 ||
+        if (abs(eq->refX) > 5120 || abs(eq->refZ) > maxZ ||
             (!counted && abs(eq->height) > 256) ||
             abs(eq->slopeX) > 4096 || abs(eq->slopeZ) > 4096) return false;
         for (unsigned j = 0; j < plane->corners; j++) {
-            if (abs(plane->corner[j].x) > 5120 || abs(plane->corner[j].z) > 5120)
+            if (abs(plane->corner[j].x) > 5120 || abs(plane->corner[j].z) > maxZ)
                 return false;
         }
         for (unsigned j = 0; j < plane->corners; j++) {
@@ -85,6 +86,7 @@ static bool loadFloorPlanes(FILE *file, FloorLayout layout)
         }
     }
     floorPlaneCount = count;
+    floorMaxZ = maxZ;
     groundPlanes = layout == CountedGroundPlanes;
     return true;
 }
@@ -123,7 +125,7 @@ bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayo
     unsigned wordsPerEdge = heightEdgeCount ? 8 : 6;
     int scale = room == MusicRoom ? 1 : 16;
     // The first-floor south wall extends 0.21 m into the adjoining chunk.
-    int maxZ = room == FirstFloor ? 21*4096 : 20*4096;
+    int maxZ = room == FirstFloor || room == OtherworldEastHall ? 21*4096 : 20*4096;
     int maxX = room == NorthHall || room == OtherworldNorthHall ? 17*4096 : 16*4096;
     for (unsigned i = 0; i < edgeCount; i++) {
         int16_t in[8] = {0};
@@ -151,7 +153,9 @@ bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayo
             cylinders[i] = (ObstacleCylinder){origin.x+16*in[0], origin.z+16*in[1], Radius+16*in[2]};
         }
     }
-    if (floorLayout != NoFloorData && !loadFloorPlanes(file, floorLayout)) return false;
+    // The east hall's stair floor extends across the southern chunk seam.
+    int floorZ = room == OtherworldEastHall ? 21*256 : 20*256;
+    if (floorLayout != NoFloorData && !loadFloorPlanes(file, floorLayout, floorZ)) return false;
     floorPlaneRoom = room;
     // Actor collision stops at the closed leaves. The facing ray can still
     // cross the threshold, and a room transition spawns beyond the radius.
@@ -184,7 +188,7 @@ Floor collisionFloor(int x, int z)
     if (floorPlaneCount && room == floorPlaneRoom) {
         RoomOrigin origin = roomOrigin();
         int localX = (x >> 4) - (origin.x >> 4), localZ = (z >> 4) - (origin.z >> 4);
-        if (abs(localX) > 5120 || abs(localZ) > 5120) return (Floor){0};
+        if (abs(localX) > 5120 || abs(localZ) > floorMaxZ) return (Floor){0};
         // Raised surfaces compete with the implicit y=0 ground. Authored
         // ground planes also cover floors below that datum (positive Y).
         Floor floor = {.height = groundPlanes ? INT_MAX : 0};

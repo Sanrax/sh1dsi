@@ -76,7 +76,7 @@ def prepare(cue):
         # USA/maps/sym.map1_s01.txt and map1_s01.yaml identify the two tables.
         offset = 0x800DD500 - 0x800C9578
         tables = overlay[offset:offset+11] + overlay[offset+12:offset+17]
-        data = (b"SHPB" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
+        data = (b"SHPC" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
                 + background(disc.read("TIM/PIANO1.TIM"))
                 + background(disc.read("TIM/PIANO2.TIM"))
                 + school_bank(disc.read("SND/MEP101.VAB"), disc.read("1ST/BASE.VAB"),
@@ -104,6 +104,8 @@ def prepare(cue):
         otherworld = school_room(disc, 24)
         otherworld_north = school_room(disc, 25)
         otherworld_lobby = school_room(disc, 26)
+        otherworld_side = school_room(disc, 27)
+        otherworld_east = school_room(disc, 28)
     write_asset(OUTPUT.with_name("notebook.dat"), notebook)
     write_asset(OUTPUT.with_name("tower.dat"), tower)
     write_asset(OUTPUT.with_name("hand.dat"), hand)
@@ -127,6 +129,8 @@ def prepare(cue):
     write_asset(OUTPUT.with_name("otherworld.dat"), otherworld)
     write_asset(OUTPUT.with_name("otherworldnorth.dat"), otherworld_north)
     write_asset(OUTPUT.with_name("otherworldlobby.dat"), otherworld_lobby)
+    write_asset(OUTPUT.with_name("otherworldside.dat"), otherworld_side)
+    write_asset(OUTPUT.with_name("otherworldeast.dat"), otherworld_east)
 
 
 def write_asset(output, data):

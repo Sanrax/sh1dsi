@@ -71,7 +71,10 @@ The double doors straight across the hall lead to the north lobby. Inside,
 face either supply on the benches and press A to inspect it. Accept or
 decline it with the same controls as the infirmary pickups. Press A at the
 far opening to read both pages of the fan warning. The lobby entrance
-returns to the north hall.
+returns to the north hall. The single door immediately
+right of the lobby double doors leads to the side hall. Walk across
+the side hall to the single door on the same wall to reach the east
+hall. The barrier blocks the east hall farther down.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

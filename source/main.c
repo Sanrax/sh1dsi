@@ -33,13 +33,13 @@ typedef struct {
 enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, DoorUnlock,
        PromptMove, PromptCancel, PromptConfirm, InsertMedallion, TowerChime,
        BoilerSwitchSound, BoilerStartSound, BoilerDoorOpen, BoilerDoorClose, BoilerHum, TowerOpening,
-       OtherworldDoorOpen, OtherworldDoorClose, ToneCount };
+       OtherworldDoorOpen, OtherworldDoorClose, SideHallOpen, SideHallClose, ToneCount };
 static const int pickupSounds[] = {
     [PickupMove] = PromptMove, [PickupCancel] = PromptCancel, [PickupConfirm] = PromptConfirm,
     [PickupBoilerSwitch] = BoilerSwitchSound, [PickupBoilerStart] = BoilerStartSound
 };
 static Tone tones[ToneCount];
-static uint8_t samples[352 * 1024] __attribute__((aligned(32)));
+static uint8_t samples[368 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
 static uint16_t humLoop;
 static const char *assetDir;
@@ -64,6 +64,8 @@ static FILE *openRoom(SchoolRoom room)
     case OtherworldCourtyard: name = "otherworld"; break;
     case OtherworldNorthHall: name = "otherworldnorth"; break;
     case OtherworldLobby: name = "otherworldlobby"; break;
+    case OtherworldSideHall: name = "otherworldside"; break;
+    case OtherworldEastHall: name = "otherworldeast"; break;
     case TowerPassage: name = "passage"; break;
     case BasementStair: name = "basement"; break;
     case BoilerRoom: name = "boiler"; break;
@@ -108,14 +110,14 @@ static bool loadPiano(void)
     assetDir = cart ? "fat:/sh1dsi" : "sd:/sh1dsi";
     if (!file)
         return false;
-    static const char versions[] = "123456789AB";
+    static const char versions[] = "123456789ABC";
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets &&
                  !memcmp(assets.magic, "SHP", 3) && assets.magic[3];
     const char *version = valid ? strchr(versions, assets.magic[3]) : NULL;
     valid = version != NULL;
     if (valid && version != versions) {
         static const unsigned counts[] = {0, 9, 10, 12, 14, 15, InsertMedallion,
-                                          BoilerSwitchSound, TowerOpening, OtherworldDoorOpen, ToneCount};
+                                          BoilerSwitchSound, TowerOpening, OtherworldDoorOpen, SideHallOpen, ToneCount};
         toneCount = counts[version-versions];
         valid = loadTones(file, toneCount);
     }
@@ -172,16 +174,29 @@ static void changeRoom(RoomExit exit)
     bool east = next == EastCorridor || from == EastCorridor;
     bool otherworldIntro = from == FarClockTower && next == OtherworldCourtyard;
     bool otherworldHall = from == OtherworldNorthHall || next == OtherworldNorthHall;
-    bool hall = east || from == Courtyard || next == Courtyard || otherworldHall ||
+    bool sideHall = from == OtherworldSideHall || next == OtherworldSideHall;
+    bool hall = east || from == Courtyard || next == Courtyard || otherworldHall || sideHall ||
                 (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
     bool towerDoor = (next == ClockTower && from == Courtyard) || otherworldIntro;
     bool door = !exit.stairs && next != TowerPassage && from != TowerPassage;
     bool boilerDoor = toneCount > BoilerDoorClose && (next == BoilerRoom || from == BoilerRoom);
-    bool otherworldSound = otherworldHall && toneCount > OtherworldDoorClose;
+    int opening = hall ? HallOpen : DoorOpen, closing = hall ? HallClose : DoorClose;
+    if (towerDoor) {
+        opening = TowerOpening;
+        closing = -1;
+    } else if (boilerDoor) {
+        opening = BoilerDoorOpen;
+        closing = BoilerDoorClose;
+    } else if (sideHall && toneCount > SideHallClose) {
+        opening = SideHallOpen;
+        closing = SideHallClose;
+    } else if (otherworldHall && toneCount > OtherworldDoorClose) {
+        opening = OtherworldDoorOpen;
+        closing = OtherworldDoorClose;
+    }
     FILE *file = openRoom(next);
     if (!file) stop("Missing room data.\nRun the asset converter.");
-    if (door) playTone(towerDoor ? TowerOpening : boilerDoor ? BoilerDoorOpen :
-                       otherworldSound ? OtherworldDoorOpen : hall ? HallOpen : DoorOpen);
+    if (door) playTone(opening);
     uint32_t start = systemCounterGetTicks();
     // Let the last geometry submission retire before remapping texture VRAM.
     setBrightness(1, -16);
@@ -200,8 +215,7 @@ static void changeRoom(RoomExit exit)
     // one second, including time already spent on disc or card reads.
     while ((uint32_t)(systemCounterGetTicks()-start) < systemCounterUsecsToTicks(1000000))
         swiWaitForVBlank();
-    if (door && !towerDoor) playTone(boilerDoor ? BoilerDoorClose :
-                                     otherworldSound ? OtherworldDoorClose : hall ? HallClose : DoorClose);
+    if (door) playTone(closing);
 }
 
 int main(void)

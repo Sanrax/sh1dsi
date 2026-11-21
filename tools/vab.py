@@ -113,4 +113,6 @@ def school_bank(map_vab, base_vab, first_floor_vab):
     tones.extend(convert_tones(first_floor_vab, [(0, 53, 127)], samples))
     # MAP1_S02's courtyard doors use BASE.VAB effects 1338 and 1339.
     tones.extend(convert_tones(base_vab, [(2, 50, 127), (2, 51, 127)], samples))
+    # The side and east hall doors use pair 12 from the same BASE.VAB.
+    tones.extend(convert_tones(base_vab, [(2, 48, 127), (2, 49, 127)], samples))
     return tones + struct.pack("<H", starts[0]) + samples

@@ -28,6 +28,8 @@ ROOM_LAYOUTS = {
     24: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_NORMALS,
     25: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES | ROOM_NORMALS,
     26: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES | ROOM_NORMALS,
+    27: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
+    28: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES | ROOM_NORMALS,
     31: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES,
 }
 
@@ -84,7 +86,8 @@ def collision_edges(ipd, room):
                 22: (-20480, -20480, 28, 8, 32, 0),
                 23: (-10240, -20480, 204, 61, 236, 0), 24: (-10240, -20480, 172, 31, 175, 0),
                 16: (30720, 40960, 33, 6, 34, 0), 25: (30720, 40960, 24, 4, 24, 0),
-                26: (20480, 30720, 61, 7, 63, 0),
+                26: (20480, 30720, 61, 7, 63, 0), 27: (30720, 30720, 16, 5, 20, 0),
+                28: (20480, 10240, 51, 13, 53, 0),
                 33: (-10240, 40960, 40, 8, 40, 0), 34: (-20480, 20480, 38, 5, 38, 15),
                 35: (-30720, 20480, 40, 7, 40, 0)}[room]
     if (x, z, vertices, surfaces, count, cylinders) != expected:
@@ -131,6 +134,13 @@ def collision_edges(ipd, room):
         # Use the lobby's inner walls, the fan opening and the benches.
         if room == 26 and (other != 255 or i in (7, 8, 9, 12, 13, 14) or floor == 2):
             continue
+        # The side hall's other splits outline the roof and its joins.
+        if room == 27 and i not in (6, 8, 9, 10, 15, 18):
+            continue
+        # SU0201's center barrier and two stair flights share the hall.
+        # The shared splits connect walkable planes.
+        if room == 28 and (other != 255 or i < 5 or floor in (1, 3, 4)):
+            continue
         # Use the inner shell and the furniture silhouettes on both floors.
         if room == 33 and 24 <= i < 32:
             continue
@@ -157,7 +167,7 @@ def collision_edges(ipd, room):
         # The top two bits of each tangent component are trigger flags.
         slope = struct.unpack_from("<2h", collision, surface+12*floor+8)
         expected_slope = {(3, 0): (-2735, 0), (31, 11): (2731, 0), (12, 7): (2778, 5), (12, 9): (-2753, 0),
-                          (22, 4): (0, 2867), (22, 6): (0, 2841)}.get((room, floor), (0, 0))
+                          (22, 4): (0, 2867), (22, 6): (0, 2841), (28, 5): (2785, 6), (28, 7): (-2740, 0)}.get((room, floor), (0, 0))
         if (tx | tz) & 0xc000 or slope != expected_slope:
             raise ValueError("unsupported school collision flags or slope")
         tx = ((tx ^ 8192) - 8192)
@@ -182,7 +192,7 @@ def collision_edges(ipd, room):
 
     floors = bytearray()
     floor_planes = {3: (0, 1), 22: range(3, 8), 31: (11, 12), 23: (*range(37, 41), *range(50, 60)),
-                    24: (15, 16, 17, 18, 28, 29), 25: (1,), 26: (2,)}[room]
+                    24: (15, 16, 17, 18, 28, 29), 25: (1,), 26: (2,), 28: range(1, 8)}[room]
     floor_count = 0
     for plane in floor_planes:
         edges = []
@@ -192,6 +202,16 @@ def collision_edges(ipd, room):
                 continue
             p, q = (struct.unpack_from("<3h", collision, vert+6*k)[::2] for k in (a, b))
             edges.append((p, q) if plane == left else (q, p))
+        if room == 28 and plane in (2, 4, 5):
+            # The floor and lower stair continue to SU0200. Close their
+            # polygon footprints where the source omits the chunk seam.
+            starts = {a for a, _ in edges}
+            ends = {b for _, b in edges}
+            start, = starts-ends
+            end, = ends-starts
+            if start[1] != -54 or end[1] != -54:
+                raise ValueError("unexpected east hall floor seam")
+            edges.append((end, start))
         if layout & ROOM_GROUND_PLANES:
             parts = convex_parts(edges)
         else:
@@ -313,9 +333,9 @@ def smoke_atlas(disc):
 
 def school_room(disc, room=39):
     cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3),
-              23: (255, 254), 24: (255, 254), 25: (3, 4), 26: (2, 3), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
+              23: (255, 254), 24: (255, 254), 25: (3, 4), 26: (2, 3), 27: (3, 3), 28: (2, 1), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
               3: (1, 255), 2: (0, 255), 20: (253, 254), 21: (252, 254), 22: (254, 254)}[room]
-    prefix = "SU" if room in (24, 25, 26) else "SC"
+    prefix = "SU" if room in (24, 25, 26, 27, 28) else "SC"
     data = disc.read(f"BG/{prefix}{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -656,7 +676,7 @@ def school_room(disc, room=39):
     # so convert the texels and CLUTs together after all textured batches are known.
     for page, (name, size, cluts) in enumerate(scene_textures):
         row_keys = [{idx for idx, color in enumerate(clut) if color == 0} for clut in cluts]
-        if room == 25 and name == "SU1FT1":
+        if room in (25, 28) and name == "SU1FT1":
             # CLUT 4 has unused zero entries after index 10. Its tile and
             # CLUT 0 both use index 1 for transparency.
             offset, width, _, _ = page_info[page]
