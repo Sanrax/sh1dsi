@@ -58,6 +58,7 @@ static FILE *openRoom(SchoolRoom room)
     case Infirmary: name = "infirmary"; break;
     case Courtyard: name = "courtyard"; break;
     case ClockTower: name = "clockroom"; break;
+    case TowerPassage: name = "passage"; break;
     case BasementStair: name = "basement"; break;
     case BoilerRoom: name = "boiler"; break;
     default: return NULL;
@@ -169,7 +170,7 @@ static void changeRoom(RoomExit exit)
     bool boilerDoor = toneCount > BoilerDoorClose && (next == BoilerRoom || from == BoilerRoom);
     FILE *file = openRoom(next);
     if (!file) stop("Missing room data.\nRun the asset converter.");
-    if (!exit.stairs) playTone(towerDoor ? TowerOpening : boilerDoor ? BoilerDoorOpen : hall ? HallOpen : DoorOpen);
+    if (!exit.stairs && next != TowerPassage) playTone(towerDoor ? TowerOpening : boilerDoor ? BoilerDoorOpen : hall ? HallOpen : DoorOpen);
     uint32_t start = systemCounterGetTicks();
     // Let the last geometry submission retire before remapping texture VRAM.
     setBrightness(1, -16);
@@ -187,7 +188,7 @@ static void changeRoom(RoomExit exit)
     // one second, including time already spent on disc or card reads.
     while ((uint32_t)(systemCounterGetTicks()-start) < systemCounterUsecsToTicks(1000000))
         swiWaitForVBlank();
-    if (!exit.stairs && !towerDoor) playTone(boilerDoor ? BoilerDoorClose : hall ? HallClose : DoorClose);
+    if (!exit.stairs && !towerDoor && next != TowerPassage) playTone(boilerDoor ? BoilerDoorClose : hall ? HallClose : DoorClose);
 }
 
 int main(void)
@@ -273,7 +274,11 @@ int main(void)
         while (debt >= step) {
             int sound = -1;
             if (point.ticks != UINT32_MAX) point.ticks++;
-            if (inRoom) {
+            if (inRoom && playerLadderActive()) {
+                roomChanged |= playerLadderTick(pressed & KEY_START);
+                if (!playerLadderActive())
+                    inspectionFadeLength = inspectionFade = LadderRevealVBlanks;
+            } else if (inRoom) {
                 MedalPhase phase = medal.phase;
                 roomChanged |= medallionTick(&medal, pressed & KEY_START);
                 int turn = 0, walk = 0;
@@ -302,7 +307,8 @@ int main(void)
                     } else if (next != roomCurrent()) {
                         inspectionFade = 0;
                         changeRoom(exit);
-                        enteringRoom = roomChanged = true;
+                        enteringRoom = !playerLadderActive();
+                        roomChanged = true;
                         previousTime = systemCounterGetTicks();
                         debt = step;
                     } else if ((pressed & KEY_SELECT) && statueStart()) {

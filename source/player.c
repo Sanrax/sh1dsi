@@ -35,12 +35,15 @@ _Static_assert(sizeof(Bone) == 6 && sizeof(Vertex) == 8 &&
                sizeof(Corner) == 4 && sizeof(Batch) == 4, "player file layout");
 
 static Bone bones[18];
-enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward, Kneel, Rise, Pour };
-static const unsigned firstFrame[] = {0, 40, 53, 66, 89, 113, 128, 140};
-static const unsigned frameCount[] = {40, 13, 13, 23, 24, 15, 12, 49};
-static const unsigned frameRate[] = {10, 15, 15, 22, 23, 15, 15, 15};
-static const unsigned blendRate[] = {5, 50, 50, 50, 20, 10, 10, 10};
-static int8_t frames[189][156];
+enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward, Kneel, Rise, Pour, DescendLadder };
+static const unsigned firstFrame[] = {0, 40, 53, 66, 89, 113, 128, 140, 189};
+static const unsigned frameCount[] = {40, 13, 13, 23, 24, 15, 12, 49, 37};
+static const unsigned frameRate[] = {10, 15, 15, 22, 23, 15, 15, 15, 18};
+static const unsigned blendRate[] = {5, 50, 50, 50, 20, 10, 10, 10, 10};
+static int8_t frames[226][156];
+static int ladderAge = -1;
+static int ladderHeight;
+enum { LadderMotion = 5, LadderFadeOut = 216, LadderEnd = 264 };
 static Vertex vertices[384];
 static Corner corners[1500];
 static Batch batches[30];
@@ -77,7 +80,8 @@ static const DoorView doorViews[] = {
     {FirstFloor, BasementStair, {442003, -5049, 182974, 451525, 736, 173841}}
 };
 static const CameraPose *doorView;
-static bool eastLabRoad;
+static bool eastLabRoad, northPassageRoad;
+enum { PassageRoadSplit = -243712 }; // Q4(-59.5 m), converted to Q12.
 enum { EquipmentAisleSplit = -407552 };
 
 static int limitToRoad(int value, int low, int high)
@@ -198,6 +202,18 @@ static void advanceRoadCamera(void)
         // MAP1_S01 switches between two stationary chase roads in the lab.
         int split = -246784;
         eastLabRoad = x > split + (eastLabRoad ? -1433 : 1433);
+        return;
+    }
+    if (room == TowerPassage) {
+        northPassageRoad = z > PassageRoadSplit + (northPassageRoad ? -1433 : 1433);
+        // MAP1_S00 uses a west-side rail and a stationary road at the
+        // ramp. Keep the moving eye on its side of the actor clearance.
+        const int minZ = -258048, maxZ = -237984, railX = -248832;
+        int along = 2*cosLerp((yaw+2048-136)*8);
+        int ideal = limitToRoad(z+along, minZ, maxZ) - z;
+        int offset = chaseAxisOffset(ideal, railX-x, roadEyeZ-z, cosLerp(yaw*8), sinLerp(yaw*8));
+        int target = limitToRoad(z+offset, minZ, maxZ);
+        roadEyeZ += limitToRoad((target-roadEyeZ)/7, -288, 288);
         return;
     }
     if (room == MusicRoom || room == ClockTower) return;
@@ -337,6 +353,17 @@ bool playerLoadPour(FILE *file)
     return fread(frames+firstFrame[Pour], sizeof frames[0], frameCount[Pour], file) == frameCount[Pour];
 }
 
+bool playerLoadLadder(FILE *file)
+{
+    return fread(frames+firstFrame[DescendLadder], sizeof frames[0],
+                 frameCount[DescendLadder], file) == frameCount[DescendLadder];
+}
+
+bool playerLadderActive(void)
+{
+    return ladderAge >= 0;
+}
+
 bool playerActionDone(PlayerAction action)
 {
     return clip == (action == PlayerKneel ? Kneel : Rise) &&
@@ -384,6 +411,34 @@ static void warp(int worldX, int worldZ, int heading)
     frameQ12 = blendQ12 = 0;
 }
 
+bool playerLadderTick(bool skip)
+{
+    if (++ladderAge >= LadderEnd || (skip && ladderAge >= LadderMotion)) {
+        ladderAge = -1;
+        warp(-245760, -260915, 0);
+        roadEyeZ = -259584;
+        northPassageRoad = false;
+        setBrightness(1, -16);
+        return true;
+    }
+
+    int motion = ladderAge - LadderMotion;
+    // The PS1 updates the climb and clip on alternating VBlanks.
+    bool moved = motion >= 0 && !(motion & 1);
+    if (moved) {
+        unsigned steps = (unsigned)motion/2+1;
+        ladderHeight = -9420 + (int)(steps*4021/100);
+        frameQ12 = steps*136*frameRate[DescendLadder] % (frameCount[DescendLadder]*4096);
+    }
+    int darkness = 0;
+    if (ladderAge < LadderMotion + LadderRevealVBlanks)
+        darkness = 16 * (LadderMotion + LadderRevealVBlanks - ladderAge) / LadderRevealVBlanks;
+    else if (ladderAge > LadderFadeOut)
+        darkness = 16 * (ladderAge-LadderFadeOut) / (LadderEnd-LadderFadeOut);
+    setBrightness(1, -limitToRoad(darkness, 0, 16));
+    return moved;
+}
+
 void playerWarpForMedal(void)
 {
     warp(-100*4096, 82329, 3840);
@@ -417,6 +472,14 @@ void playerEnterRoom(SchoolRoom from, const StairExit *stairs)
     if (to == ClockTower && from == Courtyard) {
         // MAP1_S00 point 20, with the inward offset from SysState_LoadRoom.
         warp(-409600, -244121, 2048);
+        return;
+    }
+    if (to == TowerPassage && from == ClockTower) {
+        // MAP1_S00 point 23 and ladder-down callback.
+        warp(-230768, -225689, 0);
+        clip = DescendLadder;
+        ladderHeight = -9420;
+        ladderAge = 0;
         return;
     }
     for (unsigned j = 0; j < sizeof doorViews/sizeof doorViews[0]; j++) {
@@ -474,6 +537,8 @@ void playerEnterRoom(SchoolRoom from, const StairExit *stairs)
     }
 }
 
+static bool facingEdge(int edgeX, int edgeZ, int halfWidth, int nx, int nz);
+
 RoomExit playerDestination(bool action)
 {
     SchoolRoom room = roomCurrent();
@@ -484,6 +549,9 @@ RoomExit playerDestination(bool action)
             return (RoomExit){exit->to, exit};
     }
     if (!action || roomVersion < 5) return (RoomExit){room, NULL};
+    // MAP1_S00 point 19, facing south toward the hatch.
+    if (room == ClockTower && facingEdge(-409600, -249036, 2048, 0, -1))
+        return (RoomExit){TowerPassage, NULL};
     int rayX = sinLerp(yaw*8)/2, rayZ = cosLerp(yaw*8)/2;
     for (unsigned i = 0; i < schoolDoorCount; i++) {
         const Door *d = &schoolDoors[i];
@@ -627,6 +695,28 @@ int playerSetCamera(void)
         static const CameraPose view = {-409088, -11008, -246784, -411040, 5248, -246304};
         return setCameraPose(&view, origin, originZ);
     }
+    if (room == TowerPassage) {
+        if (playerLadderActive()) {
+            static const CameraPose ladder = {-231055, -23224, -226877, -231014, -7659, -221839};
+            return setCameraPose(&ladder, origin, originZ);
+        }
+        if (northPassageRoad) {
+            // The stationary north road looks downhill across both ramps.
+            CameraPose view = {-245760, -6400 + ground/10, -252672,
+                               x + sinLerp(yaw*8), ground-2304, z + cosLerp(yaw*8)};
+            return setCameraPose(&view, origin, originZ);
+        }
+        int dx = x+248832, dz = z-roadEyeZ;
+        int distance = sqrt32(dx*dx + dz*dz);
+        int extra = 4*4096-distance;
+        CameraPose view = {-248832, -1536, roadEyeZ,
+                           x + sinLerp(yaw*8), ground-5632, z + cosLerp(yaw*8)};
+        if (distance && extra > 0) {
+            view.watchX += dx*extra/distance;
+            view.watchZ += dz*extra/distance;
+        }
+        return setCameraPose(&view, origin, originZ);
+    }
     if (lab && statueCamera()) {
         static const CameraPose pour = {-244162, -1679, 399278, -240025, -9379, 413163};
         return setCameraPose(&pour, origin, originZ);
@@ -757,7 +847,8 @@ ARM_CODE void playerDraw(unsigned firstPalette)
     glPushMatrix();
     // PS1 bone coordinates are in Q8. Convert root pose to room-local DS units.
     RoomOrigin origin = roomOrigin();
-    glTranslatef32(((x >> 4)-(origin.x >> 4))*8, -collisionFloor(x, z).height/2,
+    int height = playerLadderActive() ? ladderHeight : collisionFloor(x, z).height;
+    glTranslatef32(((x >> 4)-(origin.x >> 4))*8, -height/2,
                    ((origin.z >> 4)-(z >> 4))*8);
     glRotateYi(-yaw*8);
     glPolyFmt(POLY_ALPHA(31) | POLY_CULL_FRONT);

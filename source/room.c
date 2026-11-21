@@ -84,7 +84,8 @@ static RoomOrigin legacyRoomOrigin(SchoolRoom room)
     case NorthHall: return (RoomOrigin){140*4096, 180*4096};
     case BasementStair:
     case BoilerRoom:
-    case ClockTower: break; // These rooms require a stream origin.
+    case ClockTower:
+    case TowerPassage: break; // These rooms require a stream origin.
     case SouthHall: return (RoomOrigin){140*4096, 20*4096};
     }
     return (RoomOrigin){0, 20*4096};
@@ -214,7 +215,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (fread(&header, sizeof header, 1, file) != 1) return false;
     bool hasOrigin = !memcmp(header.magic, "SHM2", 4);
     bool streamed = hasOrigin || !memcmp(header.magic, "SHM1", 4);
-    if (!hasOrigin && (room == BasementStair || room == BoilerRoom || room == ClockTower)) return false;
+    if (!hasOrigin && (room == BasementStair || room == BoilerRoom || room == ClockTower || room == TowerPassage))
+        return false;
     struct { uint8_t room, flags; uint16_t reserved; } layout = {0};
     if (streamed && (!corridor || fread(&layout, sizeof layout, 1, file) != 1 ||
                      layout.room != room || layout.reserved ||
@@ -346,6 +348,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (latchText && !latchLoad(file)) return false;
     if (boiler && !boilerLoad(file)) return false;
     if ((layout.flags & RoomDoorNotice) && !towerDoorLoad(file)) return false;
+    if (room == TowerPassage && !playerLoadLadder(file)) return false;
     if (room == MusicRoom && header.pages == 4 &&
         (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))
         return false;

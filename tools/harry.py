@@ -12,6 +12,15 @@ def pour_frames(disc):
     return frames
 
 
+def ladder_frames(disc):
+    # MAP1_S00 state 88 uses clip 50, frames 910 through 946.
+    source = disc.read("ANIM/HB_M1S00.ANM")
+    frames = source[(910-676)*156:(947-676)*156]
+    if len(frames) != 37*156:
+        raise ValueError("incomplete Harry ladder animation")
+    return frames
+
+
 def player_data(disc):
     model = disc.read("CHARA/HERO.ILM")
     _, models, headers, order = struct.unpack_from("<4I", model, 4)

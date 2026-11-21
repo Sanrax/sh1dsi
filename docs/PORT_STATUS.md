@@ -8,7 +8,8 @@ room, and Harry can return the same way. The switch powers the boiler after
 Harry places the silver medallion, and the infirmary notebook saves that state.
 The courtyard connects the southern and northern halls.
 Harry can inspect the clock tower door and place both medallions. With the
-boiler powered he can enter the tower and walk up to the ladder hatch.
+boiler powered he can enter the tower, descend its ladder and walk the
+underground passage to the next ladder.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -807,14 +808,41 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   capture. Mean RGB error in the matched entry view is about 23.7/255,
   and the native interior is darker. Source extraction and the BlocksDS
   ROM reproduced across two builds. The 16 other sidecars are byte-identical.
-- The `clock-passage` PS1 replay on `diagnostics/dsi` descends from point 19
-  into room 22. The ladder callback runs for 264 VBlanks and finishes at
-  Q12 X/Z (−245760, −260915), yaw 0. The native ladder and passage are pending.
+## Underground passage
+
+- Point 19 opens the tower hatch. Point 23 streams room 22, the original
+  `SCFEFE` chunk, with Harry's 37-frame ladder clip. The descent freezes
+  movement, runs for 264 simulation steps and can be skipped with Start.
+  Both paths restore control at PS1 Q12 X/Z (−245760, −260915), yaw 0.
+- The passage uses two camera roads, five authored floor planes and the
+  inner shaft boundaries. Both ladder stops agree with the PS1 replay
+  within 0.01 metre. The far landing is 0.60 metre below the entry floor.
+- Two independent BlocksDS builds reproduced the ROM and 19 sidecars.
+  The 18 existing data files matched byte for byte. The new
+  `passage.dat` is 107,571 bytes.
+- PS1 buffer changes during the descent gave 129 intervals at 33.37 ms
+  and one at 50.05 ms. Walking and standing in the passage gave 424 at
+  33.37 ms and 43 at 50.05 ms.
+- The full descent passed in melonDS 1.1 DSi mode over DLDI. The virtual
+  console SD replay skipped the descent with Start. Both crossed the
+  passage in both directions with a black lower screen. The standalone
+  BlocksDS depth-fog sample also ran in DSi mode.
+- The melonDS profile averaged 33.430 ms over 129 ladder frame intervals
+  and 33.348 ms over 408 passage intervals. Mean ARM9 submission times
+  were 1.593 and 1.844 ms. Geometry RAM peaked at 797 polygons and
+  3,121 vertices across both views, with no overflow.
+- The native camera easing and fade steps approximate the original. Three
+  resampled reference views gave mean RGB errors of 12.24 to 19.81 on
+  a 0–255 scale, with darker native walls. The original passage ambience
+  and movement audio remain pending.
+- The two PS1 ascent replays on `diagnostics/dsi` reach room 20 in 369
+  VBlanks and room 21 in 370 VBlanks from the start of their callback,
+  including the destination load. Both ascents remain pending on DSi.
 
 ## Next
 
-1. Port the tower ladder descent and connect the underground passage.
-2. Verify the far end of the passage and the next school transition.
+1. Port both ladder ascents and load the far clock tower.
+2. Verify the exit from the far tower and the next school overlay.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

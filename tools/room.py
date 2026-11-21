@@ -3,7 +3,7 @@ from collections import defaultdict
 import math
 import struct
 
-from harry import player_data, pour_frames
+from harry import ladder_frames, player_data, pour_frames
 from pickup import chemical_pickup, gold_pickup, medical_pickups, prompt_data, silver_pickup
 from vab import statue_sound
 
@@ -19,6 +19,7 @@ ROOM_LAYOUTS = {
     2: ROOM_BOILER_EVENT,
     3: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES,
     20: ROOM_DOOR_NOTICE,
+    22: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES,
     23: ROOM_FLOOR_PLANES,
     31: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES,
 }
@@ -72,7 +73,8 @@ def collision_edges(ipd, room):
                 39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
                 31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0),
                 13: (30720, 0, 80, 12, 80, 0), 9: (10240, 30720, 45, 11, 49, 0),
-                20: (-30720, -20480, 16, 3, 16, 0), 23: (-10240, -20480, 204, 61, 236, 0),
+                20: (-30720, -20480, 16, 3, 16, 0), 22: (-20480, -20480, 28, 8, 32, 0),
+                23: (-10240, -20480, 204, 61, 236, 0),
                 16: (30720, 40960, 33, 6, 34, 0),
                 33: (-10240, 40960, 40, 8, 40, 0), 34: (-20480, 20480, 38, 5, 38, 15),
                 35: (-30720, 20480, 40, 7, 40, 0)}[room]
@@ -104,6 +106,10 @@ def collision_edges(ipd, room):
         # The outer roof perimeter lies beyond the playable shaft walls.
         if room == 20 and i < 4:
             continue
+        # Passable ground joins at shared edges. The inner shaft ledges
+        # can block movement from the passage even though their tops cannot.
+        if room == 22 and ((floor < 3 and i not in (4, 6, 10, 12)) or other != 255):
+            continue
         if room == 13 and floor in (3, 4):
             continue
         # SC0304's inner shell follows the usable hallway around its alcove.
@@ -130,7 +136,8 @@ def collision_edges(ipd, room):
         bx, by, bz = struct.unpack_from("<3h", collision, vert+6*b)
         # The top two bits of each tangent component are trigger flags.
         slope = struct.unpack_from("<2h", collision, surface+12*floor+8)
-        expected_slope = {(3, 0): (-2735, 0), (31, 11): (2731, 0), (12, 7): (2778, 5), (12, 9): (-2753, 0)}.get((room, floor), (0, 0))
+        expected_slope = {(3, 0): (-2735, 0), (31, 11): (2731, 0), (12, 7): (2778, 5), (12, 9): (-2753, 0),
+                          (22, 4): (0, 2867), (22, 6): (0, 2841)}.get((room, floor), (0, 0))
         if (tx | tz) & 0xc000 or slope != expected_slope:
             raise ValueError("unsupported school collision flags or slope")
         tx = ((tx ^ 8192) - 8192)
@@ -154,7 +161,7 @@ def collision_edges(ipd, room):
         return output
 
     floors = bytearray()
-    floor_planes = {3: (0, 1), 31: (11, 12), 23: (*range(37, 41), *range(50, 60))}[room]
+    floor_planes = {3: (0, 1), 22: range(3, 8), 31: (11, 12), 23: (*range(37, 41), *range(50, 60))}[room]
     floor_count = 0
     for plane in floor_planes:
         edges = []
@@ -286,7 +293,7 @@ def smoke_atlas(disc):
 def school_room(disc, room=39):
     cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3),
               23: (255, 254), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
-              3: (1, 255), 2: (0, 255), 20: (253, 254)}[room]
+              3: (1, 255), 2: (0, 255), 20: (253, 254), 22: (254, 254)}[room]
     data = disc.read(f"BG/SC{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -313,18 +320,23 @@ def school_room(disc, room=39):
         page_info.append((len(pages), words*4, len(palettes)//32, rows))
         cluts = list(struct.iter_unpack("<16H", tim[20:20 + rows*32]))
         pixels = bytearray(tim[image+12:image+size])
+        regions = ()
         if room == 23 and name == "SC1FSE2":
-            # The two tree and window palettes have different transparent
-            # indices, but their tiles occupy separate rectangles on the page.
-            for row, key, rect in ((2, 14, (0, 63, 0, 127)), (4, 15, (64, 159, 0, 63))):
-                if {j for j, value in enumerate(cluts[row]) if not value} != {key}:
-                    raise ValueError("unexpected courtyard cutout palette")
-                remapped_regions[i, row] = rect
-                left, right, top, bottom = rect
-                for y in range(top, bottom+1):
-                    for j in range(y*words*2+left//2, y*words*2+right//2+1):
-                        pixels[j] ^= key | key << 4
-                cluts[row] = tuple(cluts[row][j ^ key] for j in range(16))
+            # The tree and window palettes each have their own cutout index.
+            regions = ((2, 14, 0, (0, 63, 0, 127)), (4, 15, 0, (64, 159, 0, 63)))
+        if room == 22 and name == "SC1FURA2":
+            # The end-wall tile can share the shaft palette's cutout index.
+            regions = ((5, 2, 15, (128, 239, 208, 255)),)
+        for row, key, target, rect in regions:
+            if {j for j, value in enumerate(cluts[row]) if not value} != {key}:
+                raise ValueError("unexpected cutout palette")
+            remapped_regions[i, row] = rect
+            left, right, top, bottom = rect
+            mask = key ^ target
+            for y in range(top, bottom+1):
+                for j in range(y*words*2+left//2, y*words*2+right//2+1):
+                    pixels[j] ^= mask | mask << 4
+            cluts[row] = tuple(cluts[row][j ^ mask] for j in range(16))
         if room == 23 and name == "SC1FSEH":
             # The last CLUT is unreferenced in this IPD.
             cluts = cluts[:7]
@@ -385,7 +397,7 @@ def school_room(disc, room=39):
                         else:
                             valid = max(us) < left or min(us) > right or max(vs) < top or min(vs) > bottom
                         if not valid:
-                            raise ValueError("courtyard texture region overlaps a different palette")
+                            raise ValueError("texture region overlaps a different palette")
                 flags = (face[7] >> 7) | (color_keys[mat][row] << 1) | (untextured << 2)
                 group = groups[state, mat, row, flags]
                 start = len(group)
@@ -499,6 +511,8 @@ def school_room(disc, room=39):
                              for n in (29, 30, 31))
         elif room == 20:
             extra = prompt_data(disc, 21, first_floor=True, choices=False, map_bearings=True)
+        elif room == 22:
+            extra = ladder_frames(disc)
         elif room == 9:
             extra = medical_pickups(disc)
         elif room == 12:

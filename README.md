@@ -20,11 +20,9 @@ python3 tools/prepare_assets.py "/path/to/Silent Hill (USA).cue"
 ```
 
 Run `make sdcard` after conversion. Copy the contents of `dist/` to the
-card root. The directory includes the ROM and fifteen local data files. Keep
-the generated game data on your own devices.
-
-For the poster fixes, replace `/sh1dsi/room.dat` and
-`/sh1dsi/firstfloor.dat` on the card with the regenerated files.
+card root. The directory includes the ROM and its local runtime data. Keep the
+generated game data on your own devices. Rerun the converter when updating an
+existing installation.
 
 The build starts with Harry standing at Midwich's piano. Up and Down walk forward and backward.
 Left and Right turn him. Face the keys and press A to inspect the piano, then A again
@@ -61,9 +59,9 @@ place it. Inspect the clock again to see the new reading.
 Take the first-floor stairs to the basement and face the boiler switch.
 Press A to operate it. The silver medallion placement enables the switch.
 Once the boiler is running, face the clock tower door and press A to enter.
-The door is one-way. This build reaches the ladder hatch inside the tower.
-Rerun the asset converter when updating an existing installation to get the
-clock tower room, boiler sounds and switch, and room fixes.
+The door is one-way. Walk to the hatch and press A to descend into the passage.
+Start skips the climb once Harry begins moving. The ladders back out of the
+passage are pending.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left
