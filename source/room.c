@@ -34,7 +34,7 @@ static struct {
     uint32_t textureBytes, paletteBytes;
 } header;
 static Page pages[4], skin;
-enum { RoomEdgeHeights = 1, RoomFloorPlanes = 2, RoomWideVertices = 4 };
+enum { RoomEdgeHeights = 1, RoomFloorPlanes = 2, RoomWideVertices = 4, RoomGroundPlanes = 8 };
 static SchoolRoom current = MusicRoom;
 static RoomOrigin currentOrigin = {-100*4096, 20*4096};
 static bool handPresent, handPuzzle, wideGeometry;
@@ -212,7 +212,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     struct { uint8_t room, flags; uint16_t reserved; } layout = {0};
     if (streamed && (!corridor || fread(&layout, sizeof layout, 1, file) != 1 ||
                      layout.room != room || layout.reserved ||
-                     (layout.flags & ~(RoomEdgeHeights | RoomFloorPlanes | RoomWideVertices))))
+                     (layout.flags & ~(RoomEdgeHeights | RoomFloorPlanes | RoomWideVertices | RoomGroundPlanes)) ||
+                     ((layout.flags & RoomGroundPlanes) && (!hasOrigin || !(layout.flags & RoomFloorPlanes)))))
         return false;
     RoomOrigin origin;
     if (hasOrigin) {
@@ -242,7 +243,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (streamed) {
         magic = hasOrigin ? "SHM2" : "SHM1";
         edgeLayout = layout.flags & RoomEdgeHeights ? HeightEdges : CountedEdges;
-        if (layout.flags & RoomFloorPlanes) floorLayout = CountedFloorPlanes;
+        if (layout.flags & RoomFloorPlanes)
+            floorLayout = layout.flags & RoomGroundPlanes ? CountedGroundPlanes : CountedFloorPlanes;
     } else if (room == Courtyard) {
         magic = "SHY1";
         floorLayout = LegacyWalkways;

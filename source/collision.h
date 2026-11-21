@@ -3,7 +3,8 @@
 #include "room.h"
 #include <stdio.h>
 
-typedef enum { NoFloorData, LegacyWalkways, LegacyCourtyardFloors, CountedFloorPlanes } FloorLayout;
+typedef enum { NoFloorData, LegacyWalkways, LegacyCourtyardFloors, CountedFloorPlanes,
+               CountedGroundPlanes } FloorLayout;
 typedef enum { LegacyEdges, ExpandedEdges, CountedEdges, HeightEdges } EdgeLayout;
 bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayout floorLayout,
                    RoomOrigin origin);

@@ -429,6 +429,28 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   The shifted virtual SD replay also passed the route. Its entry capture
   differed at 214 of 49,152 pixels, with a mean channel error of 0.042/255.
 
+### Streamed stair floors
+
+- Room streams can use ground planes above or below the map datum. The
+  eastern stairwell now reads its ramp and landing from three floor
+  records. The converter splits the concave landing along an internal
+  edge. The stream grows by 79 bytes. The older eastern stream uses the
+  previous floor equations.
+- An independent host check matched the IPD floor boundaries and
+  equations across 1,346,321 samples. The prior rectangular approximation
+  differed at 65,676 of those points, including points outside walkable
+  space. The other 14 sidecars and 2,012,876 sampled courtyard floor
+  results matched the previous release.
+- The DLDI and virtual console SD routes climbed and descended the
+  eastern ramp and matched both PS1 stair arrival poses. DLDI repeated
+  the route with the previous stream. The PS1 replay recorded 416 frame
+  intervals of two VBlanks (33.37 ms) during eastern stairwell gameplay.
+- The boiler room materials total 80 KiB and 22 palette rows, within the
+  current allocation. Over 662 camera samples from the original route,
+  host frustum clipping of the static mesh peaked at 762 polygons and
+  3,061 vertices, including backfaces. The native route still needs a GPU
+  RAM measurement with Harry and the switch in view.
+
 ### Texture palette conversion
 
 - When a texture page has multiple transparency indices, the converter

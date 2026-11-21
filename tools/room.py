@@ -11,11 +11,51 @@ from vab import statue_sound
 ROOM_EDGE_HEIGHTS = 1
 ROOM_FLOOR_PLANES = 2
 ROOM_WIDE_VERTICES = 4
+ROOM_GROUND_PLANES = 8
 
 ROOM_LAYOUTS = {
     23: ROOM_FLOOR_PLANES,
-    31: ROOM_EDGE_HEIGHTS | ROOM_WIDE_VERTICES,
+    31: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES,
 }
+
+
+def convex_parts(edges):
+    # Follow the authored edges. Sorting around a centre can change a concave footprint.
+    successors = dict(edges)
+    if len(successors) != len(edges):
+        raise ValueError("branched floor boundary")
+    start = min(successors)
+    corners = [start]
+    while corners[-1] in successors:
+        end = successors.pop(corners[-1])
+        if end == start:
+            break
+        corners.append(end)
+    if end != start or successors:
+        raise ValueError("open or disconnected floor boundary")
+
+    def cross(a, b, p):
+        return (b[0]-a[0])*(p[1]-a[1]) - (b[1]-a[1])*(p[0]-a[0])
+
+    if sum(cross((0, 0), a, b) for a, b in zip(corners, corners[1:]+corners[:1])) < 0:
+        corners.reverse()
+    # Emit an ear only when necessary. Convex footprints use one record.
+    while len(corners) > 3:
+        triples = list(zip(corners[-1:]+corners[:-1], corners, corners[1:]+corners[:1]))
+        if all(cross(*triangle) > 0 for triangle in triples):
+            break
+        for index, (a, b, c) in enumerate(triples):
+            if cross(a, b, c) > 0 and not any(
+                    p not in (a, b, c) and cross(a, b, p) >= 0 and cross(b, c, p) >= 0 and cross(c, a, p) >= 0
+                    for p in corners):
+                yield (a, b, c)
+                del corners[index]
+                break
+        else:
+            raise ValueError("invalid ground floor footprint")
+    if len(corners) < 3 or cross(*corners[:3]) <= 0:
+        raise ValueError("degenerate ground floor footprint")
+    yield corners
 
 
 def collision_edges(ipd, room):
@@ -98,26 +138,35 @@ def collision_edges(ipd, room):
         return output
 
     floors = bytearray()
-    floor_planes = (*range(37, 41), *range(50, 60))
+    floor_planes = (11, 12) if room == 31 else (*range(37, 41), *range(50, 60))
+    floor_count = 0
     for plane in floor_planes:
-        corners = set()
+        edges = []
         for i in range(count):
             a, b, left, right = struct.unpack_from("4B", collision, polygon+10*i+6)
-            if plane in (left, right):
-                corners.update(struct.unpack_from("<3h", collision, vert+6*k)[::2] for k in (a, b))
-        corner_count = len(corners)
-        if not 3 <= corner_count <= 8:
-            raise ValueError("unsupported floor boundary size")
-        center_x = sum(x for x, _ in corners)
-        center_z = sum(z for _, z in corners)
-        # Store the convex floor's corners in winding order for the ARM9 test.
-        floors.append(corner_count)
-        for x, z in sorted(corners, key=lambda p: math.atan2(corner_count*p[1]-center_z,
-                                                           corner_count*p[0]-center_x)):
-            floors.extend(struct.pack("<2h", x-5120, z-5120))
+            if plane not in (left, right) or left == right:
+                continue
+            p, q = (struct.unpack_from("<3h", collision, vert+6*k)[::2] for k in (a, b))
+            edges.append((p, q) if plane == left else (q, p))
+        if layout & ROOM_GROUND_PLANES:
+            parts = convex_parts(edges)
+        else:
+            corners = set(point for edge in edges for point in edge)
+            center_x = sum(x for x, _ in corners)
+            center_z = sum(z for _, z in corners)
+            n = len(corners)
+            parts = (sorted(corners, key=lambda p: math.atan2(n*p[1]-center_z, n*p[0]-center_x)),)
         xref, y, zref, _, sx, sz = struct.unpack_from("<3hH2h", collision, surface+12*plane)
-        floors.extend(struct.pack("<5h", xref-5120, y, zref-5120, sx, sz))
-    return output + struct.pack("<H", len(floor_planes)) + floors
+        equation = struct.pack("<5h", xref-5120, y, zref-5120, sx, sz)
+        for part in parts:
+            if not 3 <= len(part) <= 8:
+                raise ValueError("unsupported floor boundary size")
+            floors.append(len(part))
+            for x, z in part:
+                floors.extend(struct.pack("<2h", x-5120, z-5120))
+            floors.extend(equation)
+            floor_count += 1
+    return output + struct.pack("<H", floor_count) + floors
 
 
 def model_directory(data):

@@ -1,5 +1,6 @@
 // Local XZ collision on the school floors. Edges and tangent vectors
 // come from the IPD splits used by the original character query.
+#include <limits.h>
 #include <nds.h>
 #include "collision.h"
 
@@ -22,6 +23,7 @@ typedef struct {
 _Static_assert(sizeof(FloorCorner) == 4 && sizeof(FloorEquation) == 10, "floor plane layout");
 static FloorPlane floorPlanes[14];
 static unsigned floorPlaneCount;
+static bool groundPlanes;
 static SchoolRoom floorPlaneRoom;
 enum { Radius = 1228 }; // Harry's 0.3-metre outer cylinder, Q12.
 
@@ -33,6 +35,7 @@ static int crossEdge(FloorCorner a, FloorCorner b, int x, int z)
 static bool loadFloorPlanes(FILE *file, FloorLayout layout)
 {
     enum { Capacity = sizeof floorPlanes/sizeof floorPlanes[0] };
+    bool counted = layout == CountedFloorPlanes || layout == CountedGroundPlanes;
     uint16_t count = 14; // SHY2 stores a fixed number of records.
     if (layout == LegacyWalkways) {
         // SHY1 stores only the rectangular or trapezoidal entrance walkways.
@@ -48,12 +51,12 @@ static bool loadFloorPlanes(FILE *file, FloorLayout layout)
             };
         }
     } else {
-        if (layout == CountedFloorPlanes && fread(&count, sizeof count, 1, file) != 1) return false;
+        if (counted && fread(&count, sizeof count, 1, file) != 1) return false;
         if (!count || count > Capacity) return false;
         for (unsigned i = 0; i < count; i++) {
             FloorPlane *plane = &floorPlanes[i];
             plane->corners = 4;
-            if (layout == CountedFloorPlanes && fread(&plane->corners, 1, 1, file) != 1)
+            if (counted && fread(&plane->corners, 1, 1, file) != 1)
                 return false;
             if (plane->corners < 3 || plane->corners > sizeof plane->corner/sizeof plane->corner[0] ||
                 fread(plane->corner, sizeof(FloorCorner), plane->corners, file) != plane->corners ||
@@ -65,7 +68,7 @@ static bool loadFloorPlanes(FILE *file, FloorLayout layout)
         const FloorPlane *plane = &floorPlanes[i];
         const FloorEquation *eq = &plane->equation;
         if (abs(eq->refX) > 5120 || abs(eq->refZ) > 5120 ||
-            (layout != CountedFloorPlanes && abs(eq->height) > 256) ||
+            (!counted && abs(eq->height) > 256) ||
             abs(eq->slopeX) > 4096 || abs(eq->slopeZ) > 4096) return false;
         for (unsigned j = 0; j < plane->corners; j++) {
             if (abs(plane->corner[j].x) > 5120 || abs(plane->corner[j].z) > 5120)
@@ -82,6 +85,7 @@ static bool loadFloorPlanes(FILE *file, FloorLayout layout)
         }
     }
     floorPlaneCount = count;
+    groundPlanes = layout == CountedGroundPlanes;
     return true;
 }
 
@@ -180,8 +184,10 @@ Floor collisionFloor(int x, int z)
     if (floorPlaneCount && room == floorPlaneRoom) {
         RoomOrigin origin = roomOrigin();
         int localX = (x >> 4) - (origin.x >> 4), localZ = (z >> 4) - (origin.z >> 4);
-        Floor floor = {0};
-        if (abs(localX) > 5120 || abs(localZ) > 5120) return floor;
+        if (abs(localX) > 5120 || abs(localZ) > 5120) return (Floor){0};
+        // Raised surfaces compete with the implicit y=0 ground. Authored
+        // ground planes also cover floors below that datum (positive Y).
+        Floor floor = {.height = groundPlanes ? INT_MAX : 0};
         for (unsigned i = 0; i < floorPlaneCount; i++) {
             const FloorPlane *plane = &floorPlanes[i];
             if (!floorContains(plane, localX, localZ)) continue;
@@ -191,7 +197,7 @@ Floor collisionFloor(int x, int z)
             if (height*16 < floor.height)
                 floor = (Floor){.height = height*16, .slopeX = eq->slopeX, .slopeZ = eq->slopeZ};
         }
-        return floor;
+        return floor.height == INT_MAX ? (Floor){0} : floor;
     }
     if (room == FirstFloor) {
         // SC0201 surfaces 8/9 lead upstairs, while 4/7 descend south of
