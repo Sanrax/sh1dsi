@@ -14,6 +14,8 @@ ROOM_WIDE_VERTICES = 4
 ROOM_GROUND_PLANES = 8
 
 ROOM_LAYOUTS = {
+    2: 0,
+    3: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES,
     23: ROOM_FLOOR_PLANES,
     31: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES,
 }
@@ -63,7 +65,8 @@ def collision_edges(ipd, room):
     edge_heights = layout is not None and layout & ROOM_EDGE_HEIGHTS
     collision = memoryview(ipd)[0x54:]
     x, z, vertices, surfaces, count, cylinders, vert, surface, polygon = struct.unpack_from("<ii4B3I", collision)
-    expected = {39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
+    expected = {2: (0, -10240, 35, 9, 43, 0), 3: (10240, -10240, 25, 4, 26, 0),
+                39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
                 31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0),
                 13: (30720, 0, 80, 12, 80, 0), 9: (10240, 30720, 45, 11, 49, 0),
                 23: (-10240, -20480, 204, 61, 236, 0), 16: (30720, 40960, 33, 6, 34, 0),
@@ -87,6 +90,12 @@ def collision_edges(ipd, room):
             continue
         # The upper and basement stair flights share this first-floor chunk.
         if room == 12 and (floor in (0, 1, 2, 10, 11) or other != 255):
+            continue
+        # The boiler obstacles have shared internal splits. The basement
+        # ramp meets the flat floor at edge zero, with a ceiling above both.
+        if room == 2 and other != 255:
+            continue
+        if room == 3 and (i == 0 or floor == 3 or other != 255):
             continue
         if room == 13 and floor in (3, 4):
             continue
@@ -114,7 +123,7 @@ def collision_edges(ipd, room):
         bx, by, bz = struct.unpack_from("<3h", collision, vert+6*b)
         # The top two bits of each tangent component are trigger flags.
         slope = struct.unpack_from("<2h", collision, surface+12*floor+8)
-        expected_slope = {(31, 11): (2731, 0), (12, 7): (2778, 5), (12, 9): (-2753, 0)}.get((room, floor), (0, 0))
+        expected_slope = {(3, 0): (-2735, 0), (31, 11): (2731, 0), (12, 7): (2778, 5), (12, 9): (-2753, 0)}.get((room, floor), (0, 0))
         if (tx | tz) & 0xc000 or slope != expected_slope:
             raise ValueError("unsupported school collision flags or slope")
         tx = ((tx ^ 8192) - 8192)
@@ -138,7 +147,7 @@ def collision_edges(ipd, room):
         return output
 
     floors = bytearray()
-    floor_planes = (11, 12) if room == 31 else (*range(37, 41), *range(50, 60))
+    floor_planes = {3: (0, 1), 31: (11, 12), 23: (*range(37, 41), *range(50, 60))}[room]
     floor_count = 0
     for plane in floor_planes:
         edges = []
@@ -269,7 +278,8 @@ def smoke_atlas(disc):
 
 def school_room(disc, room=39):
     cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3),
-              23: (255, 254), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2)}[room]
+              23: (255, 254), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
+              3: (1, 255), 2: (0, 255)}[room]
     data = disc.read(f"BG/SC{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -344,7 +354,7 @@ def school_room(disc, room=39):
                 mat = face[7] & 127
                 row = int.from_bytes(face[2:4], "little") >> 6
                 v_offset = 0
-                untextured = room == 23 and mat == 127
+                untextured = mat == 127
                 if untextured:
                     # Model_MaterialFlagsApply uses the no-material sentinel.
                     mat = row = 0

@@ -3,7 +3,9 @@
 Harry starts at the Midwich piano. He can solve the keyboard puzzle, watch
 or skip the falling silver medallion, decline or accept it, walk through the
 eastern hallway, descend the stairs, unlatch the first-floor door and enter
-the southern hallway. The courtyard connects the southern and northern halls.
+the southern hallway. The first-floor stairs reach the basement and boiler
+room, and Harry can return the same way.
+The courtyard connects the southern and northern halls.
 Harry can inspect the clock tower door and both medallion slots.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
@@ -448,8 +450,30 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - The boiler room materials total 80 KiB and 22 palette rows, within the
   current allocation. Over 662 camera samples from the original route,
   host frustum clipping of the static mesh peaked at 762 polygons and
-  3,061 vertices, including backfaces. The native route still needs a GPU
-  RAM measurement with Harry and the switch in view.
+  3,061 vertices, including backfaces.
+
+### Basement route
+
+- The first-floor stair triggers, boiler door and return route use the
+  original MAP1_S00 room links. The converter reads both room chunks from
+  the owner’s disc. The 101,974-byte stair stream has 581 quads and two
+  ground planes. The 133,030-byte boiler stream has 1,556 quads. Both fit
+  the existing 80 KiB scenery texture allocation.
+- DSi-mode DLDI and virtual console SD replays retained the infirmary
+  inventory and latch and matched all four PS1 arrival poses. The ramp
+  reaches Q12 Y 0 at the foot and −7,328 at the landing. The closed boiler
+  door and machinery stop movement. Both replays kept the lower screen black.
+- Two fresh BlocksDS builds yielded identical ROMs and all 17 room and
+  event sidecars. The 15 existing sidecars match the previous release.
+- Over 455 scene intervals from boiler entry to the machinery in melonDS
+  DSi mode, mean frame time was 33.36 ms (16.68–33.49 ms), and mean ARM9
+  submission time was 1.85 ms. Geometry RAM peaked at 693 polygons and
+  2,717 vertices with Harry visible and no overflow. Hardware timing and
+  the switch event itself still need measurement.
+- The matched DLDI and PS1 entry and return captures had mean RGB errors
+  of 18.62–22.30/255 across four views. Lighting and moving cameras still
+  differ from PS1, and the boiler door uses the standard native door pair.
+  The switch event is pending.
 
 ### Texture palette conversion
 
@@ -724,8 +748,8 @@ boiler switch event.
 
 ## Next
 
-1. Port both medallion placement events and the filled clock views.
-2. Connect the boiler room and verify the switch that unlocks the clock tower.
+1. Finish medallion placement and implement the boiler switch and door sounds.
+2. Connect the powered clock tower door and verify its arrival.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

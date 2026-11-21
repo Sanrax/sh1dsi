@@ -95,6 +95,8 @@ def prepare(cue):
         equipment = school_room(disc, 35)
         courtyard = school_room(disc, 23)
         infirmary = school_room(disc, 9)
+        basement = school_room(disc, 3)
+        boiler = school_room(disc, 2)
     write_asset(OUTPUT.with_name("notebook.dat"), notebook)
     write_asset(OUTPUT.with_name("tower.dat"), tower)
     write_asset(OUTPUT.with_name("hand.dat"), hand)
@@ -110,6 +112,8 @@ def prepare(cue):
     write_asset(OUTPUT.with_name("equipment.dat"), equipment)
     write_asset(OUTPUT.with_name("courtyard.dat"), courtyard)
     write_asset(OUTPUT.with_name("infirmary.dat"), infirmary)
+    write_asset(OUTPUT.with_name("basement.dat"), basement)
+    write_asset(OUTPUT.with_name("boiler.dat"), boiler)
 
 
 def write_asset(output, data):

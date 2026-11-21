@@ -54,6 +54,8 @@ static FILE *openRoom(SchoolRoom room)
     case EquipmentRoom: name = "equipment"; break;
     case Infirmary: name = "infirmary"; break;
     case Courtyard: name = "courtyard"; break;
+    case BasementStair: name = "basement"; break;
+    case BoilerRoom: name = "boiler"; break;
     default: return NULL;
     }
     char path[40];

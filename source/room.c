@@ -58,7 +58,9 @@ const Door schoolDoors[] = {
     {SouthHall, Courtyard, 573440, 95027, 0, -1, 4864},
     {Courtyard, SouthHall, -80691, -282214, 0, 1, 4864},
     {Courtyard, NorthHall, -80691, -215040, 0, -1, 4864},
-    {NorthHall, Courtyard, 546816, 771276, 0, 1, 4864}
+    {NorthHall, Courtyard, 546816, 771276, 0, 1, 4864},
+    {BasementStair, BoilerRoom, 219545, -70451, 1, 0, 2304},
+    {BoilerRoom, BasementStair, 93388, -79872, -1, 0, 2304}
 };
 const unsigned schoolDoorCount = sizeof schoolDoors/sizeof schoolDoors[0];
 
@@ -80,6 +82,8 @@ static RoomOrigin legacyRoomOrigin(SchoolRoom room)
     case FirstFloor: return (RoomOrigin){100*4096, 60*4096};
     case Infirmary: return (RoomOrigin){60*4096, 140*4096};
     case NorthHall: return (RoomOrigin){140*4096, 180*4096};
+    case BasementStair:
+    case BoilerRoom: break; // These rooms require a stream origin.
     case SouthHall: return (RoomOrigin){140*4096, 20*4096};
     }
     return (RoomOrigin){0, 20*4096};
@@ -209,6 +213,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (fread(&header, sizeof header, 1, file) != 1) return false;
     bool hasOrigin = !memcmp(header.magic, "SHM2", 4);
     bool streamed = hasOrigin || !memcmp(header.magic, "SHM1", 4);
+    if (!hasOrigin && (room == BasementStair || room == BoilerRoom)) return false;
     struct { uint8_t room, flags; uint16_t reserved; } layout = {0};
     if (streamed && (!corridor || fread(&layout, sizeof layout, 1, file) != 1 ||
                      layout.room != room || layout.reserved ||
