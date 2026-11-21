@@ -36,6 +36,7 @@ static struct {
 static Page pages[4], skin;
 enum { RoomEdgeHeights = 1, RoomFloorPlanes = 2, RoomWideVertices = 4 };
 static SchoolRoom current = MusicRoom;
+static RoomOrigin currentOrigin = {-100*4096, 20*4096};
 static bool handPresent, handPuzzle, wideGeometry;
 
 // MAP1_S00 and MAP1_S01 door points. Normals point into the room.
@@ -64,31 +65,24 @@ const unsigned schoolDoorCount = sizeof schoolDoors/sizeof schoolDoors[0];
 SchoolRoom roomCurrent(void) { return current; }
 bool roomHasHand(void) { return current == ChemistryLab && handPresent; }
 bool roomCanDissolveHand(void) { return current == ChemistryLab && handPuzzle; }
-int roomOriginX(SchoolRoom room)
+RoomOrigin roomOrigin(void) { return currentOrigin; }
+
+static RoomOrigin legacyRoomOrigin(SchoolRoom room)
 {
     switch (room) {
-    case MusicRoom:
-    case EquipmentRoom: return -100*4096;
-    case Courtyard:
-    case UpperNorthHall:
-    case SchoolCorridor: return -20*4096;
-    case ChemistryLab:
-    case EastCorridor: return -60*4096;
-    case FirstFloor: return 100*4096;
-    case Infirmary: return 60*4096;
-    case NorthHall:
-    case SouthHall: return 140*4096;
+    case MusicRoom: return (RoomOrigin){-100*4096, 20*4096};
+    case EquipmentRoom: return (RoomOrigin){-100*4096, 100*4096};
+    case Courtyard: return (RoomOrigin){-20*4096, -60*4096};
+    case UpperNorthHall: return (RoomOrigin){-20*4096, 180*4096};
+    case SchoolCorridor: return (RoomOrigin){-20*4096, 20*4096};
+    case ChemistryLab: return (RoomOrigin){-60*4096, 100*4096};
+    case EastCorridor: return (RoomOrigin){-60*4096, 60*4096};
+    case FirstFloor: return (RoomOrigin){100*4096, 60*4096};
+    case Infirmary: return (RoomOrigin){60*4096, 140*4096};
+    case NorthHall: return (RoomOrigin){140*4096, 180*4096};
+    case SouthHall: return (RoomOrigin){140*4096, 20*4096};
     }
-    return 0;
-}
-
-int roomOriginZ(SchoolRoom room)
-{
-    if (room == Infirmary) return 140*4096;
-    if (room == NorthHall || room == UpperNorthHall) return 180*4096;
-    if (room == ChemistryLab || room == EquipmentRoom) return 100*4096;
-    if (room == Courtyard) return -60*4096;
-    return (room == EastCorridor || room == FirstFloor ? 60 : 20)*4096;
+    return (RoomOrigin){0, 20*4096};
 }
 
 enum { MaxBatches = 128, MaxRoomVertices = 11000, ChunkQuads = 32 };
@@ -213,12 +207,25 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (room == EquipmentRoom) magic = "SHQ1";
     if (room == Infirmary) magic = "SHI1";
     if (fread(&header, sizeof header, 1, file) != 1) return false;
-    bool streamed = !memcmp(header.magic, "SHM1", 4);
+    bool hasOrigin = !memcmp(header.magic, "SHM2", 4);
+    bool streamed = hasOrigin || !memcmp(header.magic, "SHM1", 4);
     struct { uint8_t room, flags; uint16_t reserved; } layout = {0};
     if (streamed && (!corridor || fread(&layout, sizeof layout, 1, file) != 1 ||
                      layout.room != room || layout.reserved ||
                      (layout.flags & ~(RoomEdgeHeights | RoomFloorPlanes | RoomWideVertices))))
         return false;
+    RoomOrigin origin;
+    if (hasOrigin) {
+        int32_t q8[2];
+        // Allow room for signed Q12 translations and local wall coordinates.
+        const int limit = INT32_MAX/32;
+        if (fread(q8, sizeof q8, 1, file) != 1 ||
+            q8[0] < -limit || q8[0] > limit || q8[1] < -limit || q8[1] > limit)
+            return false;
+        origin = (RoomOrigin){16*q8[0], 16*q8[1]};
+    } else {
+        origin = legacyRoomOrigin(room);
+    }
     bool firstFloorObstacles = room == FirstFloor && !memcmp(header.magic, "SHF3", 4);
     bool southHallObstacles = room == SouthHall && !memcmp(header.magic, "SHS2", 4);
     bool countedFirstFloor = room == FirstFloor && !memcmp(header.magic, "SHF4", 4);
@@ -233,7 +240,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
         edgeLayout = ExpandedEdges;
     FloorLayout floorLayout = NoFloorData;
     if (streamed) {
-        magic = "SHM1";
+        magic = hasOrigin ? "SHM2" : "SHM1";
         edgeLayout = layout.flags & RoomEdgeHeights ? HeightEdges : CountedEdges;
         if (layout.flags & RoomFloorPlanes) floorLayout = CountedFloorPlanes;
     } else if (room == Courtyard) {
@@ -324,7 +331,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     vramSetBankC(VRAM_C_TEXTURE_SLOT0);
     vramSetBankE(VRAM_E_TEX_PALETTE);
     if ((corridor || header.magic[3] >= '4') &&
-        !collisionLoad(file, room, edgeLayout, floorLayout)) return false;
+        !collisionLoad(file, room, edgeLayout, floorLayout, origin)) return false;
     if (latchText && !latchLoad(file)) return false;
     if (room == MusicRoom && header.pages == 4 &&
         (pages[3].width != 256 || pages[3].palettes != 15 || !playerLoad(file, header.magic[3]-'0')))
@@ -388,6 +395,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (compact) geometry = compact;
     DC_FlushRange(geometry, geometryBytes);
     visibilityValid = false;
+    currentOrigin = origin;
     current = room;
     wideGeometry = streamed ? (layout.flags & RoomWideVertices) != 0 :
                    room == EastCorridor || room == FirstFloor || room == NorthHall;

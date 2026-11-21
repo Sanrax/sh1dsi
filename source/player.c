@@ -588,7 +588,8 @@ int playerSetCamera(void)
     bool courtyard = room == Courtyard;
     bool lab = room == ChemistryLab;
     int ground = collisionFloor(x, z).height;
-    int origin = roomOriginX(room), originZ = roomOriginZ(room);
+    RoomOrigin roomOffset = roomOrigin();
+    int origin = roomOffset.x, originZ = roomOffset.z;
     if (lab && statueCamera()) {
         static const CameraPose pour = {-244162, -1679, 399278, -240025, -9379, 413163};
         return setCameraPose(&pour, origin, originZ);
@@ -717,8 +718,9 @@ ARM_CODE void playerDraw(unsigned firstPalette)
 
     glPushMatrix();
     // PS1 bone coordinates are in Q8. Convert root pose to room-local DS units.
-    SchoolRoom room = roomCurrent();
-    glTranslatef32(((x-roomOriginX(room)) >> 4)*8, -collisionFloor(x, z).height/2, ((roomOriginZ(room) >> 4)-(z >> 4))*8);
+    RoomOrigin origin = roomOrigin();
+    glTranslatef32(((x >> 4)-(origin.x >> 4))*8, -collisionFloor(x, z).height/2,
+                   ((origin.z >> 4)-(z >> 4))*8);
     glRotateYi(-yaw*8);
     glPolyFmt(POLY_ALPHA(31) | POLY_CULL_FRONT);
     const Corner *c = corners;

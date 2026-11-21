@@ -414,7 +414,7 @@ def school_room(disc, room=39):
             add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-10240, y>>4, (z>>4)-30720), state,
                       item_page=page)
     if room != 39:
-        magic = b"SHM1" if layout is not None else {
+        magic = b"SHM2" if layout is not None else {
             9: b"SHI3", 12: b"SHF4", 13: b"SHS2", 16: b"SHU1", 32: b"SHC1",
             33: b"SHH1", 34: b"SHL3", 35: b"SHQ2"
         }[room]
@@ -484,7 +484,8 @@ def school_room(disc, room=39):
 
     result = bytearray(struct.pack("<4sHHII", magic, len(page_info), len(groups), len(pages), len(palettes)))
     if layout is not None:
-        result.extend(struct.pack("<BBH", room, layout, 0))
+        chunk_x, chunk_z = struct.unpack_from("<ii", data, 0x54)
+        result.extend(struct.pack("<BBHii", room, layout, 0, chunk_x+5120, chunk_z+5120))
     for page in page_info:
         result.extend(struct.pack("<IHHI", *page))
     result.extend(pages)

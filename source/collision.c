@@ -102,7 +102,8 @@ static unsigned legacyEdgeCount(SchoolRoom room, EdgeLayout layout)
     }
 }
 
-bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayout floorLayout)
+bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayout floorLayout,
+                   RoomOrigin origin)
 {
     cylinderCount = 0;
     floorPlaneCount = 0;
@@ -117,7 +118,6 @@ bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayo
     heightEdgeCount = edgeLayout == HeightEdges ? count : 0;
     unsigned wordsPerEdge = heightEdgeCount ? 8 : 6;
     int scale = room == MusicRoom ? 1 : 16;
-    int originX = roomOriginX(room), originZ = roomOriginZ(room);
     // The first-floor south wall extends 0.21 m into the adjoining chunk.
     int maxZ = room == FirstFloor ? 21*4096 : 20*4096;
     int maxX = room == NorthHall ? 17*4096 : 16*4096;
@@ -133,10 +133,10 @@ bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayo
             return false;
         if (heightEdgeCount && (e->ax-e->bx)*e->tx + (e->az-e->bz)*e->tz <= 0)
             return false;
-        e->ax += originX;
-        e->bx += originX;
-        e->az += originZ;
-        e->bz += originZ;
+        e->ax += origin.x;
+        e->bx += origin.x;
+        e->az += origin.z;
+        e->bz += origin.z;
     }
     if (room == ChemistryLab) {
         cylinderCount = sizeof cylinders/sizeof cylinders[0];
@@ -144,7 +144,7 @@ bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayo
             int16_t in[3];
             if (fread(in, sizeof in, 1, file) != 1 || abs(in[0]) > 5120 || abs(in[1]) > 5120 ||
                 in[2] <= 0 || in[2] >= 256) return false;
-            cylinders[i] = (ObstacleCylinder){originX+16*in[0], originZ+16*in[1], Radius+16*in[2]};
+            cylinders[i] = (ObstacleCylinder){origin.x+16*in[0], origin.z+16*in[1], Radius+16*in[2]};
         }
     }
     if (floorLayout != NoFloorData && !loadFloorPlanes(file, floorLayout)) return false;
@@ -178,8 +178,10 @@ Floor collisionFloor(int x, int z)
 {
     SchoolRoom room = roomCurrent();
     if (floorPlaneCount && room == floorPlaneRoom) {
-        int localX = (x-roomOriginX(room)) >> 4, localZ = (z-roomOriginZ(room)) >> 4;
+        RoomOrigin origin = roomOrigin();
+        int localX = (x >> 4) - (origin.x >> 4), localZ = (z >> 4) - (origin.z >> 4);
         Floor floor = {0};
+        if (abs(localX) > 5120 || abs(localZ) > 5120) return floor;
         for (unsigned i = 0; i < floorPlaneCount; i++) {
             const FloorPlane *plane = &floorPlanes[i];
             if (!floorContains(plane, localX, localZ)) continue;

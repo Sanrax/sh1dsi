@@ -18,8 +18,8 @@ extern const unsigned schoolDoorCount;
 SchoolRoom roomCurrent(void);
 bool roomHasHand(void);
 bool roomCanDissolveHand(void);
-int roomOriginX(SchoolRoom room);
-int roomOriginZ(SchoolRoom room);
+typedef struct { int x, z; } RoomOrigin; // Q12 world coordinates.
+RoomOrigin roomOrigin(void);
 bool roomLoad(FILE *file, SchoolRoom room);
 bool roomLoadShared(FILE *file);
 void roomDraw(const Medallion *medal);

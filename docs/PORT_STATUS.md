@@ -414,6 +414,21 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   the normal vertex scale. They contain 581 and 1,556 static quads.
   The boiler room still needs a peak visible-vertex measurement.
 
+### Room origins
+
+- The eastern stairwell and courtyard streams now store their IPD-derived
+  world origins. The new header adds eight bytes and keeps the existing
+  geometry and collision payloads. The loader still reads earlier headers.
+- In melonDS DSi mode the stairwell round trip passed on DLDI with both
+  header versions, with 16 distinct pixel-identical captures. The virtual
+  console SD courtyard route crossed the ramp and returned. Its entry
+  capture matched the previous release pixel for pixel. The arrival and
+  return poses matched the 59.94 Hz PS1 replay.
+- Shifting the courtyard origin by two metres in a fixture preserved
+  1,640,961 sampled floor results and 412,164 collision moves exactly.
+  The shifted virtual SD replay also passed the route. Its entry capture
+  differed at 214 of 49,152 pixels, with a mean channel error of 0.042/255.
+
 ### Texture palette conversion
 
 - When a texture page has multiple transparency indices, the converter
