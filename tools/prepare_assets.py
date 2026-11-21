@@ -76,7 +76,7 @@ def prepare(cue):
         # USA/maps/sym.map1_s01.txt and map1_s01.yaml identify the two tables.
         offset = 0x800DD500 - 0x800C9578
         tables = overlay[offset:offset+11] + overlay[offset+12:offset+17]
-        data = (b"SHP9" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
+        data = (b"SHPA" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
                 + background(disc.read("TIM/PIANO1.TIM"))
                 + background(disc.read("TIM/PIANO2.TIM"))
                 + school_bank(disc.read("SND/MEP101.VAB"), disc.read("1ST/BASE.VAB"),
@@ -98,6 +98,7 @@ def prepare(cue):
         infirmary = school_room(disc, 9)
         basement = school_room(disc, 3)
         boiler = school_room(disc, 2)
+        clock_room = school_room(disc, 20)
     write_asset(OUTPUT.with_name("notebook.dat"), notebook)
     write_asset(OUTPUT.with_name("tower.dat"), tower)
     write_asset(OUTPUT.with_name("hand.dat"), hand)
@@ -115,6 +116,7 @@ def prepare(cue):
     write_asset(OUTPUT.with_name("infirmary.dat"), infirmary)
     write_asset(OUTPUT.with_name("basement.dat"), basement)
     write_asset(OUTPUT.with_name("boiler.dat"), boiler)
+    write_asset(OUTPUT.with_name("clockroom.dat"), clock_room)
 
 
 def write_asset(output, data):

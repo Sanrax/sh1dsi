@@ -7,6 +7,8 @@ typedef enum { PickupQuiet, PickupMove, PickupCancel, PickupConfirm,
                PickupBoilerSwitch, PickupBoilerStart } PickupSound;
 
 bool latchLoad(FILE *file);
+bool towerDoorLoad(FILE *file);
+void towerDoorStart(void);
 bool boilerLoad(FILE *file);
 void boilerStart(void);
 bool boilerPowered(void);

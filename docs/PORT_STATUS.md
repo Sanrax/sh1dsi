@@ -7,7 +7,8 @@ the southern hallway. The first-floor stairs reach the basement and boiler
 room, and Harry can return the same way. The switch powers the boiler after
 Harry places the silver medallion, and the infirmary notebook saves that state.
 The courtyard connects the southern and northern halls.
-Harry can inspect the clock tower door and place both medallions.
+Harry can inspect the clock tower door and place both medallions. With the
+boiler powered he can enter the tower and walk up to the ladder hatch.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -776,16 +777,44 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   room-based volume and fixed pan. A separate melonDS DSi fixture verified
   all five effects against the emulated channel sample rates, lengths and
   repeat settings and observed nonzero mixer output. Spatial falloff and
-  PS1 lighting remain pending. The tower door still needs its powered route.
+  PS1 lighting remain pending.
   [melonDS audio state](https://github.com/melonDS-emu/melonDS/blob/1.1/src/SPU.cpp)
 - Two BlocksDS builds reproduced the ROM and all 17 sidecars. The 20
   pre-existing sounds from the medallion build matched byte for byte.
   A DLDI smoke test also loaded a checkpoint with the older SHP7 data.
 
+## Clock tower entrance
+
+- MAP1_S00 points 13 and 20 connect the courtyard and the one-way tower
+  entrance. The powered door streams the original interior and plays
+  the entrance sample. The courtyard inspection is available while the
+  boiler is off. The door inside gives the original closed-door message.
+- The interior uses the original fixed camera and shaft boundaries. The
+  51,476-byte room stream includes 486 quads, 12 collision edges and one
+  32 KiB texture page. The arrival pose matches PS1 at Q12 X/Z
+  (−409600, −244121), yaw 2048. The wall, door and hatch stops are all
+  within 0.01 metre of the corresponding PS1 blocking coordinates.
+- Both powered routes passed in melonDS 1.1 DSi mode over DLDI and virtual
+  console SD. The DLDI run confirmed the 14,998 Hz opening sample in the
+  emulated sound channel. A second DLDI run kept the door locked with power
+  off while using the previous SHP9 sound bank.
+- On the PS1, 702 of 707 measured frame intervals in room 20 were two
+  VBlanks (33.37 ms). The other five were one VBlank (16.68 ms).
+- The melonDS DSi profile averaged 33.35 ms across 221 frame intervals
+  (16.72–33.44 ms). Mean ARM9 submission time was 1.48 ms. Geometry RAM
+  peaked at 526 polygons and 2,062 vertices without overflow.
+- All 202 bright pixels in the interior message match the resampled PS1
+  capture. Mean RGB error in the matched entry view is about 23.7/255,
+  and the native interior is darker. Source extraction and the BlocksDS
+  ROM reproduced across two builds. The 16 other sidecars are byte-identical.
+- The `clock-passage` PS1 replay on `diagnostics/dsi` descends from point 19
+  into room 22. The ladder callback runs for 264 VBlanks and finishes at
+  Q12 X/Z (−245760, −260915), yaw 0. The native ladder and passage are pending.
+
 ## Next
 
-1. Connect the powered clock tower door and verify its arrival and return.
-2. Verify the next school transition and compare the boiler’s light and sound falloff.
+1. Port the tower ladder descent and connect the underground passage.
+2. Verify the far end of the passage and the next school transition.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

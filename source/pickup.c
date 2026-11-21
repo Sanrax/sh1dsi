@@ -39,13 +39,13 @@ static Model models[sizeof pickups/sizeof pickups[0]];
 static uint16_t fontPalette[16];
 static enum { Inactive, Stopping, Kneeling, Preparing, Inspecting, Rising, LatchNotice,
               EmptyShelfNotice, EmptyHandNotice, BoilerStopping, BoilerPrompt,
-              BoilerStarting, BoilerNoEffect, BoilerRunning } phase;
+              BoilerStarting, BoilerNoEffect, BoilerRunning, TowerInsideNotice } phase;
 static PickupItem activeItem;
 static unsigned ticks, selected, flash, shown;
 static unsigned collected;
 
-static Glyph latchGlyphs[24], emptyShelfGlyphs[24], emptyHandGlyphs[48];
-static uint16_t latchCount, emptyShelfCount, emptyHandCount;
+static Glyph latchGlyphs[24], emptyShelfGlyphs[24], emptyHandGlyphs[48], towerDoorGlyphs[24];
+static uint16_t latchCount, emptyShelfCount, emptyHandCount, towerDoorCount;
 static bool unlocked, powered;
 static Glyph boilerQuestion[48], boilerNoEffect[24], boilerRunning[24];
 static uint16_t boilerCount, boilerLength, boilerNoEffectCount, boilerRunningCount;
@@ -123,6 +123,15 @@ unsigned boilerVolume(void)
         return volume < 127 ? volume : 127;
     }
     return powered ? 127 : 12;
+}
+
+bool towerDoorLoad(FILE *file) { return loadNotice(file, towerDoorGlyphs, 24, &towerDoorCount); }
+
+void towerDoorStart(void)
+{
+    if (!towerDoorCount || pickupActive()) return;
+    shown = 0;
+    phase = TowerInsideNotice;
 }
 
 bool latchLoad(FILE *file) { return loadNotice(file, latchGlyphs, 24, &latchCount); }
@@ -227,12 +236,14 @@ PickupSound pickupTick(unsigned pressed)
     case EmptyShelfNotice:
     case EmptyHandNotice:
     case BoilerNoEffect:
-    case BoilerRunning: {
+    case BoilerRunning:
+    case TowerInsideNotice: {
         // Event_DisplayMapMsgWithSfx delays the first latch glyph by 0.2 s.
         bool latch = phase == LatchNotice;
         unsigned count = latch ? latchCount : phase == EmptyHandNotice ? emptyHandCount :
                          phase == BoilerNoEffect ? boilerNoEffectCount :
-                         phase == BoilerRunning ? boilerRunningCount : emptyShelfCount;
+                         phase == BoilerRunning ? boilerRunningCount :
+                         phase == TowerInsideNotice ? towerDoorCount : emptyShelfCount;
         bool advance = pressed & (KEY_A | KEY_B);
         if (latch && ++ticks < 12) break;
         if (shown < count) {
@@ -378,7 +389,8 @@ void pickupDrawPrompt(int bg)
                         phase == EmptyShelfNotice ? emptyShelfGlyphs :
                         phase == EmptyHandNotice ? emptyHandGlyphs : phase == BoilerPrompt ? boilerQuestion :
                         phase == BoilerNoEffect ? boilerNoEffect :
-                        phase == BoilerRunning ? boilerRunning : models[activeItem].glyphs;
+                        phase == BoilerRunning ? boilerRunning :
+                        phase == TowerInsideNotice ? towerDoorGlyphs : models[activeItem].glyphs;
     if (!visible) {
         bgHide(bg);
         lastShown = 0;

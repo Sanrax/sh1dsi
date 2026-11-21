@@ -13,10 +13,12 @@ ROOM_FLOOR_PLANES = 2
 ROOM_WIDE_VERTICES = 4
 ROOM_GROUND_PLANES = 8
 ROOM_BOILER_EVENT = 16
+ROOM_DOOR_NOTICE = 32
 
 ROOM_LAYOUTS = {
     2: ROOM_BOILER_EVENT,
     3: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES,
+    20: ROOM_DOOR_NOTICE,
     23: ROOM_FLOOR_PLANES,
     31: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES,
 }
@@ -70,7 +72,8 @@ def collision_edges(ipd, room):
                 39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
                 31: (-20480, 10240, 69, 15, 71, 0), 12: (20480, 10240, 80, 21, 85, 0),
                 13: (30720, 0, 80, 12, 80, 0), 9: (10240, 30720, 45, 11, 49, 0),
-                23: (-10240, -20480, 204, 61, 236, 0), 16: (30720, 40960, 33, 6, 34, 0),
+                20: (-30720, -20480, 16, 3, 16, 0), 23: (-10240, -20480, 204, 61, 236, 0),
+                16: (30720, 40960, 33, 6, 34, 0),
                 33: (-10240, 40960, 40, 8, 40, 0), 34: (-20480, 20480, 38, 5, 38, 15),
                 35: (-30720, 20480, 40, 7, 40, 0)}[room]
     if (x, z, vertices, surfaces, count, cylinders) != expected:
@@ -97,6 +100,9 @@ def collision_edges(ipd, room):
         if room == 2 and other != 255:
             continue
         if room == 3 and (i == 0 or floor == 3 or other != 255):
+            continue
+        # The outer roof perimeter lies beyond the playable shaft walls.
+        if room == 20 and i < 4:
             continue
         if room == 13 and floor in (3, 4):
             continue
@@ -280,7 +286,7 @@ def smoke_atlas(disc):
 def school_room(disc, room=39):
     cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3),
               23: (255, 254), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
-              3: (1, 255), 2: (0, 255)}[room]
+              3: (1, 255), 2: (0, 255), 20: (253, 254)}[room]
     data = disc.read(f"BG/SC{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -491,6 +497,8 @@ def school_room(disc, room=39):
                 add_model(name, identity, position, state)
             extra = b"".join(prompt_data(disc, n, first_floor=True, choices=n==29, map_bearings=True)
                              for n in (29, 30, 31))
+        elif room == 20:
+            extra = prompt_data(disc, 21, first_floor=True, choices=False, map_bearings=True)
         elif room == 9:
             extra = medical_pickups(disc)
         elif room == 12:

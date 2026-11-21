@@ -200,7 +200,7 @@ static void advanceRoadCamera(void)
         eastLabRoad = x > split + (eastLabRoad ? -1433 : 1433);
         return;
     }
-    if (room == MusicRoom) return;
+    if (room == MusicRoom || room == ClockTower) return;
     // Leave the entry view as Harry walks out along the road. The small
     // chase road places the ideal eye two metres away, twelve degrees to
     // one side of the heading opposite Harry (vcMakeIdealCamPosUseVC_ROAD_DATA).
@@ -414,6 +414,11 @@ void playerEnterRoom(SchoolRoom from, const StairExit *stairs)
 {
     doorView = NULL;
     SchoolRoom to = roomCurrent();
+    if (to == ClockTower && from == Courtyard) {
+        // MAP1_S00 point 20, with the inward offset from SysState_LoadRoom.
+        warp(-409600, -244121, 2048);
+        return;
+    }
     for (unsigned j = 0; j < sizeof doorViews/sizeof doorViews[0]; j++) {
         if (doorViews[j].room == to && doorViews[j].from == from) {
             doorView = &doorViews[j].camera;
@@ -509,6 +514,12 @@ static bool facingEdge(int edgeX, int edgeZ, int halfWidth, int nx, int nz)
 bool playerFacingPiano(void)
 {
     return roomVersion < 3 || facingEdge(-408371, 81510, 3072, 1, 0);
+}
+
+bool playerFacingTowerExit(void)
+{
+    // The interior side of MAP1_S00 point 20 uses the closed-door message.
+    return roomCurrent() == ClockTower && facingEdge(-409600, -242483, 1536, 0, 1);
 }
 
 bool playerFacingBoiler(void)
@@ -611,6 +622,11 @@ int playerSetCamera(void)
     int ground = collisionFloor(x, z).height;
     RoomOrigin roomOffset = roomOrigin();
     int origin = roomOffset.x, originZ = roomOffset.z;
+    if (room == ClockTower) {
+        // Fixed road at (-99.9, -2.7, -60.3) in MAP1_S00.
+        static const CameraPose view = {-409088, -11008, -246784, -411040, 5248, -246304};
+        return setCameraPose(&view, origin, originZ);
+    }
     if (lab && statueCamera()) {
         static const CameraPose pour = {-244162, -1679, 399278, -240025, -9379, 413163};
         return setCameraPose(&pour, origin, originZ);

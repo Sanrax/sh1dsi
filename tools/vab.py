@@ -109,4 +109,6 @@ def school_bank(map_vab, base_vab, first_floor_vab):
     tones.extend(struct.pack("<IIHBB", len(samples), len(pcm), tone_rate(first_floor_vab, tone, 56),
                              volume, first_floor_vab[tone+3]))
     samples.extend(pcm)
+    # MAP1_S00's clock entrance uses SFX pair 3, with no closing sample.
+    tones.extend(convert_tones(first_floor_vab, [(0, 53, 127)], samples))
     return tones + struct.pack("<H", starts[0]) + samples

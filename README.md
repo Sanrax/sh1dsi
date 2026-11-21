@@ -60,8 +60,10 @@ With a medallion in inventory, face its matching slot and press Select to
 place it. Inspect the clock again to see the new reading.
 Take the first-floor stairs to the basement and face the boiler switch.
 Press A to operate it. The silver medallion placement enables the switch.
+Once the boiler is running, face the clock tower door and press A to enter.
+The door is one-way. This build reaches the ladder hatch inside the tower.
 Rerun the asset converter when updating an existing installation to get the
-placement views, boiler sounds and switch, statue puzzle and room fixes.
+clock tower room, boiler sounds and switch, and room fixes.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

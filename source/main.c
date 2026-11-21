@@ -31,13 +31,13 @@ typedef struct {
 
 enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, DoorUnlock,
        PromptMove, PromptCancel, PromptConfirm, InsertMedallion, TowerChime,
-       BoilerSwitchSound, BoilerStartSound, BoilerDoorOpen, BoilerDoorClose, BoilerHum, ToneCount };
+       BoilerSwitchSound, BoilerStartSound, BoilerDoorOpen, BoilerDoorClose, BoilerHum, TowerOpening, ToneCount };
 static const int pickupSounds[] = {
     [PickupMove] = PromptMove, [PickupCancel] = PromptCancel, [PickupConfirm] = PromptConfirm,
     [PickupBoilerSwitch] = BoilerSwitchSound, [PickupBoilerStart] = BoilerStartSound
 };
 static Tone tones[ToneCount];
-static uint8_t samples[288 * 1024] __attribute__((aligned(32)));
+static uint8_t samples[320 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
 static uint16_t humLoop;
 static const char *assetDir;
@@ -57,6 +57,7 @@ static FILE *openRoom(SchoolRoom room)
     case EquipmentRoom: name = "equipment"; break;
     case Infirmary: name = "infirmary"; break;
     case Courtyard: name = "courtyard"; break;
+    case ClockTower: name = "clockroom"; break;
     case BasementStair: name = "basement"; break;
     case BoilerRoom: name = "boiler"; break;
     default: return NULL;
@@ -72,7 +73,7 @@ static bool loadTones(FILE *file, unsigned count)
 {
     if (fread(tones, sizeof(Tone), count, file) != count)
         return false;
-    if (count == ToneCount && (fread(&humLoop, sizeof humLoop, 1, file) != 1 ||
+    if (count > BoilerHum && (fread(&humLoop, sizeof humLoop, 1, file) != 1 ||
                                (humLoop & 1) || 2u*humLoop >= tones[BoilerHum].bytes)) return false;
     size_t size = fread(samples, 1, sizeof samples, file);
     for (unsigned i = 0; i < count; i++) {
@@ -100,12 +101,15 @@ static bool loadPiano(void)
     assetDir = cart ? "fat:/sh1dsi" : "sd:/sh1dsi";
     if (!file)
         return false;
-    bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets
-                 && memcmp(assets.magic, "SHP", 3) == 0 &&
-                 assets.magic[3] >= '1' && assets.magic[3] <= '9';
-    if (valid && assets.magic[3] != '1') {
-        static const unsigned counts[] = {0, 9, 10, 12, 14, 15, InsertMedallion, BoilerSwitchSound, ToneCount};
-        toneCount = counts[assets.magic[3]-'1'];
+    static const char versions[] = "123456789A";
+    bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets &&
+                 !memcmp(assets.magic, "SHP", 3) && assets.magic[3];
+    const char *version = valid ? strchr(versions, assets.magic[3]) : NULL;
+    valid = version != NULL;
+    if (valid && version != versions) {
+        static const unsigned counts[] = {0, 9, 10, 12, 14, 15, InsertMedallion,
+                                          BoilerSwitchSound, TowerOpening, ToneCount};
+        toneCount = counts[version-versions];
         valid = loadTones(file, toneCount);
     }
     valid = valid && fgetc(file) == EOF && !ferror(file);
@@ -140,7 +144,7 @@ static void updateBoilerHum(void)
 {
     static int channel = -1;
     static unsigned previousVolume;
-    if (toneCount != ToneCount) return;
+    if (toneCount <= BoilerHum) return;
     unsigned volume = boilerVolume()*tones[BoilerHum].volume/127;
     if (!volume) {
         if (channel >= 0) soundKill(channel);
@@ -161,10 +165,11 @@ static void changeRoom(RoomExit exit)
     bool east = next == EastCorridor || from == EastCorridor;
     bool hall = east || from == Courtyard || next == Courtyard ||
                 (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
-    bool boilerDoor = toneCount == ToneCount && (next == BoilerRoom || from == BoilerRoom);
+    bool towerDoor = next == ClockTower;
+    bool boilerDoor = toneCount > BoilerDoorClose && (next == BoilerRoom || from == BoilerRoom);
     FILE *file = openRoom(next);
     if (!file) stop("Missing room data.\nRun the asset converter.");
-    if (!exit.stairs) playTone(boilerDoor ? BoilerDoorOpen : hall ? HallOpen : DoorOpen);
+    if (!exit.stairs) playTone(towerDoor ? TowerOpening : boilerDoor ? BoilerDoorOpen : hall ? HallOpen : DoorOpen);
     uint32_t start = systemCounterGetTicks();
     // Let the last geometry submission retire before remapping texture VRAM.
     setBrightness(1, -16);
@@ -182,7 +187,7 @@ static void changeRoom(RoomExit exit)
     // one second, including time already spent on disc or card reads.
     while ((uint32_t)(systemCounterGetTicks()-start) < systemCounterUsecsToTicks(1000000))
         swiWaitForVBlank();
-    if (!exit.stairs) playTone(boilerDoor ? BoilerDoorClose : hall ? HallClose : DoorClose);
+    if (!exit.stairs && !towerDoor) playTone(boilerDoor ? BoilerDoorClose : hall ? HallClose : DoorClose);
 }
 
 int main(void)
@@ -288,8 +293,10 @@ int main(void)
                     sound = 9;
                 if (!wasActive && phase == medal.phase && (phase == MedalHanging || phase == MedalFinished)) {
                     RoomExit exit = playerDestination(pressed & KEY_A);
-                    SchoolRoom next = exit.room;
                     TowerPoint tower = pressed & (KEY_A | KEY_SELECT) ? playerFacingTower() : NoTowerPoint;
+                    if ((pressed & KEY_A) && tower == TowerDoor && boilerPowered())
+                        exit = (RoomExit){ClockTower, NULL};
+                    SchoolRoom next = exit.room;
                     if (next == SouthHall && roomCurrent() == FirstFloor && !latchUnlocked()) {
                         if (latchStart()) sound = DoorUnlock;
                     } else if (next != roomCurrent()) {
@@ -326,7 +333,9 @@ int main(void)
                             roomChanged = true;
                             previousTime = systemCounterGetTicks();
                             debt = step;
-                        } else if (playerFacingBoiler())
+                        } else if (playerFacingTowerExit())
+                            towerDoorStart();
+                        else if (playerFacingBoiler())
                             boilerStart();
                         else if (roomCurrent() == MusicRoom && !piano.solved && playerFacingPiano())
                             inRoom = false;
