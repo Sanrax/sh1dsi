@@ -13,6 +13,8 @@ Both ladders work in both directions. Harry can use the far tower's outer
 door, watch or skip the Otherworld arrival scene and walk the courtyard.
 Y switches the flashlight after the scene, changing the light and fog.
 The north doors reach the Otherworld north hall and lead back to the courtyard.
+The north hall connects to the lobby, where Harry can collect the first-aid
+kit and handgun bullets and inspect the fans.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -966,13 +968,46 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   The new `otherworldnorth.dat` is 101,059 bytes. Twenty previous
   sidecars match byte for byte. The expanded `piano.dat` carries
   the two original door sounds.
-- The hall's other doors, its original ambience and the courtyard's
-  south exit remain pending.
+- The hall's original ambience and the courtyard's south exit remain pending.
+
+## Otherworld north lobby
+
+- MAP1_S02 points 59 and 62 link the hall and lobby. The port loads
+  the original `SU0203` geometry, bench obstacles and floor. The Q12
+  arrivals match PS1 at (409600, 561970), yaw 0, and (546816, 789299),
+  yaw 2048. The doorway views use the measured PS1 cameras. The
+  release build passed the checkpoint-to-lobby round trip over DLDI
+  with the flashlight on and virtual console SD with it off. Both
+  runs read the warning, collected the supplies and returned to
+  the hall with the same flashlight setting and a black lower screen.
+- The two fan models use the original rotation speed ranges and a
+  local random seed. Harry can walk between the benches. The sampled
+  fan stop is within 6.1 mm of PS1. The two warning pages use the original glyphs.
+  All 389 sampled bright text pixels in their bottom text rows match.
+- The original first-aid kit and handgun bullet models sit on the
+  benches. The pickups can be declined or accepted, and the flags
+  prevent a second pickup. The PS1 replay verifies one kit and 15
+  bullets. Using supplies remains pending in the port. Updated host
+  checkpoint tests recover older records and preserve the new flags.
+- The PS1 lobby replay measured 148 intervals at 33.37 ms, 25 at
+  50.05 ms and one at 16.68 ms. The instrumented melonDS 1.1 DSi run
+  averaged 33.366 ms across 1,822 intervals (16.709–49.968 ms).
+  ARM9 submission averaged 4.708 ms and peaked at 6.166 ms. Maximum
+  geometry use was 640 polygons and 2,502 vertices with no overflow.
+  The DLDI room read and setup took 62.08 ms including one VBlank.
+- Mean RGB error against the matched PS1 images was 2.63/255 at lobby
+  entry and 7.73/255 at the hall return. The native highlights are
+  brighter. The pickup model orientation and lighting differ, and
+  the fan sound and original ambience are pending. The fan loop was
+  identified as effect 1455 in `MEP102.VAB`.
+- Two clean BlocksDS builds reproduced the TWL ROM and all 23 local
+  files. `otherworldlobby.dat` is 149,817 bytes. All 22 earlier sidecars
+  are byte-identical.
 
 ## Next
 
-1. Connect hall point 59 to the north lobby and verify the route toward the stairs.
-2. Port the courtyard rain and ambience and compare them with the PS1 replay.
+1. Connect north hall point 60 to side hall point 72, then follow the route toward the stairs.
+2. Port the courtyard rain, fan sound and room ambience against the PS1 replay.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

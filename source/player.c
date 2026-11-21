@@ -71,6 +71,8 @@ static const DoorView doorViews[] = {
     {NorthHall, Courtyard, {546816, -8003, 772695, 546561, -3404, 795226}},
     {OtherworldCourtyard, OtherworldNorthHall, {-80691, -10451, -216468, -80438, -5852, -238997}},
     {OtherworldNorthHall, OtherworldCourtyard, {546816, -8003, 772695, 546561, -3404, 795226}},
+    {OtherworldLobby, OtherworldNorthHall, {409600, -7987, 561752, 409356, -3388, 584283}},
+    {OtherworldNorthHall, OtherworldLobby, {546816, -8003, 789510, 547058, -3404, 766981}},
     {UpperNorthHall, EastCorridor, {-62457, -7987, 784384, -84986, -3388, 784129}},
     {UpperNorthHall, ChemistryLab, {-118374, -7987, 789511, -118145, -3388, 766982}},
     {EastCorridor, UpperNorthHall, {-209115, -7987, 292864, -186584, -3388, 293117}},
@@ -187,6 +189,7 @@ static const ChaseRoad chaseRoads[MusicRoom] = {
     [NorthHall]     = {1982, 2289,  3043, 3089, ChaseAlongX},
     [Courtyard]     = {-436, -196, -1096, -848, ChaseArea},
     [OtherworldCourtyard] = {-436, -196, -1096, -848, ChaseArea},
+    [OtherworldLobby] = {1572, 1572, 2188, 2272, ChaseAlongZ},
     [EastCorridor]  = {-814, -771,   684, 1168, ChaseAlongZ},
     [SchoolCorridor] = {-473, -166,   294,  345, ChaseAlongX},
     [UpperNorthHall] = {-545, -238,  3038, 3081, ChaseAlongX},
@@ -667,6 +670,12 @@ bool playerFacingPiano(void)
     return roomVersion < 3 || facingEdge(-408371, 81510, 3072, 1, 0);
 }
 
+bool playerFacingLobbyFan(void)
+{
+    // MAP1_S02 point 46 lies at the end of the fan alcove.
+    return roomCurrent() == OtherworldLobby && facingEdge(409600, 583270, 4864, 0, 1);
+}
+
 bool playerFacingTowerExit(void)
 {
     // The interior side of MAP1_S00 point 20 uses the closed-door message.
@@ -764,7 +773,7 @@ int playerSetCamera(void)
     // the distance to Harry is below four metres.
     SchoolRoom room = roomCurrent();
     bool corridor = room == SchoolCorridor || room == SouthHall || room == NorthHall ||
-                    room == UpperNorthHall || room == OtherworldNorthHall;
+                    room == UpperNorthHall || room == OtherworldNorthHall || room == OtherworldLobby;
     bool equipment = room == EquipmentRoom;
     bool stairwell = room == EastCorridor || room == FirstFloor || room == BasementStair;
     bool boiler = room == BoilerRoom;
@@ -850,11 +859,13 @@ int playerSetCamera(void)
         bool rail = doorRail && !followingRoad;
         // The authored southern hall road fixes the chase eye at Q4 -27.
         int chaseHeight = room == SouthHall ? 27*256 : 8600;
+        bool lobby = room == OtherworldLobby;
+        if (lobby) chaseHeight = 43*256;
         if (boiler) chaseHeight = (z < -68403 ? 27 : 38)*256;
         eyeHeight = ((rail ? 7987 : chaseHeight)-ground)/2;
-        targetHeight = ((rail ? 3533 : 2816)-ground)/2;
+        targetHeight = ((rail ? 3533 : lobby ? 4096 : 2816)-ground)/2;
         // The small road limits the camera to 2.5 metres above map origin.
-        if (eyeHeight > 5120) eyeHeight = 5120;
+        if (eyeHeight > 5120 && !lobby) eyeHeight = 5120;
     }
     int dx = x-eyeX, dz = z-eyeZ;
     int length = sqrt32(dx*dx + dz*dz);

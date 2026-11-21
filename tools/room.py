@@ -4,7 +4,7 @@ import math
 import struct
 
 from harry import courtyard_look_frames, ladder_frames, player_data, pour_frames
-from pickup import chemical_pickup, gold_pickup, medical_pickups, prompt_data, silver_pickup
+from pickup import chemical_pickup, gold_pickup, lobby_pickups, medical_pickups, prompt_data, silver_pickup
 from vab import statue_sound
 from xa import courtyard_voices
 
@@ -27,6 +27,7 @@ ROOM_LAYOUTS = {
     23: ROOM_FLOOR_PLANES,
     24: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_NORMALS,
     25: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES | ROOM_NORMALS,
+    26: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES | ROOM_NORMALS,
     31: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES,
 }
 
@@ -83,6 +84,7 @@ def collision_edges(ipd, room):
                 22: (-20480, -20480, 28, 8, 32, 0),
                 23: (-10240, -20480, 204, 61, 236, 0), 24: (-10240, -20480, 172, 31, 175, 0),
                 16: (30720, 40960, 33, 6, 34, 0), 25: (30720, 40960, 24, 4, 24, 0),
+                26: (20480, 30720, 61, 7, 63, 0),
                 33: (-10240, 40960, 40, 8, 40, 0), 34: (-20480, 20480, 38, 5, 38, 15),
                 35: (-30720, 20480, 40, 7, 40, 0)}[room]
     if (x, z, vertices, surfaces, count, cylinders) != expected:
@@ -125,6 +127,9 @@ def collision_edges(ipd, room):
         # SU0304 has an inner hallway shell and two locker banks. The
         # outer shells belong to the roof and the full ground plane.
         if room == 25 and (i < 4 or floor == 1):
+            continue
+        # Use the lobby's inner walls, the fan opening and the benches.
+        if room == 26 and (other != 255 or i in (7, 8, 9, 12, 13, 14) or floor == 2):
             continue
         # Use the inner shell and the furniture silhouettes on both floors.
         if room == 33 and 24 <= i < 32:
@@ -177,7 +182,7 @@ def collision_edges(ipd, room):
 
     floors = bytearray()
     floor_planes = {3: (0, 1), 22: range(3, 8), 31: (11, 12), 23: (*range(37, 41), *range(50, 60)),
-                    24: (15, 16, 17, 18, 28, 29), 25: (1,)}[room]
+                    24: (15, 16, 17, 18, 28, 29), 25: (1,), 26: (2,)}[room]
     floor_count = 0
     for plane in floor_planes:
         edges = []
@@ -308,9 +313,9 @@ def smoke_atlas(disc):
 
 def school_room(disc, room=39):
     cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 9: (1, 3),
-              23: (255, 254), 24: (255, 254), 25: (3, 4), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
+              23: (255, 254), 24: (255, 254), 25: (3, 4), 26: (2, 3), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
               3: (1, 255), 2: (0, 255), 20: (253, 254), 21: (252, 254), 22: (254, 254)}[room]
-    prefix = "SU" if room in (24, 25) else "SC"
+    prefix = "SU" if room in (24, 25, 26) else "SC"
     data = disc.read(f"BG/{prefix}{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -344,6 +349,8 @@ def school_room(disc, room=39):
         if room == 22 and name == "SC1FURA2":
             # The end-wall tile can share the shaft palette's cutout index.
             regions = ((5, 2, 15, (128, 239, 208, 255)),)
+        if room == 26 and name == "SU1FTE1":
+            regions = ((6, 2, 0, (32, 159, 160, 255)),)
         for row, key, target, rect in regions:
             if {j for j, value in enumerate(cluts[row]) if not value} != {key}:
                 raise ValueError("unexpected cutout palette")
@@ -404,12 +411,19 @@ def school_room(disc, room=39):
                 face = model_data[prim+20*k:prim+20*(k+1)]
                 mat = face[7] & 127
                 row = int.from_bytes(face[2:4], "little") >> 6
-                v_offset = 0
+                u_offset = v_offset = 0
                 untextured = mat == 127
                 if untextured:
                     # Model_MaterialFlagsApply uses the no-material sentinel.
                     mat = row = 0
-                if item_page is not None:
+                if item_page is not None and room == 26:
+                    # Two 64x64 tiles from TIM00 share the lobby item atlas.
+                    if mat or row not in (0, 12):
+                        raise ValueError("unexpected lobby item material")
+                    row = int(row == 12)
+                    u_offset, v_offset = 192*row, 64*row
+                    mat = item_page
+                elif item_page is not None:
                     # BG_ETC rows 9/10 occupy CLUTs 2/3 in the atlas.
                     if (mat, row) not in ((0, 0), (0, 1), (1, 9), (1, 10)):
                         raise ValueError("unexpected common item material")
@@ -441,10 +455,12 @@ def school_room(disc, room=39):
                         raise ValueError("vertex outside LM mesh")
                     uv = (0, 4, 8, 10)[corner]
                     u, v = face[uv:uv+2]
-                    if item_page is not None and (u >= 64 or v >= (32 if v_offset else 128)):
-                        raise ValueError("common item UV outside atlas")
+                    if item_page is not None:
+                        height = 64 if room == 26 else 32 if v_offset else 128
+                        if not 0 <= u-u_offset < 64 or v >= height:
+                            raise ValueError("common item UV outside atlas")
                     point = vertices[idx]
-                    group.extend(struct.pack("<3hBB", *point, u, v+v_offset))
+                    group.extend(struct.pack("<3hBB", *point, u-u_offset, v+v_offset))
                     if lit:
                         index = face[16+corner]
                         if index >= ref_count or model_data[refs+index] != face[12+corner]:
@@ -514,6 +530,39 @@ def school_room(disc, room=39):
                 coord, = struct.unpack_from("<h", group, offset)
                 struct.pack_into("<h", group, offset, side*max(side*coord, minimum))
 
+    if room == 26:
+        tim = disc.read("ITEM/TIM00.TIM")
+        image = 8+struct.unpack_from("<I", tim, 8)[0]
+        if (struct.unpack_from("<III4H", tim) != (16,8,524,176,0,16,16) or
+                struct.unpack_from("<I4H", tim, image) != (32780,960,0,64,256)):
+            raise ValueError("unexpected lobby item texture")
+        page = len(page_info)
+        page_info.append((len(pages), 64, len(palettes)//32, 2))
+        for tile, clut in ((0, 0), (192, 12)):
+            for y in range(64):
+                offset = image+12+128*y+tile//2
+                pages.extend(tim[offset:offset+32])
+            palette = tim[20+32*clut:52+32*clut]
+            if 0 in struct.unpack("<16H", palette):
+                raise ValueError("unexpected transparent lobby item color")
+            palettes.extend(palette)
+        color_keys.append([False]*2)
+        chunk_x, chunk_z = struct.unpack_from("<ii", data, 0x54)
+        identity = (4096,0,0,0,4096,0,0,0,4096)
+        # Map_WorldObjectsInit places two fans on the same axis.
+        for state, position_z in ((14, 142.9), (15, 145.25)):
+            add_model(b"FAN_HIDE", identity, (5120,-410,(int(position_z*4096)>>4)-chunk_z), state)
+        models.update(model_directory(disc.read("BG/BG_ITEM.PLM")))
+        overlay = disc.read("VIN/MAP1_S02.BIN")
+        # g_CommonWorldObjectPoses[3..4].
+        for i, name in ((3, b"AIDKIT_N"), (4, b"BULLET_N")):
+            x,y,z,rx,ry,rz = struct.unpack_from("<3i3h", overlay, 0x800e1eec-0x800c9578+20*i)
+            if rx or rz:
+                raise ValueError("unsupported lobby prop rotation")
+            angle = ry*math.tau/4096
+            c, s = round(math.cos(angle)*4096), round(math.sin(angle)*4096)
+            add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-chunk_x,y>>4,(z>>4)-chunk_z),
+                      9+i, item_page=page)
     if room == 9:
         page = len(page_info)
         pixels, colors, poses = infirmary_items(disc)
@@ -555,6 +604,10 @@ def school_room(disc, room=39):
             extra = courtyard_look_frames(disc) + b"".join(
                 prompt_data(disc, n, choices=False, map_bearings=True, subtitle=True) for n in (15, 16, 17)
             ) + courtyard_voices(disc)
+        elif room == 26:
+            extra = lobby_pickups(disc) + b"".join(
+                prompt_data(disc, n, choices=False, map_bearings=True, otherworld=True) for n in (48, 49)
+            )
         elif room == 9:
             extra = medical_pickups(disc)
         elif room == 12:

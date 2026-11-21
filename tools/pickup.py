@@ -5,8 +5,8 @@ import struct
 from notebook import font_advance
 
 
-def prompt_data(disc, number, *, first_floor=False, choices=True, map_bearings=False, subtitle=False):
-    scene = 2 if subtitle else 0 if first_floor else 1
+def prompt_data(disc, number, *, first_floor=False, choices=True, map_bearings=False, subtitle=False, otherworld=False):
+    scene = 2 if subtitle or otherworld else 0 if first_floor else 1
     overlay = disc.read(f"VIN/MAP1_S{scene:02d}.BIN")
     table = (0x800dd1bc, 0x800dcf5c, 0x800e1854)[scene]
     base = 0x800c9578
@@ -91,7 +91,7 @@ def prompt_data(disc, number, *, first_floor=False, choices=True, map_bearings=F
     return output
 
 
-def model_corners(tmd, counts, material, first_row, row_offset):
+def model_corners(tmd, counts, material, first_row, row_offset, *, u_offset=0):
     magic, flags, objects, vp, nv, np, nn, pp, faces, scale = struct.unpack_from("<10I", tmd)
     if (magic, flags, objects, scale) != (65, 0, 1, 0) or (nv, nn, faces) != counts:
         raise ValueError("unexpected pickup TMD")
@@ -103,7 +103,7 @@ def model_corners(tmd, counts, material, first_row, row_offset):
         for j in range(3):
             u,v,attr = struct.unpack_from("<BBH", tmd, p+4+4*j)
             n,k = struct.unpack_from("<HH", tmd, p+16+4*j)
-            if (u >= 64 or not first_row <= v < first_row+64 or k >= nv or n >= nn or
+            if (not 0 <= u-u_offset < 64 or not first_row <= v < first_row+64 or k >= nv or n >= nn or
                     (j < 2 and attr != material[j])):
                 raise ValueError("invalid pickup material or index")
             x,y,z = struct.unpack_from("<3h", tmd, 12+vp+8*k)
@@ -111,7 +111,7 @@ def model_corners(tmd, counts, material, first_row, row_offset):
             # Map PS1 view coordinates into the DS camera basis.
             normal = sum((max(-512,min(511,c//8)) & 1023) << (10*axis)
                          for axis,c in enumerate((nx,-ny,-nz)))
-            data.extend(struct.pack("<3hBBI", x,-y,-z,u,v-row_offset,normal))
+            data.extend(struct.pack("<3hBBI", x,-y,-z,u-u_offset,v-row_offset,normal))
     return data
 
 
@@ -152,3 +152,9 @@ def medical_pickups(disc):
         data.extend(model_corners(disc.read(f"ITEM/{name}.TMD"), counts, (clut, 15), first_row, 0))
         data.extend(prompt_data(disc, message, first_floor=True))
     return data
+
+def lobby_pickups(disc):
+    kit = model_corners(disc.read("ITEM/UNQ20.TMD"), (40, 34, 76), (11, 15), 0, 0)
+    bullets = model_corners(disc.read("ITEM/UNQC0.TMD"), (24, 21, 44), (779, 15), 0, -64, u_offset=192)
+    return (kit + prompt_data(disc, 5, otherworld=True) +
+            bullets + prompt_data(disc, 8, otherworld=True))

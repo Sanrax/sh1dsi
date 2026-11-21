@@ -21,7 +21,8 @@ typedef struct {
 } Batch;
 
 enum { StaticBatch, HangingSilverBatch, FallenSilverBatch, DrinkBatch, KitBatch, ChemicalBatch,
-       IntactHandBatch, OpenHandBatch, GoldAtHandBatch, BoilerUnwiredBatch, BoilerReadyBatch, BoilerGlowBatch };
+       IntactHandBatch, OpenHandBatch, GoldAtHandBatch, BoilerUnwiredBatch, BoilerReadyBatch, BoilerGlowBatch,
+       LobbyKitBatch, LobbyBulletsBatch, LobbyNearFanBatch, LobbyFarFanBatch };
 
 typedef RoomVertex Vertex;
 _Static_assert(sizeof(LitPoint) == 10 && sizeof(LitCorner) == 4, "lit room vertex layout");
@@ -38,6 +39,7 @@ enum { RoomEdgeHeights = 1, RoomFloorPlanes = 2, RoomWideVertices = 4, RoomGroun
 static SchoolRoom current = MusicRoom;
 static RoomOrigin currentOrigin = {-100*4096, 20*4096};
 static bool handPresent, handPuzzle, wideGeometry;
+static unsigned fanAngle[2];
 
 // MAP1_S00–S02 door points. Normals point into the room.
 const Door schoolDoors[] = {
@@ -61,6 +63,8 @@ const Door schoolDoors[] = {
     {NorthHall, Courtyard, 546816, 771276, 0, 1, 4864},
     {OtherworldCourtyard, OtherworldNorthHall, -80691, -215040, 0, -1, 4864},
     {OtherworldNorthHall, OtherworldCourtyard, 546816, 771276, 0, 1, 4864},
+    {OtherworldNorthHall, OtherworldLobby, 546816, 790937, 0, -1, 4864},
+    {OtherworldLobby, OtherworldNorthHall, 409600, 560332, 0, 1, 4864},
     {BasementStair, BoilerRoom, 219545, -70451, 1, 0, 2304},
     {BoilerRoom, BasementStair, 93388, -79872, -1, 0, 2304}
 };
@@ -70,6 +74,19 @@ SchoolRoom roomCurrent(void) { return current; }
 bool roomHasHand(void) { return current == ChemistryLab && handPresent; }
 bool roomCanDissolveHand(void) { return current == ChemistryLab && handPuzzle; }
 RoomOrigin roomOrigin(void) { return currentOrigin; }
+
+void roomTick(void)
+{
+    if (current != OtherworldLobby) return;
+    // The two MAP1_S02 fans vary their angular speeds independently.
+    static uint32_t rng;
+    for (unsigned fan = 0; fan < 2; fan++) {
+        rng = rng*1664525u + 1013904223u;
+        unsigned speed = (fan ? 2332 : 2048) + ((rng >> 17) & 511);
+        // Rotation about Z changes sign in the DS room basis.
+        fanAngle[fan] = (fanAngle[fan] + ((speed*136) >> 12)) & 4095;
+    }
+}
 
 static RoomOrigin legacyRoomOrigin(SchoolRoom room)
 {
@@ -90,6 +107,7 @@ static RoomOrigin legacyRoomOrigin(SchoolRoom room)
     case FarClockTower:
     case OtherworldCourtyard:
     case OtherworldNorthHall:
+    case OtherworldLobby:
     case TowerPassage: break; // These rooms require a stream origin.
     case SouthHall: return (RoomOrigin){140*4096, 20*4096};
     }
@@ -253,7 +271,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (fread(&header, sizeof header, 1, file) != 1) return false;
     bool hasOrigin = !memcmp(header.magic, "SHM2", 4);
     bool streamed = hasOrigin || !memcmp(header.magic, "SHM1", 4);
-    bool otherworld = room == OtherworldCourtyard || room == OtherworldNorthHall;
+    bool lobby = room == OtherworldLobby;
+    bool otherworld = room == OtherworldCourtyard || room == OtherworldNorthHall || lobby;
     if (!hasOrigin && (room == BasementStair || room == BoilerRoom ||
                        room == ClockTower || room == FarClockTower || room == TowerPassage ||
                        otherworld))
@@ -317,14 +336,15 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     bool hand = room == ChemistryLab && !memcmp(header.magic, "SHL2", 4);
     bool pour = room == ChemistryLab && !memcmp(header.magic, "SHL3", 4);
     bool infirmaryItems = medical || (room == Infirmary && !memcmp(header.magic, "SHI2", 4));
-    enum { KeyTileBytes = 64*64/2, SmokeTileBytes = 32*128 };
-    unsigned itemPages = pour ? 2 : chemical || infirmaryItems ? 1 : 0;
+    enum { KeyTileBytes = 64*64/2, SmokeTileBytes = 32*128, SupplyTileBytes = 64*128/2 };
+    unsigned itemPages = pour ? 2 : chemical || infirmaryItems || lobby ? 1 : 0;
     unsigned itemBytes = pour ? KeyTileBytes+SmokeTileBytes : chemical ? KeyTileBytes :
-                         infirmaryItems ? 64*256/2 : 0;
+                         infirmaryItems ? 64*256/2 : lobby ? SupplyTileBytes : 0;
     unsigned itemOffset = 128*1024-itemBytes;
     if (header.textureBytes < itemBytes) return false;
     unsigned sceneBytes = header.textureBytes - itemBytes;
-    unsigned scenePages = streamed ? header.pages :
+    if (header.pages <= itemPages) return false;
+    unsigned scenePages = streamed ? header.pages-itemPages :
                           room == SchoolCorridor || room == UpperNorthHall || room == ChemistryLab ? 2 : 3;
     if (countedFirstFloor) magic = "SHF4";
     else if (latchText) magic = firstFloorObstacles ? "SHF3" : "SHF2";
@@ -351,10 +371,11 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
         bool smoke = pour && i == scenePages+1;
         if (atlas && (p->width != (smoke ? 32 : 64) ||
             p->offset != sceneBytes+(smoke ? KeyTileBytes : 0) ||
-            p->palettes != (smoke ? 2u : infirmaryItems ? 4u : 1u)))
+            p->palettes != (smoke || lobby ? 2u : infirmaryItems ? 4u : 1u)))
             return false;
         unsigned limit = atlas ? header.textureBytes : sceneBytes;
-        unsigned pageBytes = smoke ? SmokeTileBytes : atlas && !infirmaryItems ? KeyTileBytes : p->width*128u;
+        unsigned pageBytes = smoke ? SmokeTileBytes : atlas && lobby ? SupplyTileBytes :
+                             atlas && !infirmaryItems ? KeyTileBytes : p->width*128u;
         if ((!atlas && p->width != 128 && p->width != 256) || (p->offset & 7) ||
             p->offset > limit || pageBytes > limit-p->offset ||
             p->firstPalette > header.paletteBytes/32 ||
@@ -404,6 +425,10 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
         return false;
     if (medical && (!pickupLoad(file, HealthDrink, itemOffset, pages[scenePages].firstPalette+1) ||
                     !pickupLoad(file, FirstAidKit, itemOffset, pages[scenePages].firstPalette)))
+        return false;
+    if (lobby && (!pickupLoad(file, LobbyKit, itemOffset, pages[scenePages].firstPalette) ||
+                  !pickupLoad(file, LobbyBullets, itemOffset, pages[scenePages].firstPalette+1) ||
+                  !lobbyFanLoad(file)))
         return false;
     if (chemical && (!pickupLoad(file, Chemical, itemOffset, pages[scenePages].firstPalette) ||
                      !pickupLoadEmptyShelf(file)))
@@ -455,7 +480,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     geometry = lit ? NULL : malloc(geometryBytes);
     litGeometry = lit ? malloc(total*sizeof *litGeometry) : NULL;
     if (!geometry && !litGeometry) return false;
-    unsigned maxState = boiler ? BoilerGlowBatch : pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
+    unsigned maxState = lobby ? LobbyFarFanBatch : boiler ? BoilerGlowBatch : pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
                         corridor ? StaticBatch : FallenSilverBatch;
     uint32_t *end = geometry;
     GeometryChunk *chunk = chunks;
@@ -656,12 +681,17 @@ void roomDraw(const Medallion *medal)
         [BoilerUnwiredBatch] = !(towerFlags() & MoonPlaced),
         [BoilerReadyBatch] = (towerFlags() & MoonPlaced) != 0,
         [BoilerGlowBatch] = boilerGlow(),
+        [LobbyKitBatch] = !pickupHidden(LobbyKit),
+        [LobbyBulletsBatch] = !pickupHidden(LobbyBullets),
+        [LobbyNearFanBatch] = true,
+        [LobbyFarFanBatch] = true,
     };
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];
         unsigned count = batchWords[i];
         unsigned chunkCount = (b->quads+ChunkQuads-1)/ChunkQuads;
         if (count && visible[b->state]) {
+            bool spinning = b->state >= LobbyNearFanBatch;
             bool moving = b->state == HangingSilverBatch && medal->phase >= MedalSwing;
             if (moving) {
                 // SHR1 stores the hanging model with its Q8 pivot baked in.
@@ -669,6 +699,14 @@ void roomDraw(const Medallion *medal)
                 glTranslatef32(2048, -medal->y / 2, (20 * 4096 - medal->z) / 2);
                 glRotateXi(medal->angle * 8);
                 glTranslatef32(-2048, -5488, 7640);
+            } else if (spinning) {
+                // Pivots in Q8 relative to the (100, 140) lobby origin.
+                unsigned fan = b->state-LobbyNearFanBatch;
+                int depth = fan ? 1344*8 : 742*8;
+                glPushMatrix();
+                glTranslatef32(0, 410*8, -depth);
+                glRotateZi(fanAngle[fan]*8);
+                glTranslatef32(0, -410*8, depth);
             }
             const Page *p = &pages[b->page];
             unsigned width = p->width == 64 ? TEXTURE_SIZE_64 :
@@ -683,7 +721,7 @@ void roomDraw(const Medallion *medal)
             if (lit) {
                 const LitCorner *vertices = lit;
                 for (unsigned j = 0; j < chunkCount; j++) {
-                    if (updated) inView[j] = chunkVisible(&chunk[j], updated);
+                    if (updated) inView[j] = spinning || chunkVisible(&chunk[j], updated);
                     if (inView[j]) submitLitGeometry(vertices, chunk[j].words);
                     vertices += chunk[j].words;
                 }
@@ -692,7 +730,7 @@ void roomDraw(const Medallion *medal)
             else
                 submitGeometry(commands, count);
             glEnd();
-            if (moving) glPopMatrix(1);
+            if (moving || spinning) glPopMatrix(1);
         }
         if (lit) lit += count;
         else commands += count;

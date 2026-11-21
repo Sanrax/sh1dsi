@@ -67,6 +67,11 @@ skips it. Harry can walk the courtyard after the scene. Press Y to switch the
 flashlight on or off. Cross the courtyard and face the north double doors.
 Press A to enter the Otherworld north hall. Turn around and use the same
 doors to return. The flashlight keeps its setting across both crossings.
+The double doors straight across the hall lead to the north lobby. Inside,
+face either supply on the benches and press A to inspect it. Accept or
+decline it with the same controls as the infirmary pickups. Press A at the
+far opening to read both pages of the fan warning. The lobby entrance
+returns to the north hall.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

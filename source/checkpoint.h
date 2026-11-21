@@ -8,7 +8,9 @@ enum { DrinkHeld = 16, KitHeld = 32, ChemicalTaken = 64 };
 enum { HandOpened = 128, GoldHeld = 256 };
 enum { SunPlaced = 512, MoonPlaced = 1024, TowerFlags = SunPlaced | MoonPlaced };
 enum { BoilerPowered = 2048 };
-enum { PickupFlags = SilverHeld | DrinkHeld | KitHeld | ChemicalTaken | GoldHeld };
+enum { LobbyKitHeld = 4096, LobbyBulletsHeld = 8192 };
+enum { PickupFlags = SilverHeld | DrinkHeld | KitHeld | ChemicalTaken | GoldHeld |
+                     LobbyKitHeld | LobbyBulletsHeld };
 typedef struct {
     int32_t x, z;
     uint32_t ticks, saves;

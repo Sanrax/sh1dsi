@@ -31,6 +31,7 @@ bool playerFacingPiano(void);
 bool playerFacingNotebook(void);
 bool playerFacingBoiler(void);
 bool playerFacingTowerExit(void);
+bool playerFacingLobbyFan(void);
 bool playerFacingChemical(void);
 bool playerFacingHand(void);
 TowerPoint playerFacingTower(void);

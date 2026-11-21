@@ -63,6 +63,7 @@ static FILE *openRoom(SchoolRoom room)
     case FarClockTower: name = "fartower"; break;
     case OtherworldCourtyard: name = "otherworld"; break;
     case OtherworldNorthHall: name = "otherworldnorth"; break;
+    case OtherworldLobby: name = "otherworldlobby"; break;
     case TowerPassage: name = "passage"; break;
     case BasementStair: name = "basement"; break;
     case BoilerRoom: name = "boiler"; break;
@@ -287,7 +288,7 @@ int main(void)
             int sound = -1;
             if (point.ticks != UINT32_MAX) point.ticks++;
             if (inRoom && roomHasNormals())
-                roomChanged |= lightingTick((pressed & KEY_Y) && !otherworldIntroActive());
+                roomChanged |= lightingTick((pressed & KEY_Y) && !otherworldIntroActive() && !pickupActive());
             if (inRoom && otherworldIntroActive()) {
                 roomChanged |= otherworldTickIntro(pressed & KEY_START);
             } else if (inRoom && playerLadderActive()) {
@@ -313,7 +314,10 @@ int main(void)
                     inspectionFadeLength = inspectionFade = StatueRevealVBlanks;
                     roomChanged = true;
                 }
-                roomChanged |= playerTick(turn, walk, statueCamera() ? PlayerPour : pickupAction());
+                if (playerTick(turn, walk, statueCamera() ? PlayerPour : pickupAction())) {
+                    roomTick();
+                    roomChanged = true;
+                }
                 PickupSound pickupSound = pickupTick(pressed);
                 if (pickupSound != PickupQuiet) sound = pickupSounds[pickupSound];
                 if (phase == MedalDrop && medal.phase == MedalImpact)
@@ -364,7 +368,9 @@ int main(void)
                             roomChanged = true;
                             previousTime = systemCounterGetTicks();
                             debt = step;
-                        } else if (playerFacingTowerExit())
+                        } else if (playerFacingLobbyFan())
+                            lobbyFanStart();
+                        else if (playerFacingTowerExit())
                             towerDoorStart();
                         else if (playerFacingBoiler())
                             boilerStart();

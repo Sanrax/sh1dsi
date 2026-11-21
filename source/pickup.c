@@ -23,6 +23,7 @@ typedef struct {
 
 static Corner silverCorners[156*3], drinkCorners[124*3], kitCorners[76*3];
 static Corner chemicalCorners[188*3], goldCorners[156*3];
+static Corner lobbyKitCorners[76*3], lobbyBulletCorners[44*3];
 static const struct {
     int x, z;
     unsigned flag;
@@ -34,18 +35,23 @@ static const struct {
     [FirstAidKit] = {247971, 583680, KitHeld, kitCorners, sizeof kitCorners/sizeof(Corner)},
     [Chemical] = {0, 0, ChemicalTaken, chemicalCorners, sizeof chemicalCorners/sizeof(Corner)},
     [GoldMedallion] = {0, 0, GoldHeld, goldCorners, sizeof goldCorners/sizeof(Corner)},
+    [LobbyKit] = {402227, 573849, LobbyKitHeld, lobbyKitCorners, sizeof lobbyKitCorners/sizeof(Corner)},
+    [LobbyBullets] = {399441, 567705, LobbyBulletsHeld, lobbyBulletCorners, sizeof lobbyBulletCorners/sizeof(Corner)},
 };
 static Model models[sizeof pickups/sizeof pickups[0]];
 static uint16_t fontPalette[16];
 static enum { Inactive, Stopping, Kneeling, Preparing, Inspecting, Rising, LatchNotice,
               EmptyShelfNotice, EmptyHandNotice, BoilerStopping, BoilerPrompt,
-              BoilerStarting, BoilerNoEffect, BoilerRunning, TowerInsideNotice } phase;
+              BoilerStarting, BoilerNoEffect, BoilerRunning, TowerInsideNotice, LobbyFanNotice } phase;
 static PickupItem activeItem;
 static unsigned ticks, selected, flash, shown;
 static unsigned collected;
 
 static Glyph latchGlyphs[24], emptyShelfGlyphs[24], emptyHandGlyphs[48], towerDoorGlyphs[24];
 static uint16_t latchCount, emptyShelfCount, emptyHandCount, towerDoorCount;
+static Glyph fanGlyphs[2][48];
+static uint16_t fanCount[2];
+static unsigned fanPage;
 static bool unlocked, powered;
 static Glyph boilerQuestion[48], boilerNoEffect[24], boilerRunning[24];
 static uint16_t boilerCount, boilerLength, boilerNoEffectCount, boilerRunningCount;
@@ -134,6 +140,19 @@ void towerDoorStart(void)
     phase = TowerInsideNotice;
 }
 
+bool lobbyFanLoad(FILE *file)
+{
+    return loadNotice(file, fanGlyphs[0], 48, &fanCount[0]) &&
+           loadNotice(file, fanGlyphs[1], 48, &fanCount[1]);
+}
+
+void lobbyFanStart(void)
+{
+    if (!fanCount[0] || pickupActive()) return;
+    fanPage = shown = 0;
+    phase = LobbyFanNotice;
+}
+
 bool latchLoad(FILE *file) { return loadNotice(file, latchGlyphs, 24, &latchCount); }
 
 bool pickupLoadEmptyShelf(FILE *file) { return loadNotice(file, emptyShelfGlyphs, 24, &emptyShelfCount); }
@@ -203,10 +222,13 @@ void pickupStart(void)
     } else if (roomCurrent() == Infirmary) {
         first = HealthDrink;
         last = FirstAidKit;
+    } else if (roomCurrent() == OtherworldLobby) {
+        first = LobbyKit;
+        last = LobbyBullets;
     } else {
         return;
     }
-    // MAP1_S00 points 97 and 98 follow their original event scan order.
+    // Check the props in their original event scan order.
     for (PickupItem item = first; item <= last; item++) {
         if (!models[item].loaded || pickupHidden(item) ||
             !playerFacingPoint(pickups[item].x, pickups[item].z)) continue;
@@ -237,6 +259,15 @@ PickupSound pickupTick(unsigned pressed)
     case EmptyHandNotice:
     case BoilerNoEffect:
     case BoilerRunning:
+    case LobbyFanNotice:
+        if (shown < fanCount[fanPage])
+            shown = (pressed & (KEY_A | KEY_B)) ? fanCount[fanPage] : shown+1;
+        else if (pressed & (KEY_A | KEY_B)) {
+            shown = 0;
+            if (fanPage == 0) fanPage = 1;
+            else phase = Inactive;
+        }
+        break;
     case TowerInsideNotice: {
         // Event_DisplayMapMsgWithSfx delays the first latch glyph by 0.2 s.
         bool latch = phase == LatchNotice;
@@ -367,7 +398,8 @@ void pickupDrawItem(void)
         scale = silver ? (int)(age-2)*4096/15 : (int)age*4096/(chemical ? 21 : 15);
     if (scale > 4096) scale = 4096;
     glScalef32(scale, scale, scale);
-    unsigned height = silver || chemical || activeItem == GoldMedallion ? TEXTURE_SIZE_64 : TEXTURE_SIZE_256;
+    unsigned height = silver || chemical || activeItem == GoldMedallion ? TEXTURE_SIZE_64 :
+                      activeItem == LobbyKit || activeItem == LobbyBullets ? TEXTURE_SIZE_128 : TEXTURE_SIZE_256;
     GFX_TEX_FORMAT = m->textureAddress | (TEXTURE_SIZE_64 << 20) | (height << 23) | (GL_RGB16 << 26);
     GFX_PAL_FORMAT = m->paletteAddress;
     glPolyFmt(POLY_ALPHA(31) | POLY_CULL_FRONT | POLY_FORMAT_LIGHT0);
@@ -390,7 +422,8 @@ void pickupDrawPrompt(int bg)
                         phase == EmptyHandNotice ? emptyHandGlyphs : phase == BoilerPrompt ? boilerQuestion :
                         phase == BoilerNoEffect ? boilerNoEffect :
                         phase == BoilerRunning ? boilerRunning :
-                        phase == TowerInsideNotice ? towerDoorGlyphs : models[activeItem].glyphs;
+                        phase == TowerInsideNotice ? towerDoorGlyphs :
+                        phase == LobbyFanNotice ? fanGlyphs[fanPage] : models[activeItem].glyphs;
     if (!visible) {
         bgHide(bg);
         lastShown = 0;
