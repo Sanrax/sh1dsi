@@ -34,8 +34,9 @@ static struct {
     uint32_t textureBytes, paletteBytes;
 } header;
 static Page pages[4], skin;
+enum { RoomEdgeHeights = 1, RoomFloorPlanes = 2, RoomWideVertices = 4 };
 static SchoolRoom current = MusicRoom;
-static bool handPresent, handPuzzle;
+static bool handPresent, handPuzzle, wideGeometry;
 
 // MAP1_S00 and MAP1_S01 door points. Normals point into the room.
 const Door schoolDoors[] = {
@@ -209,6 +210,12 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (room == EquipmentRoom) magic = "SHQ1";
     if (room == Infirmary) magic = "SHI1";
     if (fread(&header, sizeof header, 1, file) != 1) return false;
+    bool streamed = !memcmp(header.magic, "SHM1", 4);
+    struct { uint8_t room, flags; uint16_t reserved; } layout = {0};
+    if (streamed && (!corridor || fread(&layout, sizeof layout, 1, file) != 1 ||
+                     layout.room != room || layout.reserved ||
+                     (layout.flags & ~(RoomEdgeHeights | RoomFloorPlanes | RoomWideVertices))))
+        return false;
     bool firstFloorObstacles = room == FirstFloor && !memcmp(header.magic, "SHF3", 4);
     bool southHallObstacles = room == SouthHall && !memcmp(header.magic, "SHS2", 4);
     bool countedFirstFloor = room == FirstFloor && !memcmp(header.magic, "SHF4", 4);
@@ -222,7 +229,11 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     else if (firstFloorObstacles || southHallObstacles)
         edgeLayout = ExpandedEdges;
     FloorLayout floorLayout = NoFloorData;
-    if (room == Courtyard) {
+    if (streamed) {
+        magic = "SHM1";
+        edgeLayout = layout.flags & RoomEdgeHeights ? HeightEdges : CountedEdges;
+        if (layout.flags & RoomFloorPlanes) floorLayout = CountedFloorPlanes;
+    } else if (room == Courtyard) {
         magic = "SHY1";
         floorLayout = LegacyWalkways;
         if (!memcmp(header.magic, "SHY3", 4)) {
@@ -247,7 +258,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     unsigned itemOffset = 128*1024-itemBytes;
     if (header.textureBytes < itemBytes) return false;
     unsigned sceneBytes = header.textureBytes - itemBytes;
-    unsigned scenePages = room == SchoolCorridor || room == UpperNorthHall || room == ChemistryLab ? 2 : 3;
+    unsigned scenePages = streamed ? header.pages :
+                          room == SchoolCorridor || room == UpperNorthHall || room == ChemistryLab ? 2 : 3;
     if (countedFirstFloor) magic = "SHF4";
     else if (latchText) magic = firstFloorObstacles ? "SHF3" : "SHF2";
     if (heightEast) magic = "SHE3";
@@ -261,6 +273,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
                      sceneBytes > skin.offset || header.paletteBytes > skin.firstPalette*32u) :
          !((!memcmp(header.magic, "SHR1", 4) && header.pages == 3) ||
            (!memcmp(header.magic, "SHR", 3) && header.magic[3] >= '2' && header.magic[3] <= '5' && header.pages == 4))) ||
+        !header.pages || header.pages > sizeof pages/sizeof pages[0] ||
         header.batches > MaxBatches || !header.batches ||
         header.textureBytes > 128*1024 || (header.textureBytes & 7) ||
         header.paletteBytes > 64*1024 || (header.paletteBytes & 31) ||
@@ -337,7 +350,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     long batchHeaders = header.batches * sizeof(Batch);
     if (endOfFile < start || endOfFile-start < batchHeaders) return false;
     long bytes = endOfFile - start - batchHeaders;
-    unsigned maxVerts = room == Courtyard ? MaxRoomVertices : room == MusicRoom || room == SchoolCorridor ? 6144 : 8192;
+    unsigned maxVerts = streamed || room == Courtyard ? MaxRoomVertices :
+                        room == MusicRoom || room == SchoolCorridor ? 6144 : 8192;
     if (bytes <= 0 || bytes > maxVerts*(long)sizeof(Vertex) || bytes % (4*sizeof(Vertex)))
         return false;
     if (!scenery) return true;
@@ -354,7 +368,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     for (unsigned i = 0; i < header.batches; i++) {
         Batch *b = &batches[i];
         if (fread(b, sizeof *b, 1, file) != 1 || b->page >= header.pages ||
-            b->state > maxState || b->flags > (room == Courtyard ? 7 : 3) || b->palette >= pages[b->page].palettes ||
+            b->state > maxState || b->flags > (streamed || room == Courtyard ? 7 : 3) ||
+            b->palette >= pages[b->page].palettes ||
             ((chemical || pour) && b->page >= scenePages) ||
             b->quads > (total-pos)/4)
             return false;
@@ -370,6 +385,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (compact) geometry = compact;
     DC_FlushRange(geometry, geometryBytes);
     current = room;
+    wideGeometry = streamed ? (layout.flags & RoomWideVertices) != 0 :
+                   room == EastCorridor || room == FirstFloor || room == NorthHall;
     handPresent = hand || pour;
     handPuzzle = pour;
     return true;
@@ -481,16 +498,15 @@ void roomDraw(const Medallion *medal)
     glColor(RGB15(31,31,31));
     const uint32_t *commands = geometry;
     const GeometryChunk *chunk = chunks;
-    bool wide = current == EastCorridor || current == FirstFloor || current == NorthHall;
     ClipPlane planes[6];
     // Only the room geometry gets the additional scale, applied below.
-    roomFrustum(planes, wide ? 2 : 1);
+    roomFrustum(planes, wideGeometry ? 2 : 1);
     if (playerReady()) {
         GFX_TEX_FORMAT = (skin.offset >> 3) | (TEXTURE_SIZE_256 << 20)
                          | (TEXTURE_SIZE_256 << 23) | (GL_RGB16 << 26);
         playerDraw(skin.firstPalette);
     }
-    if (wide) glScalef32(8192, 8192, 8192);
+    if (wideGeometry) glScalef32(8192, 8192, 8192);
     bool visible[] = {
         [StaticBatch] = true,
         [HangingSilverBatch] = !solved,

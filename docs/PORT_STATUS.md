@@ -378,6 +378,23 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   The previous eastern stream matched all 659,976 host collision checks.
   The current ROM also completed the DLDI route with that stream.
 
+### Shared room header
+
+- The eastern stairwell and courtyard now share a static room header.
+  Its four layout bytes identify the room and describe edge heights,
+  floor planes and vertex scale. A byte comparison matched the rest of
+  both streams to the previous converter output.
+- In melonDS DSi mode, both layouts passed the stairwell round trip on
+  DLDI and the courtyard round trip on virtual console SD. Captures at
+  matched entry poses included 16 distinct pixel-identical stairwell
+  frames and a pixel-identical courtyard frame. The courtyard arrivals
+  matched the PS1 replay. A virtual SD fixture loaded 88 height-aware
+  edges alongside all 14 floor planes and completed the same courtyard
+  route with a pixel-identical entry frame.
+- A read-only check put the basement stair and boiler room meshes within
+  the normal vertex scale. They contain 581 and 1,556 static quads.
+  The boiler room still needs a peak visible-vertex measurement.
+
 ### Texture palette conversion
 
 - When a texture page has multiple transparency indices, the converter

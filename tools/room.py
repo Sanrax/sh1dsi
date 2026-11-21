@@ -8,7 +8,19 @@ from pickup import chemical_pickup, gold_pickup, medical_pickups, prompt_data, s
 from vab import statue_sound
 
 
+ROOM_EDGE_HEIGHTS = 1
+ROOM_FLOOR_PLANES = 2
+ROOM_WIDE_VERTICES = 4
+
+ROOM_LAYOUTS = {
+    23: ROOM_FLOOR_PLANES,
+    31: ROOM_EDGE_HEIGHTS | ROOM_WIDE_VERTICES,
+}
+
+
 def collision_edges(ipd, room):
+    layout = ROOM_LAYOUTS.get(room)
+    edge_heights = layout is not None and layout & ROOM_EDGE_HEIGHTS
     collision = memoryview(ipd)[0x54:]
     x, z, vertices, surfaces, count, cylinders, vert, surface, polygon = struct.unpack_from("<ii4B3I", collision)
     expected = {39: (-30720, 0, 51, 8, 51, 0), 32: (-10240, 0, 60, 10, 60, 0),
@@ -70,7 +82,7 @@ def collision_edges(ipd, room):
         scale = 16 if room == 39 else 1
         output.extend(struct.pack("<6h", (ax-5120)*scale, (az-5120)*scale,
                                   (bx-5120)*scale, (bz-5120)*scale, tx, tz))
-        if room == 31:
+        if edge_heights:
             output.extend(struct.pack("<2h", ay, by))
     if room == 34:
         cylinder_offset, = struct.unpack_from("<I", collision, 0x18)
@@ -79,10 +91,10 @@ def collision_edges(ipd, room):
             if flags != 1 or py != -147 or not 0 < radius < 256:
                 raise ValueError("unexpected lab obstacle cylinder")
             output.extend(struct.pack("<3h", px-5120, pz-5120, radius))
-    if room in (12, 23, 31):
-        stride = 16 if room == 31 else 12
+    if layout is not None or room == 12:
+        stride = 16 if edge_heights else 12
         output = struct.pack("<H", len(output)//stride) + output
-    if room != 23:
+    if layout is None or not layout & ROOM_FLOOR_PLANES:
         return output
 
     floors = bytearray()
@@ -262,7 +274,9 @@ def school_room(disc, room=39):
     walls = defaultdict(list)
     decorations = []
     music_decorations = []
-    vertex_scale = 4 if room in (12, 16, 31) else 8
+    layout = ROOM_LAYOUTS.get(room)
+    wide = room in (12, 16) if layout is None else (layout & ROOM_WIDE_VERTICES) != 0
+    vertex_scale = 4 if wide else 8
     def add_model(name, matrix, position, state=0, *, item_page=None):
         model_data, meshes, base, ptr = models[name]
         for j in range(meshes):
@@ -400,8 +414,10 @@ def school_room(disc, room=39):
             add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-10240, y>>4, (z>>4)-30720), state,
                       item_page=page)
     if room != 39:
-        magic = {9: b"SHI3", 12: b"SHF4", 13: b"SHS2", 16: b"SHU1", 23: b"SHY3", 31: b"SHE3",
-                 32: b"SHC1", 33: b"SHH1", 34: b"SHL3", 35: b"SHQ2"}[room]
+        magic = b"SHM1" if layout is not None else {
+            9: b"SHI3", 12: b"SHF4", 13: b"SHS2", 16: b"SHU1", 32: b"SHC1",
+            33: b"SHH1", 34: b"SHL3", 35: b"SHQ2"
+        }[room]
         extra = b""
         if room == 9:
             extra = medical_pickups(disc)
@@ -467,6 +483,8 @@ def school_room(disc, room=39):
             )
 
     result = bytearray(struct.pack("<4sHHII", magic, len(page_info), len(groups), len(pages), len(palettes)))
+    if layout is not None:
+        result.extend(struct.pack("<BBH", room, layout, 0))
     for page in page_info:
         result.extend(struct.pack("<IHHI", *page))
     result.extend(pages)
