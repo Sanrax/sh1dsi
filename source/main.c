@@ -58,6 +58,7 @@ static FILE *openRoom(SchoolRoom room)
     case Infirmary: name = "infirmary"; break;
     case Courtyard: name = "courtyard"; break;
     case ClockTower: name = "clockroom"; break;
+    case FarClockTower: name = "fartower"; break;
     case TowerPassage: name = "passage"; break;
     case BasementStair: name = "basement"; break;
     case BoilerRoom: name = "boiler"; break;
@@ -166,11 +167,12 @@ static void changeRoom(RoomExit exit)
     bool east = next == EastCorridor || from == EastCorridor;
     bool hall = east || from == Courtyard || next == Courtyard ||
                 (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
-    bool towerDoor = next == ClockTower;
+    bool towerDoor = next == ClockTower && from == Courtyard;
+    bool door = !exit.stairs && next != TowerPassage && from != TowerPassage;
     bool boilerDoor = toneCount > BoilerDoorClose && (next == BoilerRoom || from == BoilerRoom);
     FILE *file = openRoom(next);
     if (!file) stop("Missing room data.\nRun the asset converter.");
-    if (!exit.stairs && next != TowerPassage) playTone(towerDoor ? TowerOpening : boilerDoor ? BoilerDoorOpen : hall ? HallOpen : DoorOpen);
+    if (door) playTone(towerDoor ? TowerOpening : boilerDoor ? BoilerDoorOpen : hall ? HallOpen : DoorOpen);
     uint32_t start = systemCounterGetTicks();
     // Let the last geometry submission retire before remapping texture VRAM.
     setBrightness(1, -16);
@@ -188,7 +190,7 @@ static void changeRoom(RoomExit exit)
     // one second, including time already spent on disc or card reads.
     while ((uint32_t)(systemCounterGetTicks()-start) < systemCounterUsecsToTicks(1000000))
         swiWaitForVBlank();
-    if (!exit.stairs && !towerDoor && next != TowerPassage) playTone(boilerDoor ? BoilerDoorClose : hall ? HallClose : DoorClose);
+    if (door && !towerDoor) playTone(boilerDoor ? BoilerDoorClose : hall ? HallClose : DoorClose);
 }
 
 int main(void)
@@ -275,7 +277,13 @@ int main(void)
             int sound = -1;
             if (point.ticks != UINT32_MAX) point.ticks++;
             if (inRoom && playerLadderActive()) {
-                roomChanged |= playerLadderTick(pressed & KEY_START);
+                SchoolRoom arrival = roomCurrent();
+                roomChanged |= playerLadderTick(pressed & KEY_START, &arrival);
+                if (arrival != roomCurrent()) {
+                    changeRoom((RoomExit){arrival, NULL});
+                    previousTime = systemCounterGetTicks();
+                    debt = step;
+                }
                 if (!playerLadderActive())
                     inspectionFadeLength = inspectionFade = LadderRevealVBlanks;
             } else if (inRoom) {
@@ -311,6 +319,9 @@ int main(void)
                         roomChanged = true;
                         previousTime = systemCounterGetTicks();
                         debt = step;
+                    } else if ((pressed & KEY_A) && playerStartAscent()) {
+                        inspectionFade = 0;
+                        roomChanged = true;
                     } else if ((pressed & KEY_SELECT) && statueStart()) {
                         inspectionFade = 0;
                         setBrightness(1, 0);

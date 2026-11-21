@@ -100,6 +100,7 @@ def prepare(cue):
         boiler = school_room(disc, 2)
         clock_room = school_room(disc, 20)
         passage = school_room(disc, 22)
+        far_tower = school_room(disc, 21)
     write_asset(OUTPUT.with_name("notebook.dat"), notebook)
     write_asset(OUTPUT.with_name("tower.dat"), tower)
     write_asset(OUTPUT.with_name("hand.dat"), hand)
@@ -119,6 +120,7 @@ def prepare(cue):
     write_asset(OUTPUT.with_name("boiler.dat"), boiler)
     write_asset(OUTPUT.with_name("clockroom.dat"), clock_room)
     write_asset(OUTPUT.with_name("passage.dat"), passage)
+    write_asset(OUTPUT.with_name("fartower.dat"), far_tower)
 
 
 def write_asset(output, data):

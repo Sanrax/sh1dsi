@@ -13,10 +13,10 @@ def pour_frames(disc):
 
 
 def ladder_frames(disc):
-    # MAP1_S00 state 88 uses clip 50, frames 910 through 946.
+    # MAP1_S00 states 88 and 87 use clips 50 and 49, respectively.
     source = disc.read("ANIM/HB_M1S00.ANM")
-    frames = source[(910-676)*156:(947-676)*156]
-    if len(frames) != 37*156:
+    frames = b"".join(source[(start-676)*156:(start+37-676)*156] for start in (910, 873))
+    if len(frames) != 2*37*156:
         raise ValueError("incomplete Harry ladder animation")
     return frames
 

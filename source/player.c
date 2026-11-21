@@ -35,15 +35,17 @@ _Static_assert(sizeof(Bone) == 6 && sizeof(Vertex) == 8 &&
                sizeof(Corner) == 4 && sizeof(Batch) == 4, "player file layout");
 
 static Bone bones[18];
-enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward, Kneel, Rise, Pour, DescendLadder };
-static const unsigned firstFrame[] = {0, 40, 53, 66, 89, 113, 128, 140, 189};
-static const unsigned frameCount[] = {40, 13, 13, 23, 24, 15, 12, 49, 37};
-static const unsigned frameRate[] = {10, 15, 15, 22, 23, 15, 15, 15, 18};
-static const unsigned blendRate[] = {5, 50, 50, 50, 20, 10, 10, 10, 10};
-static int8_t frames[226][156];
+enum { Idle, TurnLeft, TurnRight, WalkForward, WalkBackward, Kneel, Rise, Pour, DescendLadder, AscendLadder };
+static const unsigned firstFrame[] = {0, 40, 53, 66, 89, 113, 128, 140, 189, 226};
+static const unsigned frameCount[] = {40, 13, 13, 23, 24, 15, 12, 49, 37, 37};
+static const unsigned frameRate[] = {10, 15, 15, 22, 23, 15, 15, 15, 18, 18};
+static const unsigned blendRate[] = {5, 50, 50, 50, 20, 10, 10, 10, 10, 10};
+static int8_t frames[263][156];
 static int ladderAge = -1;
 static int ladderHeight;
-enum { LadderMotion = 5, LadderFadeOut = 216, LadderEnd = 264 };
+static SchoolRoom ladderTower;
+static bool ladderAscending, ladderAscentReady;
+enum { LadderAscentMotion = 51 };
 static Vertex vertices[384];
 static Corner corners[1500];
 static Batch batches[30];
@@ -216,7 +218,7 @@ static void advanceRoadCamera(void)
         roadEyeZ += limitToRoad((target-roadEyeZ)/7, -288, 288);
         return;
     }
-    if (room == MusicRoom || room == ClockTower) return;
+    if (room == MusicRoom || room == ClockTower || room == FarClockTower) return;
     // Leave the entry view as Harry walks out along the road. The small
     // chase road places the ideal eye two metres away, twelve degrees to
     // one side of the heading opposite Harry (vcMakeIdealCamPosUseVC_ROAD_DATA).
@@ -353,15 +355,22 @@ bool playerLoadPour(FILE *file)
     return fread(frames+firstFrame[Pour], sizeof frames[0], frameCount[Pour], file) == frameCount[Pour];
 }
 
-bool playerLoadLadder(FILE *file)
+bool playerLoadLadder(FILE *file, bool ascent)
 {
-    return fread(frames+firstFrame[DescendLadder], sizeof frames[0],
-                 frameCount[DescendLadder], file) == frameCount[DescendLadder];
+    unsigned count = frameCount[DescendLadder] + (ascent ? frameCount[AscendLadder] : 0);
+    if (fread(frames+firstFrame[DescendLadder], sizeof frames[0], count, file) != count) return false;
+    ladderAscentReady = ascent;
+    return true;
 }
 
 bool playerLadderActive(void)
 {
     return ladderAge >= 0;
+}
+
+static bool onLadder(void)
+{
+    return ladderAge >= (ladderAscending ? LadderAscentMotion : 0);
 }
 
 bool playerActionDone(PlayerAction action)
@@ -411,30 +420,52 @@ static void warp(int worldX, int worldZ, int heading)
     frameQ12 = blendQ12 = 0;
 }
 
-bool playerLadderTick(bool skip)
+static void warpToLadder(void)
 {
-    if (++ladderAge >= LadderEnd || (skip && ladderAge >= LadderMotion)) {
+    // Both MAP1_S00 callbacks show the same shaft at point 23.
+    warp(-230768, -225689, 0);
+    clip = ladderAscending ? AscendLadder : DescendLadder;
+    ladderHeight = ladderAscending ? -9322 : -9420;
+}
+
+bool playerLadderTick(bool skip, SchoolRoom *arrival)
+{
+    // The original ascent starts with a fade over the current passage view.
+    int start = ladderAscending ? LadderAscentMotion : 5;
+    int fadeOut = ladderAscending ? 259 : 216;
+    int end = ladderAscending ? 310 : 264;
+    if (++ladderAge >= end || (skip && ladderAge > start)) {
         ladderAge = -1;
-        warp(-245760, -260915, 0);
-        roadEyeZ = -259584;
-        northPassageRoad = false;
+        if (ladderAscending) {
+            *arrival = ladderTower;
+        } else {
+            northPassageRoad = ladderTower == FarClockTower;
+            roadEyeZ = northPassageRoad ? -252672 : -259584;
+            warp(-245760, northPassageRoad ? -230604 : -260915, northPassageRoad ? 2048 : 0);
+        }
         setBrightness(1, -16);
         return true;
     }
+    if (ladderAscending && ladderAge < start) {
+        setBrightness(1, -16 * limitToRoad(ladderAge, 0, LadderRevealVBlanks) / LadderRevealVBlanks);
+        return false;
+    }
+    if (ladderAscending && ladderAge == start) warpToLadder();
 
-    int motion = ladderAge - LadderMotion;
+    int motion = ladderAge - start;
     // The PS1 updates the climb and clip on alternating VBlanks.
     bool moved = motion >= 0 && !(motion & 1);
     if (moved) {
         unsigned steps = (unsigned)motion/2+1;
-        ladderHeight = -9420 + (int)(steps*4021/100);
-        frameQ12 = steps*136*frameRate[DescendLadder] % (frameCount[DescendLadder]*4096);
+        int distance = steps*4021/100;
+        ladderHeight = ladderAscending ? -9322-distance : -9420+distance;
+        frameQ12 = steps*136*frameRate[clip] % (frameCount[clip]*4096);
     }
     int darkness = 0;
-    if (ladderAge < LadderMotion + LadderRevealVBlanks)
-        darkness = 16 * (LadderMotion + LadderRevealVBlanks - ladderAge) / LadderRevealVBlanks;
-    else if (ladderAge > LadderFadeOut)
-        darkness = 16 * (ladderAge-LadderFadeOut) / (LadderEnd-LadderFadeOut);
+    if (ladderAge < start + LadderRevealVBlanks)
+        darkness = 16 * (start + LadderRevealVBlanks - ladderAge) / LadderRevealVBlanks;
+    else if (ladderAge > fadeOut)
+        darkness = 16 * (ladderAge-fadeOut) / (end-fadeOut);
     setBrightness(1, -limitToRoad(darkness, 0, 16));
     return moved;
 }
@@ -469,17 +500,18 @@ void playerEnterRoom(SchoolRoom from, const StairExit *stairs)
 {
     doorView = NULL;
     SchoolRoom to = roomCurrent();
-    if (to == ClockTower && from == Courtyard) {
-        // MAP1_S00 point 20, with the inward offset from SysState_LoadRoom.
-        warp(-409600, -244121, 2048);
+    if (to == ClockTower || to == FarClockTower) {
+        // MAP1_S00 points 19–21, with the inward offset from SysState_LoadRoom.
+        bool southAscent = from == TowerPassage && to == ClockTower;
+        warp(to == ClockTower ? -409600 : -573440, southAscent ? -247398 : -244121,
+             southAscent ? 0 : 2048);
         return;
     }
-    if (to == TowerPassage && from == ClockTower) {
-        // MAP1_S00 point 23 and ladder-down callback.
-        warp(-230768, -225689, 0);
-        clip = DescendLadder;
-        ladderHeight = -9420;
+    if (to == TowerPassage) {
+        ladderTower = from;
+        ladderAscending = false;
         ladderAge = 0;
+        warpToLadder();
         return;
     }
     for (unsigned j = 0; j < sizeof doorViews/sizeof doorViews[0]; j++) {
@@ -549,8 +581,9 @@ RoomExit playerDestination(bool action)
             return (RoomExit){exit->to, exit};
     }
     if (!action || roomVersion < 5) return (RoomExit){room, NULL};
-    // MAP1_S00 point 19, facing south toward the hatch.
-    if (room == ClockTower && facingEdge(-409600, -249036, 2048, 0, -1))
+    // MAP1_S00 points 19 and 21 face opposite ways inside the towers.
+    if ((room == ClockTower && facingEdge(-409600, -249036, 2048, 0, -1)) ||
+        (room == FarClockTower && facingEdge(-573440, -242483, 2048, 0, 1)))
         return (RoomExit){TowerPassage, NULL};
     int rayX = sinLerp(yaw*8)/2, rayZ = cosLerp(yaw*8)/2;
     for (unsigned i = 0; i < schoolDoorCount; i++) {
@@ -577,6 +610,21 @@ static bool facingEdge(int edgeX, int edgeZ, int halfWidth, int nx, int nz)
         return false;
     int along = rayZ*dx - dz*rayX;
     return abs(along) <= halfWidth * reach;
+}
+
+bool playerStartAscent(void)
+{
+    if (roomCurrent() != TowerPassage || !ladderAscentReady) return false;
+    // MAP1_S00 points 16 and 17 face the south and north passage ladders.
+    if (facingEdge(-245760, -262144, 1536, 0, -1))
+        ladderTower = ClockTower;
+    else if (facingEdge(-245760, -229376, 1536, 0, 1))
+        ladderTower = FarClockTower;
+    else
+        return false;
+    ladderAscending = true;
+    ladderAge = 0;
+    return true;
 }
 
 bool playerFacingPiano(void)
@@ -695,10 +743,18 @@ int playerSetCamera(void)
         static const CameraPose view = {-409088, -11008, -246784, -411040, 5248, -246304};
         return setCameraPose(&view, origin, originZ);
     }
+    if (room == FarClockTower) {
+        // This MAP1_S00 road looks almost straight down. Use a horizontal
+        // up vector along its bearing so GL can normalize the cross product.
+        gluLookAtf32((-573184-origin)/2, 5504, (originZ+244736)/2,
+                     (-573568-origin)/2, -2680, (originZ+244880)/2, -4096, 0, 1536);
+        return 5504;
+    }
     if (room == TowerPassage) {
-        if (playerLadderActive()) {
-            static const CameraPose ladder = {-231055, -23224, -226877, -231014, -7659, -221839};
-            return setCameraPose(&ladder, origin, originZ);
+        if (onLadder()) {
+            static const CameraPose descent = {-231055, -23224, -226877, -231014, -7659, -221839};
+            static const CameraPose ascent = {-232407, -7249, -225812, -227041, -22528, -223477};
+            return setCameraPose(ladderAscending ? &ascent : &descent, origin, originZ);
         }
         if (northPassageRoad) {
             // The stationary north road looks downhill across both ramps.
@@ -847,7 +903,7 @@ ARM_CODE void playerDraw(unsigned firstPalette)
     glPushMatrix();
     // PS1 bone coordinates are in Q8. Convert root pose to room-local DS units.
     RoomOrigin origin = roomOrigin();
-    int height = playerLadderActive() ? ladderHeight : collisionFloor(x, z).height;
+    int height = onLadder() ? ladderHeight : collisionFloor(x, z).height;
     glTranslatef32(((x >> 4)-(origin.x >> 4))*8, -height/2,
                    ((origin.z >> 4)-(z >> 4))*8);
     glRotateYi(-yaw*8);

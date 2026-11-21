@@ -8,8 +8,9 @@ room, and Harry can return the same way. The switch powers the boiler after
 Harry places the silver medallion, and the infirmary notebook saves that state.
 The courtyard connects the southern and northern halls.
 Harry can inspect the clock tower door and place both medallions. With the
-boiler powered he can enter the tower, descend its ladder and walk the
-underground passage to the next ladder.
+boiler powered he can enter the tower and cross the underground passage.
+Both ladders work in both directions. The far tower's outer door leads to the
+Otherworld courtyard on PS1. The DSi port currently reaches that door.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -808,6 +809,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   capture. Mean RGB error in the matched entry view is about 23.7/255,
   and the native interior is darker. Source extraction and the BlocksDS
   ROM reproduced across two builds. The 16 other sidecars are byte-identical.
+
 ## Underground passage
 
 - Point 19 opens the tower hatch. Point 23 streams room 22, the original
@@ -835,14 +837,40 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   resampled reference views gave mean RGB errors of 12.24 to 19.81 on
   a 0–255 scale, with darker native walls. The original passage ambience
   and movement audio remain pending.
-- The two PS1 ascent replays on `diagnostics/dsi` reach room 20 in 369
-  VBlanks and room 21 in 370 VBlanks from the start of their callback,
-  including the destination load. Both ascents remain pending on DSi.
+## Passage ascents and far tower
+
+- MAP1_S00 points 16 and 17 lead back to room 20 and on to room 21.
+  Both ascents use the original 37-frame climb and restore the matching
+  PS1 arrival pose. The far hatch descends to the north landing at Q12 X/Z
+  (−245760, −230604), yaw 2048. Start skips either climb once motion starts.
+- The far tower uses its own `SCFCFE` stream and fixed overhead camera.
+  A horizontal up vector keeps the camera basis accurate in fixed point.
+  The far door stops Harry at Q12 Z −247812, within 1 cm of the PS1 stop.
+- The production round trip passed over DLDI and virtual console SD in
+  melonDS 1.1 DSi mode. Each run exercised both ascents and descents.
+  Between them, all four climbs completed normally and with Start skip.
+  The lower LCD stayed black in the sampled views.
+- Two BlocksDS builds produced identical TWL ROMs and 20 sidecars.
+  Eighteen prior sidecars stayed byte-identical. `passage.dat` adds 5,772
+  bytes for the second clip and `fartower.dat` adds 48,754 bytes.
+- The PS1 ascent callback and destination load took 369–370 VBlanks.
+  All 126 measured shaft intervals and 149 of 150 far-tower intervals
+  were 33.37 ms. The one remaining tower interval was 16.68 ms.
+- In melonDS 1.1 DSi mode, 129 ascent intervals averaged 33.301 ms and
+  154 far-tower intervals averaged 33.430 ms. Mean ARM9 submission took
+  1.253 and 1.458 ms, respectively. The maximum was 528 polygons and
+  2,064 vertices, with no geometry overflow.
+- At the sampled poses, the mean RGB error against PS1 was about 12.8/255
+  on the ladder and 22.5/255 in the far tower. The native scenes are
+  darker, and the original ambience and movement audio remain pending.
+- The private PS1 replay reaches MAP1_S02 room 23 and completes the
+  courtyard intro in 1,611 VBlanks. The original restores control at
+  Q12 XYZ (−74458, 0, −254955), yaw 3584. The DSi exit and cutscene are pending.
 
 ## Next
 
-1. Port both ladder ascents and load the far clock tower.
-2. Verify the exit from the far tower and the next school overlay.
+1. Stream the Otherworld `SUFFFE` courtyard and connect the far tower's outer door.
+2. Port the courtyard intro's movement, flashlight, camera and dialogue.
 3. Measure cold boot and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
