@@ -4,10 +4,10 @@
 #include <stdio.h>
 
 typedef enum { NoFloorData, LegacyWalkways, LegacyCourtyardFloors, CountedFloorPlanes } FloorLayout;
-typedef enum { LegacyEdges, ExpandedEdges, CountedEdges } EdgeLayout;
+typedef enum { LegacyEdges, ExpandedEdges, CountedEdges, HeightEdges } EdgeLayout;
 bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayout floorLayout);
 typedef struct { int height, slopeX, slopeZ; } Floor;
 Floor collisionFloor(int x, int z);
-void collisionMove(int *worldX, int *worldZ, int dx, int dz);
+void collisionMove(int *worldX, int *worldZ, int dx, int dz, int floorHeight);
 
 #endif

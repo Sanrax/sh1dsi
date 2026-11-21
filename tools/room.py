@@ -22,7 +22,8 @@ def collision_edges(ipd, room):
     output = bytearray()
     for i in range(count):
         tx, tz, length, a, b, floor, other = struct.unpack_from("<HHh4B", collision, polygon+10*i)
-        if max(a, b) >= vertices or floor >= surfaces or length <= 0:
+        if (max(a, b) >= vertices or floor >= surfaces or
+                (other != 255 and other >= surfaces) or length <= 0):
             raise ValueError("invalid school collision split")
         # Room 32's level path intersects the floor boundary, benches and
         # counter. The other surfaces are overhead or on the floor below.
@@ -57,8 +58,8 @@ def collision_edges(ipd, room):
             continue
         if other != 255:
             raise ValueError("unexpected shared collision edge")
-        ax, _, az = struct.unpack_from("<3h", collision, vert+6*a)
-        bx, _, bz = struct.unpack_from("<3h", collision, vert+6*b)
+        ax, ay, az = struct.unpack_from("<3h", collision, vert+6*a)
+        bx, by, bz = struct.unpack_from("<3h", collision, vert+6*b)
         # The top two bits of each tangent component are trigger flags.
         slope = struct.unpack_from("<2h", collision, surface+12*floor+8)
         expected_slope = {(31, 11): (2731, 0), (12, 7): (2778, 5), (12, 9): (-2753, 0)}.get((room, floor), (0, 0))
@@ -69,6 +70,8 @@ def collision_edges(ipd, room):
         scale = 16 if room == 39 else 1
         output.extend(struct.pack("<6h", (ax-5120)*scale, (az-5120)*scale,
                                   (bx-5120)*scale, (bz-5120)*scale, tx, tz))
+        if room == 31:
+            output.extend(struct.pack("<2h", ay, by))
     if room == 34:
         cylinder_offset, = struct.unpack_from("<I", collision, 0x18)
         for i in range(cylinders):
@@ -77,7 +80,8 @@ def collision_edges(ipd, room):
                 raise ValueError("unexpected lab obstacle cylinder")
             output.extend(struct.pack("<3h", px-5120, pz-5120, radius))
     if room in (12, 23, 31):
-        output = struct.pack("<H", len(output)//12) + output
+        stride = 16 if room == 31 else 12
+        output = struct.pack("<H", len(output)//stride) + output
     if room != 23:
         return output
 
@@ -396,7 +400,7 @@ def school_room(disc, room=39):
             add_model(name, (c,0,s,0,4096,0,-s,0,c), ((x>>4)-10240, y>>4, (z>>4)-30720), state,
                       item_page=page)
     if room != 39:
-        magic = {9: b"SHI3", 12: b"SHF4", 13: b"SHS2", 16: b"SHU1", 23: b"SHY3", 31: b"SHE2",
+        magic = {9: b"SHI3", 12: b"SHF4", 13: b"SHS2", 16: b"SHU1", 23: b"SHY3", 31: b"SHE3",
                  32: b"SHC1", 33: b"SHH1", 34: b"SHL3", 35: b"SHQ2"}[room]
         extra = b""
         if room == 9:

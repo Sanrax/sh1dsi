@@ -213,8 +213,11 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     bool southHallObstacles = room == SouthHall && !memcmp(header.magic, "SHS2", 4);
     bool countedFirstFloor = room == FirstFloor && !memcmp(header.magic, "SHF4", 4);
     bool countedEast = room == EastCorridor && !memcmp(header.magic, "SHE2", 4);
+    bool heightEast = room == EastCorridor && !memcmp(header.magic, "SHE3", 4);
     EdgeLayout edgeLayout = LegacyEdges;
-    if (room == Courtyard || countedFirstFloor || countedEast)
+    if (heightEast)
+        edgeLayout = HeightEdges;
+    else if (room == Courtyard || countedFirstFloor || countedEast)
         edgeLayout = CountedEdges;
     else if (firstFloorObstacles || southHallObstacles)
         edgeLayout = ExpandedEdges;
@@ -247,7 +250,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     unsigned scenePages = room == SchoolCorridor || room == UpperNorthHall || room == ChemistryLab ? 2 : 3;
     if (countedFirstFloor) magic = "SHF4";
     else if (latchText) magic = firstFloorObstacles ? "SHF3" : "SHF2";
-    if (countedEast) magic = "SHE2";
+    if (heightEast) magic = "SHE3";
+    else if (countedEast) magic = "SHE2";
     if (southHallObstacles) magic = "SHS2";
     if (infirmaryItems) magic = medical ? "SHI3" : "SHI2";
     if (chemical) magic = "SHQ2";

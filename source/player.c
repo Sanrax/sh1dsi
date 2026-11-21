@@ -313,7 +313,7 @@ static unsigned locomotion(int turn, int walk, int dt)
             square = (square >> shift) << shift;
         }
         int distance = ((int)sqrt32(square)*dt) >> 12;
-        collisionMove(&x, &z, (sx*distance) >> 12, (sz*distance) >> 12);
+        collisionMove(&x, &z, (sx*distance) >> 12, (sz*distance) >> 12, floor.height);
     }
     if (walk) return walk > 0 ? WalkForward : WalkBackward;
     return turn < 0 ? TurnLeft : turn > 0 ? TurnRight : Idle;

@@ -364,6 +364,20 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   first-floor double door. The DLDI replay also passed with the earlier
   sidecars.
 
+### Stairwell edge heights
+
+- The eastern stairwell stream now preserves the height at both ends of
+  each wall edge. The native solver compares the grounded foot height
+  with the interpolated edge height before pushing the player.
+  [Original edge height calculation](https://github.com/shdecompilations/silent-hill-decomp/blob/ecbb0d8e3881cf2f0cb9fa700f3bb1a74b6d34ce/src/bodyprog/collision/collision.c)
+- In melonDS DSi mode, a synthetic room crossed a ramp-to-landing seam,
+  cleared an edge below the actor's feet and stopped at a closed door.
+  The production stair round trip matched the PS1 arrival poses on DLDI
+  and virtual console SD. Both retained the first-floor door stop.
+- The eastern stream grew by 172 bytes and the edge array by 512 bytes.
+  The previous eastern stream matched all 659,976 host collision checks.
+  The current ROM also completed the DLDI route with that stream.
+
 ### Texture palette conversion
 
 - When a texture page has multiple transparency indices, the converter

@@ -5,10 +5,10 @@
 
 typedef struct {
     int ax, az, bx, bz;
-    int16_t tx, tz;
+    int16_t tx, tz, ay, by;
 } Edge;
 static Edge edges[128]; // Exterior boundaries and obstacles, plus door planes.
-static unsigned edgeCount;
+static unsigned edgeCount, heightEdgeCount;
 typedef struct { int x, z, radius; } ObstacleCylinder;
 static ObstacleCylinder cylinders[15];
 static unsigned cylinderCount;
@@ -107,27 +107,31 @@ bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayo
     cylinderCount = 0;
     floorPlaneCount = 0;
     uint16_t count;
-    if (edgeLayout == CountedEdges) {
+    if (edgeLayout == CountedEdges || edgeLayout == HeightEdges) {
         if (fread(&count, sizeof count, 1, file) != 1) return false;
     } else {
         count = legacyEdgeCount(room, edgeLayout);
     }
     if (!count || count >= sizeof edges/sizeof edges[0]) return false;
     edgeCount = count;
+    heightEdgeCount = edgeLayout == HeightEdges ? count : 0;
+    unsigned wordsPerEdge = heightEdgeCount ? 8 : 6;
     int scale = room == MusicRoom ? 1 : 16;
     int originX = roomOriginX(room), originZ = roomOriginZ(room);
     // The first-floor south wall extends 0.21 m into the adjoining chunk.
     int maxZ = room == FirstFloor ? 21*4096 : 20*4096;
     int maxX = room == NorthHall ? 17*4096 : 16*4096;
     for (unsigned i = 0; i < edgeCount; i++) {
-        int16_t in[6];
-        if (fread(in, sizeof in, 1, file) != 1) return false;
+        int16_t in[8] = {0};
+        if (fread(in, sizeof in[0], wordsPerEdge, file) != wordsPerEdge) return false;
         Edge *e = &edges[i];
-        *e = (Edge){in[0]*scale, in[1]*scale, in[2]*scale, in[3]*scale, in[4], in[5]};
+        *e = (Edge){in[0]*scale, in[1]*scale, in[2]*scale, in[3]*scale, in[4], in[5], in[6], in[7]};
         if (abs(e->ax) > maxX || abs(e->az) > maxZ ||
             abs(e->bx) > maxX || abs(e->bz) > maxZ ||
             abs(e->tx) > 4096 || abs(e->tz) > 4096 ||
             (e->ax == e->bx && e->az == e->bz))
+            return false;
+        if (heightEdgeCount && (e->ax-e->bx)*e->tx + (e->az-e->bz)*e->tz <= 0)
             return false;
         e->ax += originX;
         e->bx += originX;
@@ -154,7 +158,7 @@ bool collisionLoad(FILE *file, SchoolRoom room, EdgeLayout edgeLayout, FloorLayo
         int tx = d->nz, tz = -d->nx;
         int halfX = tx*d->halfWidth, halfZ = tz*d->halfWidth;
         edges[edgeCount++] = (Edge){d->x+halfX, d->z+halfZ, d->x-halfX, d->z-halfZ,
-                                    tx*4096, tz*4096};
+                                    tx*4096, tz*4096, 0, 0};
     }
     return true;
 }
@@ -216,7 +220,17 @@ Floor collisionFloor(int x, int z)
     return (Floor){0};
 }
 
-static bool pushFromEdge(const Edge *e, int *x, int *z)
+static int edgeHeight(const Edge *e, int alongA, int alongB)
+{
+    if (e->ay == e->by || alongA >= 0) return e->ay;
+    if (alongB <= 0) return e->by;
+    // Projected distance from A and segment length, both in Q8.
+    int distance = (-alongA) >> 16;
+    int length = (alongB-alongA) >> 16;
+    return length ? e->ay + (e->by-e->ay)*distance/length : e->ay;
+}
+
+static bool pushFromEdge(const Edge *e, int *x, int *z, int feet, bool hasHeight)
 {
     int fromAX = *x-e->ax, fromAZ = *z-e->az;
     int fromBX = *x-e->bx, fromBZ = *z-e->bz;
@@ -224,11 +238,13 @@ static bool pushFromEdge(const Edge *e, int *x, int *z)
         (fromAZ > Radius && fromBZ > Radius) || (fromAZ < -Radius && fromBZ < -Radius))
         return false;
 
+    int alongA = fromAX*e->tx + fromAZ*e->tz;
+    int alongB = fromBX*e->tx + fromBZ*e->tz;
     int nx, nz, distance;
-    if (fromBX*e->tx + fromBZ*e->tz < 0 || fromAX*e->tx + fromAZ*e->tz > 0) {
+    if (alongB < 0 || alongA > 0) {
         // Beyond the segment, use its rounded end.
         int dx = fromBX, dz = fromBZ;
-        if (fromAX*e->tx + fromAZ*e->tz > 0) {
+        if (alongA > 0) {
             dx = fromAX;
             dz = fromAZ;
         }
@@ -245,6 +261,8 @@ static bool pushFromEdge(const Edge *e, int *x, int *z)
         if (distance >= Radius) return false;
         if (side < 0) { nx = -nx; nz = -nz; }
     }
+    // An edge below the actor's feet cannot push the ground collision circle.
+    if (hasHeight && feet < edgeHeight(e, alongA, alongB)) return false;
     *x += (nx*(Radius-distance)) >> 12;
     *z += (nz*(Radius-distance)) >> 12;
     return true;
@@ -261,15 +279,16 @@ static bool pushFromCylinder(const ObstacleCylinder *c, int *x, int *z)
     return true;
 }
 
-void collisionMove(int *worldX, int *worldZ, int dx, int dz)
+void collisionMove(int *worldX, int *worldZ, int dx, int dz, int floorHeight)
 {
     int x = *worldX + dx, z = *worldZ + dz;
+    int feet = floorHeight >> 4;
     // The largest walking step is under five centimetres. A second pass
     // resolves adjacent segments when sliding into a corner.
     for (unsigned pass = 0; pass < 2; pass++) {
         bool contact = false;
         for (unsigned i = 0; i < edgeCount; i++)
-            contact |= pushFromEdge(&edges[i], &x, &z);
+            contact |= pushFromEdge(&edges[i], &x, &z, feet, i < heightEdgeCount);
         for (unsigned i = 0; i < cylinderCount; i++)
             contact |= pushFromCylinder(&cylinders[i], &x, &z);
         if (!contact) break;
