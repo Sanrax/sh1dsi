@@ -628,12 +628,17 @@ def school_room(disc, room=39):
             add_model(bytes(data[info+4:info+12]).rstrip(b"\0"), pose[:9], pose[9:])
 
     # The PS1 ordering table layers wall decorations over their backing
-    # faces. First-floor posters need a wider gap at shallow camera angles.
-    gap = (16 if room == 12 else 2) * vertex_scale
+    # faces. Posters in these rooms need more clearance at shallow angles.
+    gap = (16 if room in (9, 10, 12, 16) else 2) * vertex_scale
     for (axis, depth, side), bounds, group, start, plaque in decorations:
         left, right, bottom, top = bounds
-        # Some first-floor posters already sit one Q8 unit in front of the wall.
-        depths = (depth, depth-side*vertex_scale) if room == 12 else (depth,)
+        # Some posters are authored one or two Q8 units off their wall.
+        if room == 12:
+            depths = (depth, depth-side*vertex_scale)
+        elif room in (9, 10, 16):
+            depths = tuple(depth + offset*vertex_scale for offset in (0, -1, 1, -2, 2))
+        else:
+            depths = (depth,)
         for wall in depths:
             if plaque or any(bounds != b and b[0] <= left and b[1] >= right and b[2] <= bottom and b[3] >= top
                              for b in walls[axis, wall, side]):

@@ -1360,6 +1360,18 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   those pixels in the emulated DLDI capture and verified the west
   double-door stop on the way. The PS1 courtyard remains darker.
 
+## Infirmary and north-side posters
+
+- The converter matches the wall behind the decals even when the
+  source places them one or two Q8 units away. It gives the matched
+  faces 62.5 mm of clearance, using the same offset as the first-floor
+  stairwell. The change affects the infirmary, the normal north hall
+  and the Otherworld west hall.
+- Five matched camera angles per room in melonDS DSi mode confined
+  visible changes to the adjusted wall decorations. The normal north
+  hall had 4,832 changed pixels summed over the five views. The
+  in-room sweep covers those three locations.
+
 ## Next
 
 1. Port the Otherworld west stairs using the original transition and ramp trace.
