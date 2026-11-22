@@ -62,13 +62,23 @@ def player_data(disc):
                                  *struct.unpack_from("<h", model, z+2*v), bone))
             for f in range(count):
                 face = model[prim+20*f:prim+20*f+20]
-                corners = (0, 1, 2) if face[15] == 255 else (0, 1, 3, 2)
                 palette = int.from_bytes(face[2:4], "little") >> 6
                 if face[7] or palette >= 15:
                     raise ValueError("unsupported player material")
-                for k in corners:
-                    uv = (0, 4, 8, 10)[k]
-                    groups[palette,len(corners)].extend(struct.pack("<HBB", slots[face[12+k]], *face[uv:uv+2]))
+                sides = 3 if face[15] == 255 else 4
+                indices = [slots[i] for i in face[12:12+sides]]
+                if sides == 3:
+                    polygons = ((0, 1, 2),)
+                elif len({vertices[i][3] for i in indices}) > 1:
+                    # Quads spanning joints can fold as the bones move.
+                    # Cull each half of the PS1 strip independently.
+                    polygons = ((0, 1, 2), (1, 3, 2))
+                else:
+                    polygons = ((0, 1, 3, 2),)
+                for corners in polygons:
+                    for k in corners:
+                        uv = (0, 4, 8, 10)[k]
+                        groups[palette,len(corners)].extend(struct.pack("<HBB", indices[k], *face[uv:uv+2]))
 
     # Anim_BonesUpdate and HarryAnim_Idle. Retain the native signed matrix
     # samples and their hierarchy so interpolation stays on the game clock.

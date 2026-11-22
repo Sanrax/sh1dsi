@@ -1369,13 +1369,29 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   and the Otherworld west hall.
 - Five matched camera angles per room in melonDS DSi mode confined
   visible changes to the adjusted wall decorations. The normal north
-  hall had 4,832 changed pixels summed over the five views. The
-  in-room sweep covers those three locations.
+  hall had 4,832 changed pixels summed over the five views.
+
+## Harry's joint faces
+
+- The converter splits the 73 quads that span different bones along
+  the original PS1 strip diagonal. The DSi can cull each half as the
+  joint moves. The actor uses 1,482 corners and the same animation data.
+- In 64 matched idle views in melonDS, the new mesh restored 413 pixels
+  of coverage, including 58 inside the previous silhouette. Eleven
+  pixels lost coverage with the different triangle rasterization.
+- The music room, Otherworld upper west hall and Otherworld east hall
+  each averaged 33.430 ms across 123 settled frame intervals. Peak
+  submission was 9.718 ms, and geometry peaked at 1,081 polygons and
+  4,190 vertices with no overflow in those samples.
+- Two independent BlocksDS 1.24.0 builds matched the unit-code-3 ROM
+  and all 38 converted files byte for byte. The production build
+  turned Harry in the music room and crossed into the corridor over
+  virtual console SD.
 
 ## Next
 
-1. Port the Otherworld west stairs using the original transition and ramp trace.
-2. Reach the rooftop and reproduce the Rubber Ball, drain and valve sequence.
+1. Port the Otherworld west stairs using the original transition and ramp trace, then connect the rooftop route.
+2. Compare the remaining school doors, walls and posters as the route expands, and implement the Rubber Ball drain puzzle.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026
