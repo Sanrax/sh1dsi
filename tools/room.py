@@ -27,6 +27,7 @@ ROOM_LAYOUTS = {
     8: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
     10: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES | ROOM_NORMALS,
     11: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_NORMALS,
+    13: ROOM_EDGE_HEIGHTS,
     14: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
     17: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES | ROOM_NORMALS,
     19: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
@@ -42,6 +43,7 @@ ROOM_LAYOUTS = {
     29: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
     30: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
     31: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES,
+    32: ROOM_EDGE_HEIGHTS,
 }
 
 
@@ -114,13 +116,14 @@ def collision_edges(ipd, room):
         if (max(a, b) >= vertices or floor >= surfaces or
                 (other != 255 and other >= surfaces) or length <= 0):
             raise ValueError("invalid school collision split")
-        # Room 32's level path intersects the floor boundary, benches and
-        # counter. The other surfaces are overhead or on the floor below.
-        if room == 32 and floor not in (1, 2, 3, 4, 6):
+        # SCFF00 has an inner shell along the hallway, plus the benches
+        # and counters. Its roof extends over the adjoining rooms.
+        if room == 32 and not (floor in (1, 2, 3, 4, 5, 6) or
+                               i in (36, 37, 49, 50, 51)):
             continue
-        # SCFE01 includes the connected stair ramp and landing. Keep their
-        # outside walls and leave the two shared walkable edges open.
-        if room == 31 and (floor in (1, 6, 10, 14) or other != 255):
+        # SCFE01 includes the locker banks, stair ramp and landing.
+        # Leave the shared walkable edges open.
+        if room == 31 and (floor == 14 or other != 255):
             continue
         # The upper and basement stair flights share this first-floor chunk.
         if room == 12 and (floor in (0, 1, 2, 10, 11) or other != 255):
@@ -138,7 +141,9 @@ def collision_edges(ipd, room):
         # can block movement from the passage even though their tops cannot.
         if room == 22 and ((floor < 3 and i not in (4, 6, 10, 12)) or other != 255):
             continue
-        if room == 13 and floor in (3, 4):
+        # SC0300's inside walls and door jambs are part of the shell
+        # above the ground. Keep its hall-facing outline.
+        if room == 13 and (floor == 3 or (floor == 4 and not 29 <= i <= 45)):
             continue
         # The alternate southern hallway's inside walls and the lockers.
         if room == 11 and not (i in (0, 4) or 7 <= i <= 14 or i >= 23):
@@ -207,7 +212,7 @@ def collision_edges(ipd, room):
         bx, by, bz = struct.unpack_from("<3h", collision, vert+6*b)
         # The top two bits of each tangent component are trigger flags.
         slope = struct.unpack_from("<2h", collision, surface+12*floor+8)
-        expected_slope = {(3, 0): (-2735, 0), (31, 11): (2731, 0), (12, 7): (2778, 5), (12, 9): (-2753, 0),
+        expected_slope = {(3, 0): (-2735, 0), (31, 11): (2731, 0), (32, 5): (0, -31), (12, 7): (2778, 5), (12, 9): (-2753, 0),
                           (22, 4): (0, 2867), (22, 6): (0, 2841), (28, 5): (2785, 6), (28, 7): (-2740, 0)}.get((room, floor), (0, 0))
         if (tx | tz) & 0xc000 or slope != expected_slope:
             raise ValueError("unsupported school collision flags or slope")

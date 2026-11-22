@@ -1337,6 +1337,18 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   close-up again during the plaque fade. The fixed virtual-SD build
   showed the courtyard until the fade reached the new plaque image.
 
+## Collision on the route out of the music room
+
+- The East Corridor stream includes three missing locker banks. The
+  music-room corridor includes the north counter and the inner hallway
+  shell. The south hall includes the inner walls and the closed double
+  doors west of the infirmary.
+- Eleven approach replays over emulated DLDI stopped within 7 mm of the
+  PS1 along the direction of travel. The original native build passed
+  0.50–1.52 m beyond the reference at the affected surfaces. The same
+  DSi replay still opened the courtyard doors from the south hall.
+  The converter changed `corridor.dat`, `east.dat` and `south.dat`.
+
 ## Next
 
 1. Port the Otherworld west stairs using the original transition and ramp trace.
