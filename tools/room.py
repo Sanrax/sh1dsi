@@ -565,7 +565,12 @@ def school_room(disc, room=39):
                             valid = max(us) < left or min(us) > right or max(vs) < top or min(vs) > bottom
                         if not valid:
                             raise ValueError("texture region overlaps a different palette")
-                flags = (face[7] >> 7) | (color_keys[mat][row] << 1) | (untextured << 2)
+                # The PS1 blends textured pixels only when the CLUT entry
+                # also has STP set. A blend-enabled cutout can be opaque.
+                translucent = face[7] >> 7
+                if translucent and not untextured and item_page is None:
+                    translucent = any(color & 0x8000 for color in scene_textures[mat][2][row])
+                flags = translucent | (color_keys[mat][row] << 1) | (untextured << 2)
                 key = state, mat, row, flags
                 group = groups[key]
                 start = len(group)

@@ -1349,6 +1349,17 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   DSi replay still opened the courtyard doors from the south hall.
   The converter changed `corridor.dat`, `east.dat` and `south.dat`.
 
+## Courtyard and school cutouts
+
+- The converter checks both the PS1 primitive's blend flag and the
+  palette's STP bit. The courtyard trees and bushes keep their cutout
+  gaps and draw their visible texels opaquely. The same fix applies to
+  school materials with those palette flags.
+- The melonDS DSi entry comparison changed 4,241 pixels around the
+  courtyard canopy. The production virtual-SD run matched all of
+  those pixels in the emulated DLDI capture and verified the west
+  double-door stop on the way. The PS1 courtyard remains darker.
+
 ## Next
 
 1. Port the Otherworld west stairs using the original transition and ramp trace.
