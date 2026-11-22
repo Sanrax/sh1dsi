@@ -1388,9 +1388,26 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   turned Harry in the music room and crossed into the corridor over
   virtual console SD.
 
+## Otherworld west staircase
+
+- MAP1_S02 point 95 and MAP1_S03 point 71 connect the two west halls
+  when Harry walks across the original stair triggers. Both ramps use
+  the floor planes already in the room streams. The settled entry cameras
+  use the PS1 poses and movement continues on the existing chase roads.
+- The melonDS 1.1 DSi-mode DLDI replay matched both PS1 landing positions,
+  heights and headings. Across 65 moving samples, the nearest PS1 position
+  differed in height by at most 48 Q12 units (12 mm). The arrival views
+  differed by 6.66 and 6.30 RGB values on average on a 0–255 scale.
+  The production virtual-SD replay reached the stairs through the Picture
+  Card and teachers' rooms and kept their progression state on return.
+- The native frame intervals averaged 33.413 ms and 33.431 ms on the two
+  sides. The PS1 samples stayed at 33.367 ms. The longest native interval
+  was 48.480 ms. Geometry peaked at 840 polygons and 3,232 vertices with
+  no overflow. Peak submission was 8.773 ms.
+
 ## Next
 
-1. Port the Otherworld west stairs using the original transition and ramp trace, then connect the rooftop route.
+1. Connect the second-floor west flight to the roof stairs and rooftop.
 2. Compare the remaining school doors, walls and posters as the route expands, and implement the Rubber Ball drain puzzle.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 

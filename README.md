@@ -101,6 +101,10 @@ From those double doors, the next single door to the east leads to the
 storage room. Walk to the pile at the far end, face the Rubber Ball, and
 press A to inspect it. Choose Yes to take it or No to leave it on the pile.
 
+Beyond the northern teachers' room, follow the west hall north and take
+the steps on the left. Walk up to reach the second-floor west hall.
+Turn back down the same flight to return to the first floor.
+
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left
 or Right changes the confirmation choice. After saving, B returns to the room.

@@ -115,7 +115,9 @@ static const DoorView doorViews[] = {
     {OtherworldNorthHall, OtherworldWestHall, {508902, -8003, 784384, 531424, -3319, 784612}, 0},
     {OtherworldWestHall, OtherworldNorthHall, {254174, -8003, 289996, 231639, -3404, 289741}, 0},
     {OtherworldStorage, OtherworldNorthHall, {409088, -11008, 412787, 407044, -4096, 400625}, 0},
-    {OtherworldNorthHall, OtherworldStorage, {512409, -8003, 789521, 512603, -3392, 766986}, 0}
+    {OtherworldNorthHall, OtherworldStorage, {512409, -8003, 789521, 512603, -3392, 766986}, 0},
+    {OtherworldUpperWestHall, OtherworldWestHall, {-399991, -4873, 309222, -410324, 912, 317009}, 0},
+    {OtherworldWestHall, OtherworldUpperWestHall, {250053, -10240, 311239, 240399, -5664, 302278}, 0}
 };
 static const CameraPose *doorView;
 static const CameraPose otherworldArrival = {-72982, -14626, -228551, -77354, -3034, -252059};
@@ -634,7 +636,10 @@ static const StairExit stairExits[] = {
     {EastCorridor, FirstFloor, -184320, 174899, 6144, 6144, 454656, 188006, 3072, 441876, 179657},
     {FirstFloor, EastCorridor, 462848, 188006, 6144, 6144, -192512, 174899, 3072, -204178, 184306},
     {FirstFloor, BasementStair, 462848, 174489, 6144, 6144, 237568, -77824, 3072, 224047, -85118},
-    {BasementStair, FirstFloor, 245760, -77824, 6144, 6144, 454656, 174489, 3072, 442003, 182974}
+    {BasementStair, FirstFloor, 245760, -77824, 6144, 6144, 454656, 174489, 3072, 442003, 182974},
+    // MAP1_S02 point 95 ascends to MAP1_S03. Point 71 returns below it.
+    {OtherworldWestHall, OtherworldUpperWestHall, 229376, 303104, 6144, 6144, -413696, 316620, 1024, -399991, 309222},
+    {OtherworldUpperWestHall, OtherworldWestHall, -421888, 316620, 6144, 6144, 237568, 303104, 1024, 250053, 311239}
 };
 
 void playerEnterRoom(SchoolRoom from, RoomExit exit)
