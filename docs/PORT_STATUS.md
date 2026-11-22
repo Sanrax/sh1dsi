@@ -1328,6 +1328,15 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   data files include `storageroom.dat` (176,374 bytes). The other 37 match
   the previous build byte for byte.
 
+## Inspection fades
+
+- The notebook and inspection screens keep their bitmap layer hidden
+  until the new page is ready. In a production melonDS 1.1 DSi replay,
+  Harry opened the infirmary notebook, checked the locked clock tower
+  and inspected the sun plaque. The old build briefly showed the clock
+  close-up again during the plaque fade. The fixed virtual-SD build
+  showed the courtyard until the fade reached the new plaque image.
+
 ## Next
 
 1. Port the Otherworld west stairs using the original transition and ramp trace.

@@ -131,7 +131,7 @@ NotebookResult notebookMenu(const char *dir, bool loading, Checkpoint *point)
     if (!n) return NotebookClosed;
     Art *a = readArt(dir);
     if (!a) return NotebookMissingArt;
-    int bg = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
+    int bg = bgInitHidden(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     bgSetPriority(bg, 0);
     uint16_t *screen = bgGetGfxPtr(bg);
     if (!loading && !(point->flags & NotebookRead)) {
@@ -141,7 +141,6 @@ NotebookResult notebookMenu(const char *dir, bool loading, Checkpoint *point)
         point->flags |= NotebookRead;
     }
     bgHide(0);
-    bgShow(bg);
     NotebookResult result = NotebookClosed;
     MenuState state = Browse;
     bool draw = true, yes = false;
@@ -177,6 +176,7 @@ NotebookResult notebookMenu(const char *dir, bool loading, Checkpoint *point)
                                    loading ? "A Load   B New game" : "A Save   B Return";
                 text(a, screen, hint, 20, 195, false);
             }
+            bgShow(bg);
             draw = false;
         }
         unsigned keys = input();
@@ -217,10 +217,8 @@ NotebookResult notebookMenu(const char *dir, bool loading, Checkpoint *point)
         }
         state = Saved;
     }
-    bgHide(bg);
-    bgInit(3, BgType_Bmp8, BgSize_B8_256x256, 0, 0);
+    bgInitHidden(3, BgType_Bmp8, BgSize_B8_256x256, 0, 0);
     bgSetPriority(bg, 0);
-    bgHide(bg);
     free(a);
     return result;
 }

@@ -228,17 +228,15 @@ static bool readHand(const char *dir, Art *art)
 
 static uint16_t *openScreen(void)
 {
-    int bg = bgInit(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
+    int bg = bgInitHidden(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     bgSetPriority(bg, 0);
     return bgGetGfxPtr(bg);
 }
 
 static void closeScreen(void)
 {
-    bgHide(3);
-    int bg = bgInit(3, BgType_Bmp8, BgSize_B8_256x256, 0, 0);
+    int bg = bgInitHidden(3, BgType_Bmp8, BgSize_B8_256x256, 0, 0);
     bgSetPriority(bg, 0);
-    bgHide(bg);
     bgShow(0);
 }
 
