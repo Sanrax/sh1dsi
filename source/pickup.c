@@ -24,6 +24,7 @@ typedef struct {
 static Corner silverCorners[156*3], drinkCorners[124*3], kitCorners[76*3];
 static Corner chemicalCorners[188*3], goldCorners[156*3];
 static Corner lobbyKitCorners[76*3], lobbyBulletCorners[44*3], cardCorners[4*3];
+static Corner ballCorners[352*3];
 static const struct {
     int x, z;
     unsigned flag;
@@ -38,6 +39,7 @@ static const struct {
     [LobbyKit] = {402227, 573849, LobbyKitHeld, lobbyKitCorners, sizeof lobbyKitCorners/sizeof(Corner)},
     [LobbyBullets] = {399441, 567705, LobbyBulletsHeld, lobbyBulletCorners, sizeof lobbyBulletCorners/sizeof(Corner)},
     [PictureCard] = {0, 0, PictureCardHeld, cardCorners, sizeof cardCorners/sizeof(Corner)},
+    [RubberBall] = {0, 0, RubberBallHeld, ballCorners, sizeof ballCorners/sizeof(Corner)},
 };
 static Model models[sizeof pickups/sizeof pickups[0]];
 static uint16_t fontPalette[16];
@@ -240,6 +242,11 @@ void pickupStart(void)
         } else {
             preparePickup(GoldMedallion);
         }
+        return;
+    }
+    if (roomCurrent() == OtherworldStorage) {
+        if (models[RubberBall].loaded && !pickupHidden(RubberBall) && playerFacingRubberBall())
+            preparePickup(RubberBall);
         return;
     }
     if (roomCurrent() == NorthClassroom) {

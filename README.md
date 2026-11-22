@@ -97,6 +97,10 @@ east wall and press A to unlatch them. Dismiss the notice with A or B,
 then press A to reach the north hall. The doors stay unlocked in both
 directions. Run the current asset converter to update the local data.
 
+From those double doors, the next single door to the east leads to the
+storage room. Walk to the pile at the far end, face the Rubber Ball, and
+press A to inspect it. Choose Yes to take it or No to leave it on the pile.
+
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left
 or Right changes the confirmation choice. After saving, B returns to the room.

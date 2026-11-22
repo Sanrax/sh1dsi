@@ -113,7 +113,9 @@ static const DoorView doorViews[] = {
     {TeachersSouth, TeachersNorth, {76797, -8601, 425958, 67874, -2816, 435622}, 0},
     {OtherworldWestHall, TeachersNorth, {243902, -8003, 292044, 266433, -3404, 292297}, 0},
     {OtherworldNorthHall, OtherworldWestHall, {508902, -8003, 784384, 531424, -3319, 784612}, 0},
-    {OtherworldWestHall, OtherworldNorthHall, {254174, -8003, 289996, 231639, -3404, 289741}, 0}
+    {OtherworldWestHall, OtherworldNorthHall, {254174, -8003, 289996, 231639, -3404, 289741}, 0},
+    {OtherworldStorage, OtherworldNorthHall, {409088, -11008, 412787, 407044, -4096, 400625}, 0},
+    {OtherworldNorthHall, OtherworldStorage, {512409, -8003, 789521, 512603, -3392, 766986}, 0}
 };
 static const CameraPose *doorView;
 static const CameraPose otherworldArrival = {-72982, -14626, -228551, -77354, -3034, -252059};
@@ -226,6 +228,7 @@ static const ChaseRoad chaseRoads[MusicRoom] = {
     [Courtyard]     = {-436, -196, -1096, -848, ChaseArea},
     [OtherworldCourtyard] = {-436, -196, -1096, -848, ChaseArea},
     [OtherworldLobby] = {1572, 1572, 2188, 2272, ChaseAlongZ},
+    [OtherworldStorage] = {1598, 1598, 1560, 1672, ChaseAlongZ},
     [OtherworldSideHall] = {2108, 2364, 2187, 2291, ChaseAlongX},
     [OtherworldEastHall] = {1710, 1756, 964, 1169, ChaseAlongZ},
     [TeachersSouth] = {252, 355, 1523, 1718, ChaseArea},
@@ -820,6 +823,26 @@ bool playerFacingCard(void)
            facingEdge(570572, 405504, 1024, 0, 1);
 }
 
+bool playerFacingRubberBall(void)
+{
+    // MAP1_S02 points 33 and 34 sit on adjacent edges of the same pile.
+    static const struct { int x, z, angle, width; } points[] = {
+        {410419, 413286, 115*16, 1536}, {409190, 414105, 179*16, 2048}
+    };
+    int rx = sinLerp(yaw*8)/2, rz = cosLerp(yaw*8)/2;
+    for (unsigned i = 0; i < sizeof points/sizeof points[0]; i++) {
+        int dx = points[i].x-x, dz = points[i].z-z;
+        if (abs(dx) > 4096 || abs(dz) > 4096) continue;
+        int nx = -sinLerp(points[i].angle*8), nz = -cosLerp(points[i].angle*8);
+        int reach = rx*nx + rz*nz;
+        int distance = dx*nx + dz*nz;
+        if (reach > 0 && distance >= 0 && distance <= reach &&
+            (int64_t)abs(rx*dz-dx*rz)*4096 <= (int64_t)points[i].width*reach)
+            return true;
+    }
+    return false;
+}
+
 bool playerFacingSlot(void)
 {
     // MAP1_S02 point 26 is the west wall of reception.
@@ -905,7 +928,7 @@ int playerSetCamera(void)
                     room == UpperNorthHall || room == OtherworldNorthHall || room == OtherworldLobby ||
                     room == OtherworldSideHall || room == OtherworldEastHall ||
                     room == OtherworldSouthHall || room == OtherworldWestHall ||
-                    room == OtherworldUpperWestHall;
+                    room == OtherworldUpperWestHall || room == OtherworldStorage;
     bool equipment = room == EquipmentRoom;
     bool stairwell = room == EastCorridor || room == FirstFloor || room == BasementStair;
     bool boiler = room == BoilerRoom;
@@ -1005,7 +1028,7 @@ int playerSetCamera(void)
         bool rail = doorRail && !followingRoad;
         // The authored southern hall road fixes the chase eye at Q4 -27.
         int chaseHeight = room == SouthHall ? 27*256 : 8600;
-        bool highEye = room == OtherworldLobby || classroom;
+        bool highEye = room == OtherworldLobby || room == OtherworldStorage || classroom;
         if (highEye) chaseHeight = 43*256;
         if (reception) chaseHeight = 38*256;
         if (boiler) chaseHeight = (z < -68403 ? 27 : 38)*256;

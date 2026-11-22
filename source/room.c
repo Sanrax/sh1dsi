@@ -23,7 +23,7 @@ typedef struct {
 
 enum { StaticBatch, HangingSilverBatch, FallenSilverBatch, DrinkBatch, KitBatch, ChemicalBatch,
        IntactHandBatch, OpenHandBatch, GoldAtHandBatch, BoilerUnwiredBatch, BoilerReadyBatch, BoilerGlowBatch,
-       LobbyKitBatch, LobbyBulletsBatch, LobbyNearFanBatch, LobbyFarFanBatch, PictureCardBatch, PhoneDeskBatch };
+       LobbyKitBatch, LobbyBulletsBatch, LobbyNearFanBatch, LobbyFarFanBatch, PictureCardBatch, PhoneDeskBatch, RubberBallBatch };
 
 typedef RoomVertex Vertex;
 _Static_assert(sizeof(LitPoint) == 10 && sizeof(LitCorner) == 4, "lit room vertex layout");
@@ -97,6 +97,9 @@ static const Door schoolDoors[] = {
     // MAP1_S02 points 80 and 56, with a latch on the west-hall side.
     {OtherworldWestHall, OtherworldNorthHall, 255590, 289996, -1, 0, 3584},
     {OtherworldNorthHall, OtherworldWestHall, 507494, 784384, 1, 0, 3584},
+    // MAP1_S02 points 58 and 61, the storage room door.
+    {OtherworldNorthHall, OtherworldStorage, 512409, 790937, 0, -1, 2304},
+    {OtherworldStorage, OtherworldNorthHall, 407142, 395673, 0, 1, 2304},
     {BasementStair, BoilerRoom, 219545, -70451, 1, 0, 2304},
     {BoilerRoom, BasementStair, 93388, -79872, -1, 0, 2304}
 };
@@ -174,6 +177,7 @@ static RoomOrigin legacyRoomOrigin(SchoolRoom room)
     case OtherworldUpperWestHall:
     case TeachersSouth:
     case TeachersNorth:
+    case OtherworldStorage:
     case NorthClassroom:
     case SouthClassroom:
     case TowerPassage: break; // These rooms require a stream origin.
@@ -341,10 +345,11 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     bool streamed = hasOrigin || !memcmp(header.magic, "SHM1", 4);
     bool lobby = room == OtherworldLobby;
     bool pictureCard = room == NorthClassroom;
+    bool rubberBall = room == OtherworldStorage;
     bool otherworld = room == OtherworldCourtyard || room == OtherworldNorthHall || lobby ||
                       room == OtherworldSideHall || room == OtherworldEastHall ||
                       room == OtherworldSouthHall || room == OtherworldReception || room == OtherworldWestHall ||
-                      pictureCard || room == SouthClassroom || roomIsRestroom(room) ||
+                      (pictureCard || rubberBall) || room == SouthClassroom || roomIsRestroom(room) ||
                       room == OtherworldUpperWestHall || roomIsTeachersRoom(room);
     if (!hasOrigin && (room == BasementStair || room == BoilerRoom ||
                        room == ClockTower || room == FarClockTower || room == TowerPassage ||
@@ -413,8 +418,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     bool infirmaryItems = medical || (room == Infirmary && !memcmp(header.magic, "SHI2", 4));
     enum { KeyTileBytes = 64*64/2, SmokeTileBytes = 32*128, SupplyTileBytes = 64*128/2 };
     bool phoneRoom = room == TeachersNorth;
-    unsigned itemPages = pour ? 2 : chemical || infirmaryItems || lobby || pictureCard || phoneRoom ? 1 : 0;
-    unsigned itemBytes = pour ? KeyTileBytes+SmokeTileBytes : (chemical || pictureCard || phoneRoom) ? KeyTileBytes :
+    unsigned itemPages = pour ? 2 : chemical || infirmaryItems || lobby || pictureCard || rubberBall || phoneRoom ? 1 : 0;
+    unsigned itemBytes = pour ? KeyTileBytes+SmokeTileBytes : (chemical || pictureCard || rubberBall || phoneRoom) ? KeyTileBytes :
                          infirmaryItems ? 64*256/2 : lobby ? SupplyTileBytes : 0;
     unsigned itemOffset = 128*1024-itemBytes;
     if (header.textureBytes < itemBytes) return false;
@@ -509,6 +514,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     if (pictureCard && (!pickupLoad(file, PictureCard, itemOffset, pages[scenePages].firstPalette) ||
                         !pickupLoadScatteredCards(file)))
         return false;
+    if (rubberBall && !pickupLoad(file, RubberBall, itemOffset, pages[scenePages].firstPalette))
+        return false;
     if (chemical && (!pickupLoad(file, Chemical, itemOffset, pages[scenePages].firstPalette) ||
                      !pickupLoadEmptyShelf(file)))
         return false;
@@ -559,7 +566,7 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
     geometry = lit ? NULL : malloc(geometryBytes);
     litGeometry = lit ? malloc(total*sizeof *litGeometry) : NULL;
     if (!geometry && !litGeometry) return false;
-    unsigned maxState = phoneRoom ? PhoneDeskBatch : pictureCard ? PictureCardBatch : lobby ? LobbyFarFanBatch : boiler ? BoilerGlowBatch : pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
+    unsigned maxState = rubberBall ? RubberBallBatch : phoneRoom ? PhoneDeskBatch : pictureCard ? PictureCardBatch : lobby ? LobbyFarFanBatch : boiler ? BoilerGlowBatch : pour ? GoldAtHandBatch : chemical ? ChemicalBatch : medical ? KitBatch :
                         corridor ? StaticBatch : FallenSilverBatch;
     uint32_t *end = geometry;
     GeometryChunk *chunk = chunks;
@@ -568,7 +575,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
         if (fread(b, sizeof *b, 1, file) != 1 || b->page >= header.pages ||
             b->state > maxState || b->flags > (streamed || room == Courtyard ? 7 : 3) ||
             b->palette >= pages[b->page].palettes ||
-            ((chemical || pour || phoneRoom) && b->page >= scenePages) ||
+            ((chemical || pour || phoneRoom || rubberBall) && b->page >= scenePages) ||
+            (rubberBall && b->state != StaticBatch && b->state != RubberBallBatch) ||
             (phoneRoom && b->state != StaticBatch && b->state != PhoneDeskBatch) ||
             b->quads > (total-pos)/4)
             return false;
@@ -776,6 +784,7 @@ void roomDraw(const Medallion *medal)
         [LobbyFarFanBatch] = true,
         [PictureCardBatch] = !pickupHidden(PictureCard),
         [PhoneDeskBatch] = phoneDeskVisible(),
+        [RubberBallBatch] = !pickupHidden(RubberBall),
     };
     for (unsigned i = 0; i < header.batches; i++) {
         const Batch *b = &batches[i];

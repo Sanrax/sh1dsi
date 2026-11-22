@@ -24,7 +24,8 @@ and back. The two first-floor teachers' rooms provide a route around
 the west-hall barrier. Facing the north room's exit triggers the
 original phone call. Start skips it and returns control to Harry. The
 doors beyond the barrier unlock from the west hall and reconnect it to
-the north hall.
+the north hall. The storage room opens from the north hall, and Harry can
+inspect, decline or collect the Rubber Ball.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -1304,10 +1305,33 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   data files. `westlatch.dat` is 3,864 bytes. `piano.dat` adds one tone
   and retains the existing samples. The other 35 data files match.
 
+## Otherworld storage room
+
+- MAP1_S02 points 58 and 61 connect the north hall to the storage room.
+  The room uses original wall and pile collision, door sound pair 12,
+  the Rubber Ball model and the original prompt. Accepting the pickup
+  removes the model and keeps the ball across room loads.
+- The production melonDS 1.1 DSi-mode replay used virtual SD to reach
+  the room from the powered-boiler checkpoint. It declined, collected
+  and returned to the hall. A focused DLDI replay also went back to
+  the shelf and verified that the pickup could only be taken once.
+  Both arrival poses matched the PS1. The compared storage arrival and
+  north-hall return frames differed by 10.85 and 9.00 RGB values on
+  average on a 0–255 scale. The native chase camera approximates the
+  original moving view, and the pickup frames differed by 13.22–13.44.
+- Within continuous scene and pickup segments, melonDS averaged 33.379 ms
+  (1,650 intervals) and 33.269 ms (104). PS1 averaged 46.826 ms (238)
+  and 62.368 ms (107). Both native 95th percentiles were 33.43 ms.
+  Peak submission was 11.393 ms, geometry reached 1,383 polygons and
+  5,302 vertices, and no overflow was observed. Hardware timing is pending.
+- BlocksDS 1.24.0 produced two identical unit-code-3 ROMs. The 38 local
+  data files include `storageroom.dat` (176,374 bytes). The other 37 match
+  the previous build byte for byte.
+
 ## Next
 
-1. Connect the north hall to the storage room and collect the Rubber Ball.
-2. Trace the Otherworld stairs to the rooftop drain on PS1.
+1. Port the Otherworld west stairs using the original transition and ramp trace.
+2. Reach the rooftop and reproduce the Rubber Ball, drain and valve sequence.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

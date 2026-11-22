@@ -5,7 +5,7 @@ import struct
 
 from harry import courtyard_look_frames, ladder_frames, player_data, pour_frames
 from phone import receiver_texture
-from pickup import chemical_pickup, gold_pickup, lobby_pickups, medical_pickups, picture_card, prompt_data, silver_pickup
+from pickup import chemical_pickup, gold_pickup, lobby_pickups, medical_pickups, picture_card, prompt_data, rubber_ball, silver_pickup
 from vab import statue_sound
 from xa import courtyard_voices
 
@@ -29,6 +29,7 @@ ROOM_LAYOUTS = {
     11: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_NORMALS,
     14: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
     17: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES | ROOM_NORMALS,
+    19: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
     20: ROOM_DOOR_NOTICE,
     21: 0,
     22: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES | ROOM_LADDER_ASCENT,
@@ -95,6 +96,7 @@ def collision_edges(ipd, room):
                 13: (30720, 0, 80, 12, 80, 0), 11: (30720, 0, 33, 7, 35, 0), 9: (10240, 30720, 45, 11, 49, 0), 8: (10240, 0, 34, 6, 34, 0),
                 10: (10240, 10240, 40, 9, 42, 0),
                 14: (0, 0, 35, 6, 36, 0), 17: (-30720, 10240, 54, 14, 56, 0),
+                19: (20480, 20480, 38, 5, 38, 0),
                 20: (-30720, -20480, 16, 3, 16, 0), 21: (-40960, -20480, 16, 3, 16, 0),
                 22: (-20480, -20480, 28, 8, 32, 0),
                 23: (-10240, -20480, 204, 61, 236, 0), 24: (-10240, -20480, 172, 31, 175, 0),
@@ -193,6 +195,9 @@ def collision_edges(ipd, room):
         # The teachers' rooms share outer shells and overhead beams.
         # The northern room also has a desk and two low chairs.
         if room in (6, 7) and (i < 8 or 12 <= i < 16):
+            continue
+        # Storage has separate outer shells, inside walls and pole/pile edges.
+        if room == 19 and (i < 4 or 8 <= i < 12):
             continue
         if room == 8 and i < 8:
             continue
@@ -377,10 +382,10 @@ def smoke_atlas(disc):
 
 
 def school_room(disc, room=39):
-    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 11: (3, 0), 6: (0, 2), 7: (0, 3), 8: (1, 0), 10: (1, 1), 14: (0, 0), 17: (253, 1), 9: (1, 3),
+    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 11: (3, 0), 6: (0, 2), 7: (0, 3), 8: (1, 0), 10: (1, 1), 14: (0, 0), 17: (253, 1), 19: (2, 2), 9: (1, 3),
               23: (255, 254), 24: (255, 254), 25: (3, 4), 26: (2, 3), 27: (3, 3), 28: (2, 1), 29: (3, 2), 30: (3, 1), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
               3: (1, 255), 2: (0, 255), 20: (253, 254), 21: (252, 254), 22: (254, 254)}[room]
-    prefix = "SU" if room in (6, 7, 8, 10, 11, 14, 17, 24, 25, 26, 27, 28, 29, 30) else "SC"
+    prefix = "SU" if room in (6, 7, 8, 10, 11, 14, 17, 19, 24, 25, 26, 27, 28, 29, 30) else "SC"
     data = disc.read(f"BG/{prefix}{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -461,6 +466,17 @@ def school_room(disc, room=39):
                     pixels[x] = indices[value & 15] | indices[value >> 4] << 4
             color = cluts[2]
             cluts[2] = (color[1], 0, *color[2:15], color[1])
+        if room == 19 and name == "SUBFO2":
+            if {i for i, color in enumerate(cluts[7]) if color == 0} != {0, 13}:
+                raise ValueError("unexpected storage cutout palette")
+            remapped_regions[i, 7] = (176, 223, 160, 255)
+            indices = (15, *range(1, 13), 15, 14, 0)
+            for y in range(160, 256):
+                for x in range(y*128+88, y*128+112):
+                    value = pixels[x]
+                    pixels[x] = indices[value & 15] | indices[value >> 4] << 4
+            color = cluts[7]
+            cluts[7] = (color[15], *color[1:13], color[15], color[14], 0)
         if room == 23 and name == "SC1FSEH":
             # The last CLUT is unreferenced in this IPD.
             cluts = cluts[:7]
@@ -723,6 +739,14 @@ def school_room(disc, room=39):
             x, y, z = (int(v*4096)>>4 for v in (139.199, -0.8753, 99.3733))
             add_model(b"KEY_HIDE", (c,0,s,0,4096,0,-s,0,c), (x-30720,y,z-20480), 16)
             extra, pixels, colors = picture_card(disc)
+            page_info.append((len(pages), 64, len(palettes)//32, 1))
+            pages.extend(pixels)
+            palettes.extend(colors)
+        elif room == 19:
+            # WorldObject_PlacementInit places BOLL_HID on the pile.
+            x, y, z = (int(v*4096)>>4 for v in (100.124, -1.08, 101.166))
+            add_model(b"BOLL_HID", (4096,0,0,0,4096,0,0,0,4096), (x-20480,y,z-20480), 18)
+            extra, pixels, colors = rubber_ball(disc)
             page_info.append((len(pages), 64, len(palettes)//32, 1))
             pages.extend(pixels)
             palettes.extend(colors)

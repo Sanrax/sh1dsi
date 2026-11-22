@@ -36,6 +36,7 @@ bool playerFacingLobbyFan(void);
 bool playerFacingChemical(void);
 bool playerFacingHand(void);
 bool playerFacingCard(void);
+bool playerFacingRubberBall(void);
 bool playerFacingSlot(void);
 bool playerLoadSlot(FILE *file);
 void playerWarpForSlot(void);

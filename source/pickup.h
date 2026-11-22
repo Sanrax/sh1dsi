@@ -2,7 +2,7 @@
 #define SH1_PICKUP_H
 #include "player.h"
 
-typedef enum { SilverMedallion, HealthDrink, FirstAidKit, Chemical, GoldMedallion, LobbyKit, LobbyBullets, PictureCard } PickupItem;
+typedef enum { SilverMedallion, HealthDrink, FirstAidKit, Chemical, GoldMedallion, LobbyKit, LobbyBullets, PictureCard, RubberBall } PickupItem;
 typedef enum { PickupQuiet, PickupMove, PickupCancel, PickupConfirm,
                PickupBoilerSwitch, PickupBoilerStart } PickupSound;
 

@@ -162,6 +162,12 @@ def picture_card(disc):
     return model, *key_item_tile(disc, 192, 7, column=64)
 
 
+def rubber_ball(disc):
+    model = model_corners(disc.read("ITEM/UNQ63.TMD"), (178, 178, 352), (202, 14), 192, 192)
+    model.extend(prompt_data(disc, 37, map_bearings=True, otherworld=True))
+    return model, *key_item_tile(disc, 192, 3)
+
+
 def lobby_pickups(disc):
     kit = model_corners(disc.read("ITEM/UNQ20.TMD"), (40, 34, 76), (11, 15), 0, 0)
     bullets = model_corners(disc.read("ITEM/UNQC0.TMD"), (24, 21, 44), (779, 15), 0, -64, u_offset=192)
