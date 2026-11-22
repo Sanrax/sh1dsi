@@ -118,4 +118,6 @@ def school_bank(map_vab, base_vab, first_floor_vab, otherworld_vab):
     # MAP1_S02 event 11 plays effects 1454 and 1343 at half volume.
     tones.extend(convert_tones(otherworld_vab, [(0, 39, 64)], samples))
     tones.extend(convert_tones(base_vab, [(2, 55, 64)], samples))
+    # MAP1_S02's locked corridor door uses BASE.VAB effect 1344.
+    tones.extend(convert_tones(base_vab, [(2, 56, 38)], samples))
     return tones + struct.pack("<H", starts[0]) + samples

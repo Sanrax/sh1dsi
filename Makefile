@@ -10,7 +10,7 @@ include $(BLOCKSDS)/sys/default_makefiles/rom_arm9/Makefile
 
 .PHONY: sdcard
 sdcard: $(ROM)
-	@for data in piano room corridor east firstfloor south north uppernorth laboratory equipment courtyard infirmary notebook tower hand basement boiler clockroom passage fartower otherworld otherworldnorth otherworldlobby otherworldside otherworldeast otherworldsouth reception cardslot otherworldwest restroom otherworldupperwest teacherssouth teachersnorth phone classroomnorth classroomsouth; do \
+	@for data in piano room corridor east firstfloor south north uppernorth laboratory equipment courtyard infirmary notebook tower hand basement boiler clockroom passage fartower otherworld otherworldnorth otherworldlobby otherworldside otherworldeast otherworldsouth reception cardslot otherworldwest westlatch restroom otherworldupperwest teacherssouth teachersnorth phone classroomnorth classroomsouth; do \
 		test -f dist/sh1dsi/$$data.dat || { echo "Missing $$data.dat. Run tools/prepare_assets.py with your CUE first."; exit 1; }; \
 	done
 	@mkdir -p dist

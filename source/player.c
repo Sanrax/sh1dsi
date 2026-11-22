@@ -111,7 +111,9 @@ static const DoorView doorViews[] = {
     {OtherworldWestHall, TeachersSouth, {243902, -8003, 239206, 266433, -3404, 239448}, 239206},
     {TeachersNorth, TeachersSouth, {72704, -8601, 563336, 72934, -2816, 551019}, 0},
     {TeachersSouth, TeachersNorth, {76797, -8601, 425958, 67874, -2816, 435622}, 0},
-    {OtherworldWestHall, TeachersNorth, {243902, -8003, 292044, 266433, -3404, 292297}, 0}
+    {OtherworldWestHall, TeachersNorth, {243902, -8003, 292044, 266433, -3404, 292297}, 0},
+    {OtherworldNorthHall, OtherworldWestHall, {508902, -8003, 784384, 531424, -3319, 784612}, 0},
+    {OtherworldWestHall, OtherworldNorthHall, {254174, -8003, 289996, 231639, -3404, 289741}, 0}
 };
 static const CameraPose *doorView;
 static const CameraPose otherworldArrival = {-72982, -14626, -228551, -77354, -3034, -252059};

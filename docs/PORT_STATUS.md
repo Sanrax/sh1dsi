@@ -22,7 +22,9 @@ Harry can use the Picture Card in reception to open the west hall.
 The women's restroom takes Harry from there to the upstairs west hall
 and back. The two first-floor teachers' rooms provide a route around
 the west-hall barrier. Facing the north room's exit triggers the
-original phone call. Start skips it and returns control to Harry.
+original phone call. Start skips it and returns control to Harry. The
+doors beyond the barrier unlock from the west hall and reconnect it to
+the north hall.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -1239,6 +1241,7 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   local data files include `teacherssouth.dat` (105,940 bytes) and
   `teachersnorth.dat` (128,100 bytes). The other 33 files match the
   previous build byte for byte.
+
 ## Teachers' room phone call
 
 - MAP1_S02 event 14 starts automatically at point 91. The event uses
@@ -1255,9 +1258,9 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
 - The production virtual-SD replay started at the powered-boiler
   checkpoint. The harness resumed the same ROM at the classroom card
   prompt and during the northern room load after reading the wrong
-  dialog counter and checking the arrival pose before loading finished. The build completed the call over virtual SD and
-  crossed into the far side of the west hall with the Picture Card
-  and reception unlock intact.
+  dialog counter and checking the arrival pose before loading finished.
+  The build completed the call over virtual SD and crossed into the
+  far side of the west hall with the Picture Card and reception unlock intact.
 - The original replay completed in 1,980 VBlanks with the scripted
   reply dismissal and 155 VBlanks with early Start. The eight paired
   DSi shots differed by 6.66–9.88 RGB values on average on a 0–255
@@ -1281,10 +1284,30 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   eleven seconds of the ring that the scene cuts after 10.4 seconds,
   plus the full dialogue track.
 
+## Otherworld west-hall latch
+
+- MAP1_S02 points 80 and 56 connect the west and north halls. The north
+  side starts locked. The west side displays the unlock message and
+  makes later crossings possible in both directions for the current run.
+  Both notices and the door use the original sounds.
+- A focused melonDS 1.1 DSi-mode DLDI replay checked both latch directions,
+  repeated crossings and the north jamb. The collision stop differed from
+  PS1 by 1.2 mm along the collision axis. Settled entry views differed by
+  6.33 and 7.58 RGB values on average on a 0–255 scale. The production
+  virtual-SD replay started at the powered-boiler checkpoint and reached
+  both sides through the Picture Card route and the teachers' room call.
+- The north-hall walk averaged 33.430 ms over 110 melonDS intervals
+  and 33.367 ms over 97 PS1 intervals. The melonDS maximum interval was
+  33.442 ms, peak submission was 5.853 ms, and geometry peaked at
+  872 polygons and 3,438 vertices with zero overflows.
+- BlocksDS 1.24.0 produced two identical unit-code-3 ROMs and 37 local
+  data files. `westlatch.dat` is 3,864 bytes. `piano.dat` adds one tone
+  and retains the existing samples. The other 35 data files match.
+
 ## Next
 
-1. Connect the west hall to the north hall through points 80 and 56 with the original one-way latch.
-2. Follow the school route to the Rubber Ball and rooftop drain.
+1. Connect the north hall to the storage room and collect the Rubber Ball.
+2. Trace the Otherworld stairs to the rooftop drain on PS1.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

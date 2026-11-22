@@ -92,8 +92,10 @@ its north door to reach the northern teachers' room. Keep to the east of
 the desk and chairs and leave by the east door near the far end to get
 past the west-hall barrier. Facing the exit triggers the phone call
 automatically. A or B advances Harry's final replies. Start skips the
-scene. Run the current asset converter to get `phone.dat` and the
-updated room stream.
+scene. Once Harry is beyond the barrier, face the double doors on the
+east wall and press A to unlatch them. Dismiss the notice with A or B,
+then press A to reach the north hall. The doors stay unlocked in both
+directions. Run the current asset converter to update the local data.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

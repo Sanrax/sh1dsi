@@ -43,7 +43,7 @@ static Model models[sizeof pickups/sizeof pickups[0]];
 static uint16_t fontPalette[16];
 static enum { Inactive, Stopping, Kneeling, Preparing, Inspecting, Rising, LatchNotice,
               EmptyShelfNotice, EmptyHandNotice, BoilerStopping, BoilerPrompt,
-              BoilerStarting, BoilerNoEffect, BoilerRunning, TowerInsideNotice, LobbyFanNotice, ScatteredCardsNotice } phase;
+              BoilerStarting, BoilerNoEffect, BoilerRunning, TowerInsideNotice, LobbyFanNotice, ScatteredCardsNotice, WestLatchNotice, WestLockedNotice } phase;
 static PickupItem activeItem;
 static unsigned ticks, selected, flash, shown;
 static unsigned collected;
@@ -55,6 +55,9 @@ static uint16_t scatteredCardsCount;
 static uint16_t fanCount[2];
 static unsigned fanPage;
 static bool unlocked, powered;
+static Glyph westDoorGlyphs[2][24];
+static uint16_t westDoorCount[2];
+static bool westLatchOpen;
 static Glyph boilerQuestion[48], boilerNoEffect[24], boilerRunning[24];
 static uint16_t boilerCount, boilerLength, boilerNoEffectCount, boilerRunningCount;
 // MAP1_S00 callbacks 18 and 19, measured from switch confirmation.
@@ -156,6 +159,22 @@ void lobbyFanStart(void)
 }
 
 bool latchLoad(FILE *file) { return loadNotice(file, latchGlyphs, 24, &latchCount); }
+
+bool westLatchLoad(FILE *file)
+{
+    return loadNotice(file, westDoorGlyphs[0], 24, &westDoorCount[0]) &&
+           loadNotice(file, westDoorGlyphs[1], 24, &westDoorCount[1]);
+}
+
+bool westLatchStart(bool unlock)
+{
+    if (westLatchOpen || !westDoorCount[unlock] || pickupActive()) return false;
+    phase = unlock ? WestLatchNotice : WestLockedNotice;
+    ticks = shown = 0;
+    return true;
+}
+
+bool westLatchUnlocked(void) { return westLatchOpen; }
 
 bool pickupLoadEmptyShelf(FILE *file) { return loadNotice(file, emptyShelfGlyphs, 24, &emptyShelfCount); }
 
@@ -280,6 +299,8 @@ PickupSound pickupTick(unsigned pressed)
         }
         break;
     case LatchNotice:
+    case WestLatchNotice:
+    case WestLockedNotice:
     case EmptyShelfNotice:
     case EmptyHandNotice:
     case BoilerNoEffect:
@@ -288,17 +309,20 @@ PickupSound pickupTick(unsigned pressed)
     case TowerInsideNotice: {
         // Event_DisplayMapMsgWithSfx delays the first latch glyph by 0.2 s.
         bool latch = phase == LatchNotice;
-        unsigned count = latch ? latchCount : phase == EmptyHandNotice ? emptyHandCount :
+        bool westDoor = phase == WestLatchNotice || phase == WestLockedNotice;
+        unsigned count = westDoor ? westDoorCount[phase == WestLatchNotice] :
+                         latch ? latchCount : phase == EmptyHandNotice ? emptyHandCount :
                          phase == BoilerNoEffect ? boilerNoEffectCount :
                          phase == BoilerRunning ? boilerRunningCount :
                          phase == TowerInsideNotice ? towerDoorCount :
                          phase == ScatteredCardsNotice ? scatteredCardsCount : emptyShelfCount;
         bool advance = pressed & (KEY_A | KEY_B);
-        if (latch && ++ticks < 12) break;
+        if ((latch || westDoor) && ++ticks < 12) break;
         if (shown < count) {
             shown = advance ? count : shown+1;
         } else if (advance) {
             if (latch) unlocked = true;
+            if (phase == WestLatchNotice) westLatchOpen = true;
             phase = Inactive;
         }
         break;
@@ -436,6 +460,8 @@ void pickupDrawPrompt(int bg)
     static unsigned lastShown, lastHighlight;
     unsigned visible = phase >= LatchNotice || phase == Inspecting ? shown : 0;
     const Glyph *text = phase == LatchNotice ? latchGlyphs :
+                        phase == WestLatchNotice ? westDoorGlyphs[1] :
+                        phase == WestLockedNotice ? westDoorGlyphs[0] :
                         phase == EmptyShelfNotice ? emptyShelfGlyphs :
                         phase == EmptyHandNotice ? emptyHandGlyphs : phase == BoilerPrompt ? boilerQuestion :
                         phase == BoilerNoEffect ? boilerNoEffect :

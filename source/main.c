@@ -34,16 +34,23 @@ typedef struct {
 enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, DoorUnlock,
        PromptMove, PromptCancel, PromptConfirm, InsertMedallion, TowerChime,
        BoilerSwitchSound, BoilerStartSound, BoilerDoorOpen, BoilerDoorClose, BoilerHum, TowerOpening,
-       OtherworldDoorOpen, OtherworldDoorClose, SideHallOpen, SideHallClose, CardSlide, CardUnlock, ToneCount };
+       OtherworldDoorOpen, OtherworldDoorClose, SideHallOpen, SideHallClose, CardSlide, CardUnlock, DoorLocked, ToneCount };
 static const int pickupSounds[] = {
     [PickupMove] = PromptMove, [PickupCancel] = PromptCancel, [PickupConfirm] = PromptConfirm,
     [PickupBoilerSwitch] = BoilerSwitchSound, [PickupBoilerStart] = BoilerStartSound
 };
 static Tone tones[ToneCount];
-static uint8_t samples[388 * 1024] __attribute__((aligned(32)));
+static uint8_t samples[400 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
 static uint16_t humLoop;
 static const char *assetDir;
+
+static FILE *openAsset(const char *name)
+{
+    char path[40];
+    snprintf(path, sizeof path, "%s/%s.dat", assetDir, name);
+    return fopen(path, "rb");
+}
 
 static FILE *openRoom(SchoolRoom room)
 {
@@ -82,9 +89,7 @@ static FILE *openRoom(SchoolRoom room)
     case BoilerRoom: name = "boiler"; break;
     default: return NULL;
     }
-    char path[40];
-    snprintf(path, sizeof path, "%s/%s.dat", assetDir, name);
-    FILE *file = fopen(path, "rb");
+    FILE *file = openAsset(name);
     if (file) setvbuf(file, NULL, _IOFBF, 16*1024);
     return file;
 }
@@ -121,14 +126,14 @@ static bool loadPiano(void)
     assetDir = cart ? "fat:/sh1dsi" : "sd:/sh1dsi";
     if (!file)
         return false;
-    static const char versions[] = "123456789ABCD";
+    static const char versions[] = "123456789ABCDE";
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets &&
                  !memcmp(assets.magic, "SHP", 3) && assets.magic[3];
     const char *version = valid ? strchr(versions, assets.magic[3]) : NULL;
     valid = version != NULL;
     if (valid && version != versions) {
         static const unsigned counts[] = {0, 9, 10, 12, 14, 15, InsertMedallion,
-                                          BoilerSwitchSound, TowerOpening, OtherworldDoorOpen, SideHallOpen, CardSlide, ToneCount};
+                                          BoilerSwitchSound, TowerOpening, OtherworldDoorOpen, SideHallOpen, CardSlide, DoorLocked, ToneCount};
         toneCount = counts[version-versions];
         valid = loadTones(file, toneCount);
     }
@@ -184,6 +189,15 @@ static void updateBoilerHum(void)
     previousVolume = volume;
 }
 
+static void loadWestLatch(void)
+{
+    FILE *file = openAsset("westlatch");
+    if (!file) stop("Missing westlatch.dat.\nRun the asset converter.");
+    bool valid = westLatchLoad(file) && fgetc(file) == EOF && !ferror(file);
+    fclose(file);
+    if (!valid) stop("Invalid westlatch.dat.");
+}
+
 static void changeRoom(RoomExit exit)
 {
     SchoolRoom from = roomCurrent(), next = exit.room;
@@ -233,6 +247,11 @@ static void changeRoom(RoomExit exit)
     if (!ok) {
         setBrightness(1, 0);
         stop("Invalid school room data.");
+    }
+    static bool westLatchLoaded;
+    if (!westLatchLoaded && (next == OtherworldNorthHall || next == OtherworldWestHall)) {
+        loadWestLatch();
+        westLatchLoaded = true;
     }
     if (from == TeachersNorth) phoneUnload();
     if (next == TeachersNorth && !phoneComplete() && !phoneLoad(assetDir))
@@ -386,6 +405,9 @@ int main(void)
                     SchoolRoom next = exit.room;
                     if (next == SouthHall && roomCurrent() == FirstFloor && !latchUnlocked()) {
                         if (latchStart()) sound = DoorUnlock;
+                    } else if (roomUsesWestLatch(roomCurrent(), next) && !westLatchUnlocked()) {
+                        bool unlock = roomCurrent() == OtherworldWestHall;
+                        if (westLatchStart(unlock)) sound = unlock ? DoorUnlock : DoorLocked;
                     } else if (next != roomCurrent()) {
                         inspectionFade = 0;
                         changeRoom(exit);

@@ -87,7 +87,7 @@ def prepare(cue):
         # USA/maps/sym.map1_s01.txt and map1_s01.yaml identify the two tables.
         offset = 0x800DD500 - 0x800C9578
         tables = overlay[offset:offset+11] + overlay[offset+12:offset+17]
-        data = (b"SHPD" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
+        data = (b"SHPE" + tables + piano_cursor(disc.read("TIM/BG_ETC.TIM"))
                 + background(disc.read("TIM/PIANO1.TIM"))
                 + background(disc.read("TIM/PIANO2.TIM"))
                 + school_bank(disc.read("SND/MEP101.VAB"), disc.read("1ST/BASE.VAB"),
@@ -121,6 +121,8 @@ def prepare(cue):
         reception = school_room(disc, 8)
         slot = card_slot_data(disc)
         otherworld_west = school_room(disc, 10)
+        west_latch = b"".join(prompt_data(disc, n, choices=False, map_bearings=True, otherworld=True)
+                              for n in (12, 13))
         restroom = school_room(disc, 14)
         otherworld_upper_west = school_room(disc, 17)
         teachers_south = school_room(disc, 6)
@@ -157,6 +159,7 @@ def prepare(cue):
     write_asset(OUTPUT.with_name("reception.dat"), reception)
     write_asset(OUTPUT.with_name("cardslot.dat"), slot)
     write_asset(OUTPUT.with_name("otherworldwest.dat"), otherworld_west)
+    write_asset(OUTPUT.with_name("westlatch.dat"), west_latch)
     write_asset(OUTPUT.with_name("restroom.dat"), restroom)
     write_asset(OUTPUT.with_name("otherworldupperwest.dat"), otherworld_upper_west)
     write_asset(OUTPUT.with_name("teacherssouth.dat"), teachers_south)

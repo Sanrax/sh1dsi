@@ -94,6 +94,9 @@ static const Door schoolDoors[] = {
     {TeachersNorth, OtherworldWestHall, 95027, 595558, -1, 0, 2304},
     {TeachersSouth, TeachersNorth, 68812, 439910, 0, -1, 2304},
     {TeachersNorth, TeachersSouth, 72908, 547225, 0, 1, 2304},
+    // MAP1_S02 points 80 and 56, with a latch on the west-hall side.
+    {OtherworldWestHall, OtherworldNorthHall, 255590, 289996, -1, 0, 3584},
+    {OtherworldNorthHall, OtherworldWestHall, 507494, 784384, 1, 0, 3584},
     {BasementStair, BoilerRoom, 219545, -70451, 1, 0, 2304},
     {BoilerRoom, BasementStair, 93388, -79872, -1, 0, 2304}
 };

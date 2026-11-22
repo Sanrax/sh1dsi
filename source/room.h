@@ -28,6 +28,12 @@ static inline bool roomUsesCardDoor(SchoolRoom from, SchoolRoom to)
            (from == OtherworldWestHall && to == OtherworldReception);
 }
 
+static inline bool roomUsesWestLatch(SchoolRoom from, SchoolRoom to)
+{
+    return (from == OtherworldWestHall && to == OtherworldNorthHall) ||
+           (from == OtherworldNorthHall && to == OtherworldWestHall);
+}
+
 typedef struct {
     SchoolRoom room, other;
     int x, z, nx, nz, halfWidth;
