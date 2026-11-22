@@ -120,4 +120,6 @@ def school_bank(map_vab, base_vab, first_floor_vab, otherworld_vab):
     tones.extend(convert_tones(base_vab, [(2, 55, 64)], samples))
     # MAP1_S02's locked corridor door uses BASE.VAB effect 1344.
     tones.extend(convert_tones(base_vab, [(2, 56, 38)], samples))
+    # MAP1_S03 connects the rooftop through sound pair 14.
+    tones.extend(convert_tones(base_vab, [(2, 52, 127), (2, 53, 127)], samples))
     return tones + struct.pack("<H", starts[0]) + samples

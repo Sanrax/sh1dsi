@@ -103,7 +103,11 @@ press A to inspect it. Choose Yes to take it or No to leave it on the pile.
 
 Beyond the northern teachers' room, follow the west hall north and take
 the steps on the left. Walk up to reach the second-floor west hall.
-Turn back down the same flight to return to the first floor.
+Turn back down the same flight to return to the first floor. For the
+roof, step off the lower flight, turn south a short way along the
+landing, and take the other westbound flight. Press A at the door at
+the top to step onto the roof. The same door and stairs return to the
+second floor.
 
 Face the notebook on the eastern desk and press A. A or B advances the first
 visit’s message. Choose a slot with Up or Down, press A, then confirm. Left

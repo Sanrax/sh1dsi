@@ -117,7 +117,11 @@ static const DoorView doorViews[] = {
     {OtherworldStorage, OtherworldNorthHall, {409088, -11008, 412787, 407044, -4096, 400625}, 0},
     {OtherworldNorthHall, OtherworldStorage, {512409, -8003, 789521, 512603, -3392, 766986}, 0},
     {OtherworldUpperWestHall, OtherworldWestHall, {-399991, -4873, 309222, -410324, 912, 317009}, 0},
-    {OtherworldWestHall, OtherworldUpperWestHall, {250053, -10240, 311239, 240399, -5664, 302278}, 0}
+    {OtherworldWestHall, OtherworldUpperWestHall, {250053, -10240, 311239, 240399, -5664, 302278}, 0},
+    {RoofStairs, OtherworldUpperWestHall, {-235556, -15631, -71168, -247844, -1440, -70346}, 0},
+    {SchoolRooftop, RoofStairs, {-110944, -13433, -41519, -122539, 0, -46334}, 0},
+    {RoofStairs, SchoolRooftop, {-258816, -1962, -71168, -237567, -6400, -70451}, 0},
+    {OtherworldUpperWestHall, RoofStairs, {-399719, -10240, 309529, -410531, -5632, 302676}, 0}
 };
 static const CameraPose *doorView;
 static const CameraPose otherworldArrival = {-72982, -14626, -228551, -77354, -3034, -252059};
@@ -231,6 +235,8 @@ static const ChaseRoad chaseRoads[MusicRoom] = {
     [OtherworldCourtyard] = {-436, -196, -1096, -848, ChaseArea},
     [OtherworldLobby] = {1572, 1572, 2188, 2272, ChaseAlongZ},
     [OtherworldStorage] = {1598, 1598, 1560, 1672, ChaseAlongZ},
+    [RoofStairs] = {-1011, -921, -278, -278, ChaseAlongX},
+    [SchoolRooftop] = {-491, -200, -292, -144, ChaseArea},
     [OtherworldSideHall] = {2108, 2364, 2187, 2291, ChaseAlongX},
     [OtherworldEastHall] = {1710, 1756, 964, 1169, ChaseAlongZ},
     [TeachersSouth] = {252, 355, 1523, 1718, ChaseArea},
@@ -639,7 +645,10 @@ static const StairExit stairExits[] = {
     {BasementStair, FirstFloor, 245760, -77824, 6144, 6144, 454656, 174489, 3072, 442003, 182974},
     // MAP1_S02 point 95 ascends to MAP1_S03. Point 71 returns below it.
     {OtherworldWestHall, OtherworldUpperWestHall, 229376, 303104, 6144, 6144, -413696, 316620, 1024, -399991, 309222},
-    {OtherworldUpperWestHall, OtherworldWestHall, -421888, 316620, 6144, 6144, 237568, 303104, 1024, 250053, 311239}
+    {OtherworldUpperWestHall, OtherworldWestHall, -421888, 316620, 6144, 6144, 237568, 303104, 1024, 250053, 311239},
+    // MAP1_S03 points 72 and 7 connect the second floor to the roof flight.
+    {OtherworldUpperWestHall, RoofStairs, -421888, 303104, 6144, 6144, -249856, -70451, 1024, -235556, -71168},
+    {RoofStairs, OtherworldUpperWestHall, -258048, -70451, 6144, 6144, -413696, 303104, 1024, -399719, 309529}
 };
 
 void playerEnterRoom(SchoolRoom from, RoomExit exit)
@@ -935,10 +944,10 @@ int playerSetCamera(void)
                     room == OtherworldSouthHall || room == OtherworldWestHall ||
                     room == OtherworldUpperWestHall || room == OtherworldStorage;
     bool equipment = room == EquipmentRoom;
-    bool stairwell = room == EastCorridor || room == FirstFloor || room == BasementStair;
+    bool stairwell = room == EastCorridor || room == FirstFloor || room == BasementStair || room == RoofStairs;
     bool boiler = room == BoilerRoom;
     bool infirmary = room == Infirmary;
-    bool courtyard = room == Courtyard || room == OtherworldCourtyard;
+    bool courtyard = room == Courtyard || room == OtherworldCourtyard || room == SchoolRooftop;
     bool lab = room == ChemistryLab;
     int ground = collisionFloor(x, z).height;
     RoomOrigin roomOffset = roomOrigin();
@@ -1033,12 +1042,14 @@ int playerSetCamera(void)
         bool rail = doorRail && !followingRoad;
         // The authored southern hall road fixes the chase eye at Q4 -27.
         int chaseHeight = room == SouthHall ? 27*256 : 8600;
-        bool highEye = room == OtherworldLobby || room == OtherworldStorage || classroom;
+        bool highEye = room == OtherworldLobby || room == OtherworldStorage || room == SchoolRooftop || classroom;
         if (highEye) chaseHeight = 43*256;
+        if (room == SchoolRooftop) chaseHeight = 52*256;
         if (reception) chaseHeight = 38*256;
         if (boiler) chaseHeight = (z < -68403 ? 27 : 38)*256;
         eyeHeight = ((rail ? 7987 : chaseHeight)-ground)/2;
-        targetHeight = ((rail ? 3533 : highEye ? 4096 : reception ? 5120 : 2816)-ground)/2;
+        int watchHeight = room == SchoolRooftop ? 0 : highEye ? 4096 : reception ? 5120 : 2816;
+        targetHeight = ((rail ? 3533 : watchHeight)-ground)/2;
         // The small road limits the camera to 2.5 metres above map origin.
         if (eyeHeight > 5120 && !highEye) eyeHeight = 5120;
     }

@@ -100,6 +100,9 @@ static const Door schoolDoors[] = {
     // MAP1_S02 points 58 and 61, the storage room door.
     {OtherworldNorthHall, OtherworldStorage, 512409, 790937, 0, -1, 2304},
     {OtherworldStorage, OtherworldNorthHall, 407142, 395673, 0, 1, 2304},
+    // MAP1_S03 points 5 and 6 lead out to the roof.
+    {RoofStairs, SchoolRooftop, -231833, -70451, -1, 0, 2304},
+    {SchoolRooftop, RoofStairs, -124108, -45056, 1, 0, 2304},
     {BasementStair, BoilerRoom, 219545, -70451, 1, 0, 2304},
     {BoilerRoom, BasementStair, 93388, -79872, -1, 0, 2304}
 };
@@ -178,6 +181,8 @@ static RoomOrigin legacyRoomOrigin(SchoolRoom room)
     case TeachersSouth:
     case TeachersNorth:
     case OtherworldStorage:
+    case RoofStairs:
+    case SchoolRooftop:
     case NorthClassroom:
     case SouthClassroom:
     case TowerPassage: break; // These rooms require a stream origin.
@@ -350,7 +355,8 @@ static bool loadRoom(FILE *file, SchoolRoom room, bool scenery)
                       room == OtherworldSideHall || room == OtherworldEastHall ||
                       room == OtherworldSouthHall || room == OtherworldReception || room == OtherworldWestHall ||
                       (pictureCard || rubberBall) || room == SouthClassroom || roomIsRestroom(room) ||
-                      room == OtherworldUpperWestHall || roomIsTeachersRoom(room);
+                      room == OtherworldUpperWestHall || room == RoofStairs || room == SchoolRooftop ||
+                      roomIsTeachersRoom(room);
     if (!hasOrigin && (room == BasementStair || room == BoilerRoom ||
                        room == ClockTower || room == FarClockTower || room == TowerPassage ||
                        otherworld))

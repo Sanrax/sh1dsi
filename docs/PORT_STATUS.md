@@ -25,7 +25,8 @@ the west-hall barrier. Facing the north room's exit triggers the
 original phone call. Start skips it and returns control to Harry. The
 doors beyond the barrier unlock from the west hall and reconnect it to
 the north hall. The storage room opens from the north hall, and Harry can
-inspect, decline or collect the Rubber Ball.
+inspect, decline or collect the Rubber Ball. The two west flights and
+their roof door reach the tank and valve on the Otherworld rooftop.
 Upstairs, the east corridor connects through the north hall to the chemistry lab
 and equipment room. Harry can collect the Chemical, open the hand statue
 and take the gold medallion.
@@ -1405,10 +1406,43 @@ See the replay instructions on `diagnostics/dsi`. Native simulation uses
   was 48.480 ms. Geometry peaked at 840 polygons and 3,232 vertices with
   no overflow. Peak submission was 8.773 ms.
 
+## Otherworld rooftop route
+
+- MAP1_S03 points 72 and 7 connect the second-floor west hall to the
+  roof flight. Points 5 and 6 link its door to the roof. Both rooms use
+  the original geometry, with the valve placed at its original pose.
+  The stairs use the three authored ground planes. The camera follows
+  the hall and roof bounds after leaving the measured entry shots.
+- The melonDS 1.1 DSi-mode DLDI replay matched all four PS1 landing
+  positions, heights and headings, and walked around the tank to the
+  valve and back. The door requested sound pair 14 on both crossings
+  and ARM7 allocated all four samples. The four settled views differed
+  by 5.29–7.15 RGB values on average on a 0–255 scale.
+- The production virtual-SD replay started at the powered-boiler
+  checkpoint, took both west flights, crossed the roof door twice and
+  descended to the second floor with the Picture Card and story state
+  intact.
+- Five host-side movement probes using the same native collision code
+  matched the original stair, tank and railing stops within 8 mm along
+  the approach axis. All 12,288 texels in the three remapped cutout
+  regions retained the original colors and transparent pixels.
+- The DSi stair and roof replays averaged 33.430 ms (318 intervals) and
+  33.368 ms (2,708). The matched PS1 route averaged 41.448 ms (256) and
+  35.748 ms (1,002). The longest DSi intervals were 49.972 and 49.970 ms.
+  Peak geometry was 1,022 polygons and 3,966 vertices on the stairs,
+  and 841 and 3,226 on the roof, with zero overflow. These are emulator
+  measurements.
+- Two independent BlocksDS 1.24.0 builds matched the unit-code-3 ROM
+  and all 40 local data files. `roofstairs.dat` is 142,197 bytes and
+  `rooftop.dat` is 130,126 bytes. `piano.dat` adds the two roof door
+  sounds. The earlier PCM and the other 37 files match byte for byte.
+  The 1,480-byte DSpico driver patches into the new ROM and preserves
+  unit code 3. Pico-Launcher and hardware validation remain pending.
+
 ## Next
 
-1. Connect the second-floor west flight to the roof stairs and rooftop.
-2. Compare the remaining school doors, walls and posters as the route expands, and implement the Rubber Ball drain puzzle.
+1. Port the roof drain inspections and Rubber Ball placement using the captured PS1 events.
+2. Port the valve sequence and continue to the key pickup, checking school collision and posters along the route.
 3. Measure boot, scene pacing and checkpoint I/O on physical console SD and DSpico.
 
 Based on the original GPL-3.0 decompilation, Copyright (C) 2026

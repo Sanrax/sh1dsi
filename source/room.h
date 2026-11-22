@@ -4,12 +4,12 @@
 #include <stdio.h>
 #include "medallion.h"
 
-typedef enum { MusicRoom = 39, EquipmentRoom = 35, ChemistryLab = 34, UpperNorthHall = 33, SchoolCorridor = 32,
+typedef enum { MusicRoom = 39, SchoolRooftop = 36, EquipmentRoom = 35, ChemistryLab = 34, UpperNorthHall = 33, SchoolCorridor = 32,
                EastCorridor = 31, SouthClassroom = 30, NorthClassroom = 29, OtherworldEastHall = 28, OtherworldSideHall = 27, OtherworldLobby = 26,
                OtherworldNorthHall = 25, OtherworldCourtyard = 24, Courtyard = 23,
                TowerPassage = 22, FarClockTower = 21, ClockTower = 20,
                FirstFloor = 12, OtherworldSouthHall = 11, SouthHall = 13, NorthHall = 16, OtherworldWestHall = 10, OtherworldReception = 8, Infirmary = 9,
-               OtherworldRestroom = 14, OtherworldUpperRestroom = 15, OtherworldUpperWestHall = 17, OtherworldStorage = 19,
+               OtherworldRestroom = 14, OtherworldUpperRestroom = 15, OtherworldUpperWestHall = 17, RoofStairs = 18, OtherworldStorage = 19,
                TeachersSouth = 6, TeachersNorth = 7, BasementStair = 3, BoilerRoom = 2 } SchoolRoom;
 
 static inline bool roomIsTeachersRoom(SchoolRoom room)

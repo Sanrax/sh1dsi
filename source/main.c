@@ -34,13 +34,13 @@ typedef struct {
 enum { DoorOpen = 10, DoorClose, HallOpen, HallClose, DoorUnlock,
        PromptMove, PromptCancel, PromptConfirm, InsertMedallion, TowerChime,
        BoilerSwitchSound, BoilerStartSound, BoilerDoorOpen, BoilerDoorClose, BoilerHum, TowerOpening,
-       OtherworldDoorOpen, OtherworldDoorClose, SideHallOpen, SideHallClose, CardSlide, CardUnlock, DoorLocked, ToneCount };
+       OtherworldDoorOpen, OtherworldDoorClose, SideHallOpen, SideHallClose, CardSlide, CardUnlock, DoorLocked, RoofDoorOpen, RoofDoorClose, ToneCount };
 static const int pickupSounds[] = {
     [PickupMove] = PromptMove, [PickupCancel] = PromptCancel, [PickupConfirm] = PromptConfirm,
     [PickupBoilerSwitch] = BoilerSwitchSound, [PickupBoilerStart] = BoilerStartSound
 };
 static Tone tones[ToneCount];
-static uint8_t samples[400 * 1024] __attribute__((aligned(32)));
+static uint8_t samples[432 * 1024] __attribute__((aligned(32)));
 static unsigned toneCount;
 static uint16_t humLoop;
 static const char *assetDir;
@@ -83,6 +83,8 @@ static FILE *openRoom(SchoolRoom room)
     case TeachersSouth: name = "teacherssouth"; break;
     case TeachersNorth: name = "teachersnorth"; break;
     case OtherworldStorage: name = "storageroom"; break;
+    case RoofStairs: name = "roofstairs"; break;
+    case SchoolRooftop: name = "rooftop"; break;
     case NorthClassroom: name = "classroomnorth"; break;
     case SouthClassroom: name = "classroomsouth"; break;
     case TowerPassage: name = "passage"; break;
@@ -127,14 +129,14 @@ static bool loadPiano(void)
     assetDir = cart ? "fat:/sh1dsi" : "sd:/sh1dsi";
     if (!file)
         return false;
-    static const char versions[] = "123456789ABCDE";
+    static const char versions[] = "123456789ABCDEF";
     bool valid = fread(&assets, 1, sizeof assets, file) == sizeof assets &&
                  !memcmp(assets.magic, "SHP", 3) && assets.magic[3];
     const char *version = valid ? strchr(versions, assets.magic[3]) : NULL;
     valid = version != NULL;
     if (valid && version != versions) {
         static const unsigned counts[] = {0, 9, 10, 12, 14, 15, InsertMedallion,
-                                          BoilerSwitchSound, TowerOpening, OtherworldDoorOpen, SideHallOpen, CardSlide, DoorLocked, ToneCount};
+                                          BoilerSwitchSound, TowerOpening, OtherworldDoorOpen, SideHallOpen, CardSlide, DoorLocked, RoofDoorOpen, ToneCount};
         toneCount = counts[version-versions];
         valid = loadTones(file, toneCount);
     }
@@ -217,6 +219,7 @@ static void changeRoom(RoomExit exit)
                 (from == FirstFloor && next == SouthHall) || (from == SouthHall && next == FirstFloor);
     bool towerDoor = (next == ClockTower && from == Courtyard) || otherworldIntro;
     bool slotDoor = roomUsesCardDoor(from, next);
+    bool roofDoor = from == SchoolRooftop || next == SchoolRooftop;
     bool door = !exit.stairs && next != TowerPassage && from != TowerPassage;
     bool boilerDoor = toneCount > BoilerDoorClose && (next == BoilerRoom || from == BoilerRoom);
     int opening = hall ? HallOpen : DoorOpen, closing = hall ? HallClose : DoorClose;
@@ -226,6 +229,9 @@ static void changeRoom(RoomExit exit)
     } else if (boilerDoor) {
         opening = BoilerDoorOpen;
         closing = BoilerDoorClose;
+    } else if (roofDoor && toneCount > RoofDoorClose) {
+        opening = RoofDoorOpen;
+        closing = RoofDoorClose;
     } else if (slotDoor) {
         opening = HallOpen;
         closing = HallClose;

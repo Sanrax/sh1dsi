@@ -30,7 +30,9 @@ ROOM_LAYOUTS = {
     13: ROOM_EDGE_HEIGHTS,
     14: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
     17: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_WIDE_VERTICES | ROOM_GROUND_PLANES | ROOM_NORMALS,
+    18: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES | ROOM_NORMALS,
     19: ROOM_EDGE_HEIGHTS | ROOM_NORMALS,
+    36: ROOM_EDGE_HEIGHTS | ROOM_WIDE_VERTICES | ROOM_NORMALS,
     20: ROOM_DOOR_NOTICE,
     21: 0,
     22: ROOM_EDGE_HEIGHTS | ROOM_FLOOR_PLANES | ROOM_GROUND_PLANES | ROOM_LADDER_ASCENT,
@@ -98,7 +100,9 @@ def collision_edges(ipd, room):
                 13: (30720, 0, 80, 12, 80, 0), 11: (30720, 0, 33, 7, 35, 0), 9: (10240, 30720, 45, 11, 49, 0), 8: (10240, 0, 34, 6, 34, 0),
                 10: (10240, 10240, 40, 9, 42, 0),
                 14: (0, 0, 35, 6, 36, 0), 17: (-30720, 10240, 54, 14, 56, 0),
+                18: (-20480, -10240, 19, 6, 24, 0),
                 19: (20480, 20480, 38, 5, 38, 0),
+                36: (-10240, -10240, 58, 8, 59, 0),
                 20: (-30720, -20480, 16, 3, 16, 0), 21: (-40960, -20480, 16, 3, 16, 0),
                 22: (-20480, -20480, 28, 8, 32, 0),
                 23: (-10240, -20480, 204, 61, 236, 0), 24: (-10240, -20480, 172, 31, 175, 0),
@@ -201,6 +205,13 @@ def collision_edges(ipd, room):
         # The northern room also has a desk and two low chairs.
         if room in (6, 7) and (i < 8 or 12 <= i < 16):
             continue
+        # The roof flight's walkable planes share two ramp edges. Keep
+        # the inside shell along the stair and door.
+        if room == 18 and i not in (0, 10, 11, 17, 18, 22, 23):
+            continue
+        # The roof's railings, drain curb, and walls border the flat path.
+        if room == 36 and not (i < 12 or 18 <= i <= 29 or i in (30, 34, 35, 36, 37, 38)):
+            continue
         # Storage has separate outer shells, inside walls and pole/pile edges.
         if room == 19 and (i < 4 or 8 <= i < 12):
             continue
@@ -237,7 +248,7 @@ def collision_edges(ipd, room):
         return output
 
     floors = bytearray()
-    floor_planes = {17: range(1, 8), 10: (2, 3, 4, 5), 11: (3,), 3: (0, 1), 22: range(3, 8), 31: (11, 12), 23: (*range(37, 41), *range(50, 60)),
+    floor_planes = {17: range(1, 8), 18: (0, 1, 2), 10: (2, 3, 4, 5), 11: (3,), 3: (0, 1), 22: range(3, 8), 31: (11, 12), 23: (*range(37, 41), *range(50, 60)),
                     24: (15, 16, 17, 18, 28, 29), 25: (1,), 26: (2,), 28: range(1, 8)}[room]
     floor_count = 0
     for plane in floor_planes:
@@ -387,10 +398,10 @@ def smoke_atlas(disc):
 
 
 def school_room(disc, room=39):
-    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 11: (3, 0), 6: (0, 2), 7: (0, 3), 8: (1, 0), 10: (1, 1), 14: (0, 0), 17: (253, 1), 19: (2, 2), 9: (1, 3),
+    cx, cz = {39: (253, 0), 32: (255, 0), 31: (254, 1), 12: (2, 1), 13: (3, 0), 11: (3, 0), 6: (0, 2), 7: (0, 3), 8: (1, 0), 10: (1, 1), 14: (0, 0), 17: (253, 1), 18: (254, 255), 19: (2, 2), 36: (255, 255), 9: (1, 3),
               23: (255, 254), 24: (255, 254), 25: (3, 4), 26: (2, 3), 27: (3, 3), 28: (2, 1), 29: (3, 2), 30: (3, 1), 16: (3, 4), 33: (255, 4), 34: (254, 2), 35: (253, 2),
               3: (1, 255), 2: (0, 255), 20: (253, 254), 21: (252, 254), 22: (254, 254)}[room]
-    prefix = "SU" if room in (6, 7, 8, 10, 11, 14, 17, 19, 24, 25, 26, 27, 28, 29, 30) else "SC"
+    prefix = "SU" if room in (6, 7, 8, 10, 11, 14, 17, 18, 19, 24, 25, 26, 27, 28, 29, 30, 36) else "SC"
     data = disc.read(f"BG/{prefix}{cx:02X}{cz:02X}.IPD")
     if data[:4] != bytes((20, 0, cx, cz)):
         raise ValueError("unexpected school chunk coordinates")
@@ -448,6 +459,8 @@ def school_room(disc, room=39):
         if room == 6 and name == "SU2FC11":
             # The chain's tile uses index 0 while the door and window use 1.
             regions = ((3, 0, 1, (160, 207, 0, 143)),)
+        if room == 18 and name == "SU3FTH":
+            regions = ((1, 14, 15, (64, 127, 0, 63)), (2, 14, 15, (0, 63, 0, 47)))
         for row, key, target, rect in regions:
             if {j for j, value in enumerate(cluts[row]) if not value} != {key}:
                 raise ValueError("unexpected cutout palette")
@@ -482,6 +495,20 @@ def school_room(disc, room=39):
                     pixels[x] = indices[value & 15] | indices[value >> 4] << 4
             color = cluts[7]
             cluts[7] = (color[15], *color[1:13], color[15], color[14], 0)
+        if room == 36 and name == "SU3F11":
+            # This railing tile has four transparent palette entries.
+            keys = {10, 13, 14, 15}
+            palette = cluts[0]
+            if {j for j, color in enumerate(palette) if not color} != keys:
+                raise ValueError("unexpected roof railing cutout palette")
+            remapped_regions[i, 0] = (0, 63, 0, 79)
+            indices = tuple(15 if j in keys else j for j in range(16))
+            for y in range(80):
+                for j in range(y*128, y*128+32):
+                    value = pixels[j]
+                    pixels[j] = indices[value & 15] | indices[value >> 4] << 4
+            cluts[0] = tuple(palette[1] if j in keys and j != 15 else color
+                             for j, color in enumerate(palette))
         if room == 23 and name == "SC1FSEH":
             # The last CLUT is unreferenced in this IPD.
             cluts = cluts[:7]
@@ -765,6 +792,10 @@ def school_room(disc, room=39):
             page_info.append((len(pages), 64, len(palettes)//32, 1))
             pages.extend(pixels)
             palettes.extend(colors)
+        elif room == 36:
+            # MAP1_S03 places the valve separately from the roof geometry.
+            x, y, z = (int(v*4096)>>4 for v in (-10.49, -0.7, -12.92))
+            add_model(b"VALVE_HI", (4096,0,0,0,4096,0,0,0,4096), (x+10240,y,z+10240))
         elif room == 26:
             extra = lobby_pickups(disc) + b"".join(
                 prompt_data(disc, n, choices=False, map_bearings=True, otherworld=True) for n in (48, 49)
